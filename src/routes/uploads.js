@@ -5,6 +5,25 @@ const path = require('path');
 const fs = require('fs');
 const { getDatabase } = require('../config/database');
 
+// Helper function to log activity
+async function logActivity(db, action, entityType, entityId, details) {
+    return new Promise((resolve, reject) => {
+        db.run(
+            `INSERT INTO activity_log (action, entity_type, entity_id, details, created_at) 
+             VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+            [action, entityType, entityId, details],
+            (err) => {
+                if (err) {
+                    console.error('Error logging activity:', err);
+                    reject(err);
+                } else {
+                    resolve();
+                }
+            }
+        );
+    });
+}
+
 // Debug: Log all requests to this router
 router.use((req, res, next) => {
     console.log(`[UPLOADS] ${req.method} ${req.path} - Track ID: ${req.params.id || 'N/A'}`);
@@ -101,6 +120,10 @@ router.post('/track/:id/audio', upload.single('audio_file'), async (req, res) =>
                 else resolve();
             });
         });
+        
+        // Log activity
+        await logActivity(db, 'AUDIO_UPLOAD', 'track', trackId, 
+            `Audio subido: ${req.file.originalname} (${file_type || 'master'})`);
         
         res.json({ 
             success: true, 
@@ -218,6 +241,151 @@ router.get('/track/:id/audio', async (req, res) => {
     } catch (error) {
         console.error('Error serving audio:', error);
         res.status(500).json({ error: 'Error sirviendo archivo de audio' });
+    }
+});
+
+// DELETE audio file for a track
+router.delete('/track/:id/audio', async (req, res) => {
+    try {
+        const db = getDatabase();
+        const trackId = req.params.id;
+        
+        // Get current audio info
+        const track = await new Promise((resolve, reject) => {
+            db.get('SELECT * FROM tracks WHERE id = ?', [trackId], (err, row) => {
+                if (err) reject(err);
+                else resolve(row);
+            });
+        });
+        
+        if (!track || !track.audio_file_path) {
+            return res.status(404).json({ error: 'No hay archivo de audio para eliminar' });
+        }
+        
+        const oldFilePath = track.audio_file_path;
+        const fileName = oldFilePath.split('/').pop();
+        
+        // Delete physical file if it exists
+        const fullPath = path.join(__dirname, '../../public', oldFilePath);
+        if (fs.existsSync(fullPath)) {
+            fs.unlinkSync(fullPath);
+        }
+        
+        // Update database
+        await new Promise((resolve, reject) => {
+            db.run(`
+                UPDATE tracks 
+                SET audio_file_path = NULL, audio_file_type = NULL, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            `, [trackId], (err) => {
+                if (err) reject(err);
+                else resolve();
+            });
+        });
+        
+        // Log activity
+        await logActivity(db, 'AUDIO_DELETE', 'track', trackId, 
+            `Audio eliminado: ${fileName}`);
+        
+        res.json({ 
+            success: true, 
+            message: 'Audio eliminado exitosamente',
+            deletedFile: fileName
+        });
+    } catch (error) {
+        console.error('Error deleting audio:', error);
+        res.status(500).json({ error: 'Error eliminando archivo de audio' });
+    }
+});
+
+// POST replace audio file for a track
+router.post('/track/:id/audio/replace', upload.single('audio_file'), async (req, res) => {
+    try {
+        const db = getDatabase();
+        const trackId = req.params.id;
+        const { file_type } = req.body;
+        
+        if (!req.file) {
+            return res.status(400).json({ error: 'No se subió ningún archivo' });
+        }
+        
+        // Get old audio info
+        const track = await new Promise((resolve, reject) => {
+            db.get('SELECT * FROM tracks WHERE id = ?', [trackId], (err, row) => {
+                if (err) reject(err);
+                else resolve(row);
+            });
+        });
+        
+        const oldFilePath = track?.audio_file_path;
+        const oldFileName = oldFilePath ? oldFilePath.split('/').pop() : 'ninguno';
+        
+        const newFilePath = `/uploads/audio/${req.file.filename}`;
+        const newFileName = req.file.originalname;
+        
+        // Delete old file if it exists
+        if (oldFilePath) {
+            const fullOldPath = path.join(__dirname, '../../public', oldFilePath);
+            if (fs.existsSync(fullOldPath)) {
+                fs.unlinkSync(fullOldPath);
+            }
+        }
+        
+        // Update database with new file
+        await new Promise((resolve, reject) => {
+            db.run(`
+                UPDATE tracks 
+                SET audio_file_path = ?, audio_file_type = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            `, [newFilePath, file_type || 'master', trackId], (err) => {
+                if (err) reject(err);
+                else resolve();
+            });
+        });
+        
+        // Log activity
+        await logActivity(db, 'AUDIO_REPLACE', 'track', trackId, 
+            `Audio reemplazado: ${oldFileName} → ${newFileName} (${file_type || 'master'})`);
+        
+        res.json({ 
+            success: true, 
+            message: 'Audio reemplazado exitosamente',
+            newFilePath: newFilePath,
+            fileType: file_type || 'master',
+            oldFile: oldFileName,
+            newFile: newFileName
+        });
+    } catch (error) {
+        console.error('Error replacing audio:', error);
+        res.status(500).json({ error: 'Error reemplazando archivo de audio' });
+    }
+});
+
+// GET activity log for a track
+router.get('/track/:id/log', async (req, res) => {
+    try {
+        const db = getDatabase();
+        const trackId = req.params.id;
+        
+        const activities = await new Promise((resolve, reject) => {
+            db.all(`
+                SELECT * FROM activity_log 
+                WHERE entity_type = 'track' AND entity_id = ?
+                ORDER BY created_at DESC
+            `, [trackId], (err, rows) => {
+                if (err) reject(err);
+                else resolve(rows);
+            });
+        });
+        
+        res.json({
+            success: true,
+            trackId: trackId,
+            activities: activities
+        });
+    } catch (error) {
+        console.error('Error fetching activity log:', error);
+        res.status(500).json({ error: 'Error obteniendo historial' });
     }
 });
 

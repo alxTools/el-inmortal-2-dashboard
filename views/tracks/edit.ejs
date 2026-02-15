@@ -147,10 +147,40 @@
                     Tu navegador no soporta el reproductor de audio.
                 </audio>
                 
-                <div style="display: flex; gap: 10px; margin-top: 15px;">
+                <div style="display: flex; gap: 10px; margin-top: 15px; flex-wrap: wrap;">
                     <button onclick="playAudio()" class="btn" style="padding: 8px 15px; font-size: 0.85em;">▶️ Play</button>
                     <button onclick="pauseAudio()" class="btn btn-secondary" style="padding: 8px 15px; font-size: 0.85em;">⏸️ Pause</button>
                     <a href="<%= track.audio_file_path %>" download class="btn btn-secondary" style="padding: 8px 15px; font-size: 0.85em; text-decoration: none;">⬇️ Descargar</a>
+                    <button onclick="showReplaceAudio()" class="btn" style="padding: 8px 15px; font-size: 0.85em; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none;">🔄 Reemplazar</button>
+                    <button onclick="deleteAudio()" class="btn btn-danger" style="padding: 8px 15px; font-size: 0.85em; background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%); border: none;">🗑️ Eliminar</button>
+                </div>
+                
+                <!-- Replace Audio Section (Hidden by default) -->
+                <div id="replaceAudioSection" style="display: none; margin-top: 20px; padding: 15px; background: rgba(102, 126, 234, 0.1); border: 1px dashed rgba(102, 126, 234, 0.5); border-radius: 8px;">
+                    <h4 style="color: #667eea; margin-bottom: 10px; font-size: 0.95em;">🔄 Reemplazar Audio</h4>
+                    <form id="replaceAudioForm" enctype="multipart/form-data">
+                        <div class="form-group" style="margin-bottom: 10px;">
+                            <label style="font-size: 0.9em;">Nuevo Archivo de Audio</label>
+                            <input type="file" name="audio_file" id="replaceAudioFile" accept="audio/*" required 
+                                   style="padding: 8px; background: rgba(0,0,0,0.3); border: 1px dashed #667eea; border-radius: 5px; color: #fff; font-size: 0.9em;">
+                        </div>
+                        <div class="form-group" style="margin-bottom: 10px;">
+                            <label style="font-size: 0.9em;">Tipo de Archivo</label>
+                            <select name="file_type" id="replaceFileType" required style="font-size: 0.9em;">
+                                <option value="">Seleccionar...</option>
+                                <option value="master">🎚️ MASTER</option>
+                                <option value="acapella">🎤 ACAPELLA</option>
+                                <option value="beat">🥁 BEAT</option>
+                                <option value="show">🎭 SHOW</option>
+                                <option value="rough">🔧 ROUGH MIX</option>
+                                <option value="demo">💡 DEMO</option>
+                            </select>
+                        </div>
+                        <div style="display: flex; gap: 10px;">
+                            <button type="submit" class="btn" style="padding: 8px 15px; font-size: 0.85em;">✅ Confirmar Reemplazo</button>
+                            <button type="button" onclick="hideReplaceAudio()" class="btn btn-secondary" style="padding: 8px 15px; font-size: 0.85em;">❌ Cancelar</button>
+                        </div>
+                    </form>
                 </div>
             </div>
             <% } %>
@@ -223,6 +253,28 @@
                         📤 Subir Cover
                     </button>
                 </form>
+            </div>
+        </div>
+
+        <!-- Activity Log Section -->
+        <div class="section" style="margin-top: 40px; background: rgba(0, 0, 0, 0.2); border: 1px solid rgba(255, 215, 0, 0.2);">
+            <h2 style="color: #ffd700; margin-bottom: 20px; display: flex; align-items: center; gap: 10px;">
+                📋 Historial de Actividades
+                <span style="font-size: 0.6em; color: #888; font-weight: normal;">(Logs de cambios)</span>
+            </h2>
+            
+            <div id="activityLogContainer" style="max-height: 400px; overflow-y: auto; border-radius: 8px; background: rgba(0, 0, 0, 0.3);">
+                <div id="activityLogList">
+                    <p style="color: #888; text-align: center; padding: 30px;">
+                        ⏳ Cargando historial...
+                    </p>
+                </div>
+            </div>
+            
+            <div style="margin-top: 15px; padding: 15px; background: rgba(255, 215, 0, 0.05); border-radius: 8px; border-left: 3px solid #ffd700;">
+                <p style="color: #888; font-size: 0.85em; margin: 0;">
+                    💡 <strong>Registro automático:</strong> Todas las acciones (subir, eliminar, reemplazar audio) se guardan automáticamente con fecha y hora.
+                </p>
             </div>
         </div>
     </div>
@@ -456,6 +508,166 @@
                 btn.disabled = false;
             }
         }
+
+        // Show/Hide Replace Audio Section
+        function showReplaceAudio() {
+            document.getElementById('replaceAudioSection').style.display = 'block';
+        }
+        
+        function hideReplaceAudio() {
+            document.getElementById('replaceAudioSection').style.display = 'none';
+            document.getElementById('replaceAudioForm').reset();
+        }
+
+        // Handle Replace Audio
+        document.getElementById('replaceAudioForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            if (!confirm('⚠️ ¿Estás seguro de que deseas reemplazar el audio actual?\n\nEl archivo anterior será eliminado permanentemente.')) {
+                return;
+            }
+            
+            const formData = new FormData();
+            const fileInput = document.getElementById('replaceAudioFile');
+            const fileTypeInput = document.getElementById('replaceFileType');
+            
+            if (!fileInput.files[0]) {
+                alert('❌ Por favor selecciona un archivo de audio');
+                return;
+            }
+            
+            formData.append('audio_file', fileInput.files[0]);
+            formData.append('file_type', fileTypeInput.value);
+            formData.append('replace', 'true'); // Flag to indicate replacement
+            
+            try {
+                const response = await fetch('/uploads/track/<%= track.id %>/audio/replace', {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok && result.success) {
+                    alert('✅ ' + (result.message || 'Audio reemplazado exitosamente!'));
+                    location.reload();
+                } else {
+                    throw new Error(result.error || 'Error al reemplazar el audio');
+                }
+            } catch (error) {
+                alert('❌ Error: ' + error.message);
+                console.error('Replace error:', error);
+            }
+        });
+
+        // Delete Audio
+        async function deleteAudio() {
+            if (!confirm('⚠️ ¿Estás seguro de que deseas eliminar el audio?\n\nEsta acción no se puede deshacer.')) {
+                return;
+            }
+            
+            if (!confirm('🗑️ Confirmación final: ¿Eliminar permanentemente el archivo de audio?')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('/uploads/track/<%= track.id %>/audio', {
+                    method: 'DELETE',
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok && result.success) {
+                    alert('✅ ' + (result.message || 'Audio eliminado exitosamente!'));
+                    location.reload();
+                } else {
+                    throw new Error(result.error || 'Error al eliminar el audio');
+                }
+            } catch (error) {
+                alert('❌ Error: ' + error.message);
+                console.error('Delete error:', error);
+            }
+        }
+
+        // Load and display activity log
+        async function loadActivityLog() {
+            try {
+                const response = await fetch('/uploads/track/<%= track.id %>/log');
+                const result = await response.json();
+                
+                if (result.success && result.activities) {
+                    displayActivityLog(result.activities);
+                }
+            } catch (error) {
+                console.error('Error loading activity log:', error);
+            }
+        }
+
+        function displayActivityLog(activities) {
+            const container = document.getElementById('activityLogContainer');
+            const list = document.getElementById('activityLogList');
+            
+            if (!activities || activities.length === 0) {
+                list.innerHTML = '<p style="color: #888; text-align: center; padding: 20px;">No hay actividades registradas para este tema.</p>';
+                return;
+            }
+            
+            list.innerHTML = activities.map(activity => {
+                const date = new Date(activity.created_at);
+                const dateStr = date.toLocaleDateString('es-ES', { 
+                    day: '2-digit', month: '2-digit', year: 'numeric',
+                    hour: '2-digit', minute: '2-digit'
+                });
+                
+                let icon = '📝';
+                let color = '#888';
+                
+                switch(activity.action) {
+                    case 'AUDIO_UPLOAD':
+                        icon = '📤';
+                        color = '#28a745';
+                        break;
+                    case 'AUDIO_DELETE':
+                        icon = '🗑️';
+                        color = '#dc3545';
+                        break;
+                    case 'AUDIO_REPLACE':
+                        icon = '🔄';
+                        color = '#667eea';
+                        break;
+                    case 'LYRICS_TRANSCRIBE':
+                        icon = '🎤';
+                        color = '#ffd700';
+                        break;
+                }
+                
+                return `
+                    <div style="padding: 12px; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; align-items: flex-start; gap: 12px;">
+                        <span style="font-size: 1.2em;">${icon}</span>
+                        <div style="flex: 1;">
+                            <div style="color: ${color}; font-weight: 600; font-size: 0.9em; margin-bottom: 4px;">
+                                ${activity.action.replace(/_/g, ' ')}
+                            </div>
+                            <div style="color: #ccc; font-size: 0.85em; margin-bottom: 4px;">
+                                ${activity.details}
+                            </div>
+                            <div style="color: #666; font-size: 0.75em;">
+                                ${dateStr}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Load activity log on page load
+        document.addEventListener('DOMContentLoaded', loadActivityLog);
     </script>
 </body>
 </html>

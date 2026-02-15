@@ -10,6 +10,25 @@ const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY
 });
 
+// Helper function to log activity
+async function logActivity(db, action, entityType, entityId, details) {
+    return new Promise((resolve, reject) => {
+        db.run(
+            `INSERT INTO activity_log (action, entity_type, entity_id, details, created_at) 
+             VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+            [action, entityType, entityId, details],
+            (err) => {
+                if (err) {
+                    console.error('Error logging activity:', err);
+                    reject(err);
+                } else {
+                    resolve();
+                }
+            }
+        );
+    });
+}
+
 // GET dashboard stats
 router.get('/stats', async (req, res) => {
     try {
@@ -319,6 +338,10 @@ router.post('/tracks/:id/transcribe', async (req, res) => {
             });
 
             console.log(`[API] Lyrics saved to database for track ${trackId}`);
+
+            // Log activity
+            await logActivity(db, 'LYRICS_TRANSCRIBE', 'track', trackId, 
+                `Letra transcrita automáticamente usando Whisper API (${transcription.length} caracteres)`);
 
             res.json({ 
                 success: true, 

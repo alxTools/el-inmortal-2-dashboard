@@ -226,9 +226,6 @@ process.on('SIGINT', () => {
     process.exit(0);
 });
 
-const fs = require('fs');
-const path = require('path');
-
 // Dropbox paths for album content
 const DROPBOX_BASE = 'C:/Users/AlexSerrano/Dropbox/GALANTE_CONTENT/El Inmortal 2';
 const LETRAS_PATH = path.join(DROPBOX_BASE, 'letras');

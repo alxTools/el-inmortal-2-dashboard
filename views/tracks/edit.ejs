@@ -419,7 +419,7 @@
             
             btn.disabled = true;
             status.style.display = 'inline';
-            status.textContent = '⏳ Transcribiendo con IA... (puede tomar 1-2 minutos)';
+            status.textContent = '🎤 Enviando audio a Whisper API...';
             status.style.color = '#ffd700';
             
             try {
@@ -435,23 +435,23 @@
                 
                 if (response.ok && result.success) {
                     textarea.value = result.lyrics;
-                    status.textContent = '✅ Letra transcrita exitosamente!';
+                    status.textContent = '✅ Letra transcrita y guardada!';
                     status.style.color = '#28a745';
                     
-                    // Auto-save the lyrics
-                    setTimeout(() => {
-                        if (confirm('¿Deseas guardar la letra transcrita?')) {
-                            document.querySelector('form').submit();
-                        }
-                    }, 500);
+                    // Show success message
+                    alert('✅ Transcripción completada!\n\nLa letra ha sido transcrita usando OpenAI Whisper y guardada automáticamente en la base de datos.');
+                    
+                    // Show word count
+                    const wordCount = result.lyrics.split(/\s+/).filter(w => w.length > 0).length;
+                    console.log(`Transcribed ${wordCount} words for track "${result.trackTitle}"`);
                 } else {
-                    throw new Error(result.error || 'Error en la transcripción');
+                    throw new Error(result.error || result.details || 'Error en la transcripción');
                 }
             } catch (error) {
                 status.textContent = '❌ Error: ' + error.message;
                 status.style.color = '#dc3545';
                 console.error('Transcription error:', error);
-                alert('❌ Error al transcribir: ' + error.message);
+                alert('❌ Error al transcribir: ' + error.message + '\n\nAsegúrate de que el archivo de audio exista y sea accesible.');
             } finally {
                 btn.disabled = false;
             }

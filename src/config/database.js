@@ -1,5 +1,6 @@
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
+const fs = require('fs');
 
 const DB_PATH = path.join(__dirname, '../../database/el_inmortal_2.db');
 
@@ -225,30 +226,80 @@ process.on('SIGINT', () => {
     process.exit(0);
 });
 
-// Data for El Inmortal 2 album
+const fs = require('fs');
+const path = require('path');
+
+// Dropbox paths for album content
+const DROPBOX_BASE = 'C:/Users/AlexSerrano/Dropbox/GALANTE_CONTENT/El Inmortal 2';
+const LETRAS_PATH = path.join(DROPBOX_BASE, 'letras');
+const MASTERED_PATH = path.join(DROPBOX_BASE, 'ALBUM MASTERED');
+
+// Data for El Inmortal 2 album with Dropbox paths
 const albumData = {
     tracks: [
-        { track_number: 1, title: "Si El Mundo Se Acabara", producers: "Yow Fade & ALX", features: null },
-        { track_number: 2, title: "Toda Para Mi 2", producers: "Askenax, Anthony The Producer & ALX", features: null },
-        { track_number: 3, title: "Dime Ahora Remix", producers: "Askenax, Yow Fade & ALX", features: "Genio La Musa, Killatonez" },
-        { track_number: 4, title: "Pa Buscarte", producers: "Anthony The Producer & ALX", features: "Tiana Estebanez" },
-        { track_number: 5, title: "Come Calla", producers: "Yow Fade, Bryan LMDE & ALX", features: null },
-        { track_number: 6, title: "Ya Te Mudaste", producers: "Askenax & ALX", features: null },
-        { track_number: 7, title: "Si Te Vuelvo A Ver", producers: "Wutti, Melody & ALX", features: "Bayriton" },
-        { track_number: 8, title: "Mi Tentacion", producers: "Anthony The Producer & ALX", features: "Dilox" },
-        { track_number: 9, title: "Casi Algo", producers: "Anthony The Producer & ALX", features: null },
-        { track_number: 10, title: "Cuenta Fantasma", producers: "Music Zone & ALX", features: "Dixon Versatil" },
-        { track_number: 11, title: "Inaceptable", producers: "Anthony The Producer & ALX", features: "Manny Eztilo" },
-        { track_number: 12, title: "No Se Que Somos", producers: "Wutti & ALX", features: null },
-        { track_number: 13, title: "No Te Enamores", producers: "Askenax, Wutti & ALX", features: "LaDeLaJotaa" },
-        { track_number: 14, title: "Siguele", producers: "Anthony The Producer & ALX", features: null },
-        { track_number: 15, title: "No Me Quieres Entender", producers: "DMT Level & ALX", features: "Lenny Low" },
-        { track_number: 16, title: "Sigo En La Mia", producers: "Wutti & ALX", features: "Daizak" },
-        { track_number: 17, title: "En La Nave", producers: "Wutti & ALX", features: "Sota One" },
-        { track_number: 18, title: "Tu Pirata", producers: "UBeats & ALX", features: "Pablo Nick" },
-        { track_number: 19, title: "Al Que Se Meta Remix", producers: "Yeizel & ALX", features: "Joe Yncio" },
-        { track_number: 20, title: "Pa Chingal", producers: "Wutti & ALX", features: null },
-        { track_number: 21, title: "Las Eleven", producers: "Wutti & ALX", features: null }
+        { track_number: 1, title: "Si El Mundo Se Acabara", producers: "Yow Fade & ALX", features: null, 
+          lyrics_file: "01 Galante El Emperador - Si El Mundo Se Acabara [LETRA] - Prod By Yow Fade & ALX.md",
+          audio_file: "01 Galante El Emperador - Si El Mundo Se Acabara - Prod By Yow Fade & ALX.wav" },
+        { track_number: 2, title: "Toda Para Mi 2", producers: "Askenax, Anthony The Producer & ALX", features: null,
+          lyrics_file: "02 Galante El Emperador - Toda Para Mi 2 [LETRA] - Prod By Askenax, Anthony The Producer & ALX.md",
+          audio_file: "02 Galante El Emperador - Toda Para Mi 2 - Prod By Askenax, Anthony The Producer & ALX.wav" },
+        { track_number: 3, title: "Dime Ahora Remix", producers: "Askenax, Yow Fade & ALX", features: "Genio La Musa, Killatonez",
+          lyrics_file: "03 Galante El Emperador Ft. Genio La Musa, Killatonez - Dime Ahora Remix [LETRA] - Prod By Askenax, Yow Fade & ALX.md",
+          audio_file: "03 Galante El Emperador Ft. Genio La Musa, Killatonez - Dime Ahora Remix - Prod By Askenax, Yow Fade & ALX.wav" },
+        { track_number: 4, title: "Pa Buscarte", producers: "Anthony The Producer & ALX", features: "Tiana Estebanez",
+          lyrics_file: "04 Galante El Emperador  Ft Tiana Estebanez - Pa Buscarte [LETRA] - Prod By Anthony The Producer & ALX.md",
+          audio_file: "04 Galante El Emperador Ft. Tiana Estebanez - Pa Buscarte - Prod By Anthony The Producer & ALX.wav" },
+        { track_number: 5, title: "Come Calla", producers: "Yow Fade, Bryan LMDE & ALX", features: null,
+          lyrics_file: "05 Galante El Emperador - Come Calla [LETRA] - Prod By Yow Fade, Bryan LMDE & ALX copy.md",
+          audio_file: "05 Galante El Emperador - Come Calla - Prod By Yow Fade, Bryan LMDE & ALX copy.wav" },
+        { track_number: 6, title: "Ya Te Mudaste", producers: "Askenax & ALX", features: null,
+          lyrics_file: "06 Galante El Emperador -Ya Te Mudaste [LETRA]- Prod By Askenax & ALX.md",
+          audio_file: "06 Galante El Emperador - Ya Te Mudaste - Prod By Askenax & ALX.wav" },
+        { track_number: 7, title: "Si Te Vuelvo A Ver", producers: "Wutti, Melody & ALX", features: "Bayriton",
+          lyrics_file: "07 Galante El Emperador - Si Te Vuelvo A Ver Ft Bayriton [LETRA]- Prod By Wutti, Melody & ALX.md",
+          audio_file: "07 Galante El Emperador - Si Te Vuelvo A Ver Ft Bayriton - Prod By Wutti, Melody & ALX.wav" },
+        { track_number: 8, title: "Mi Tentacion", producers: "Anthony The Producer & ALX", features: "Dilox",
+          lyrics_file: "08 Galante El Emperador  Ft Dilox - Mi Tentacion [LETRA]- Prod By Anthony The Producer & ALX.md",
+          audio_file: "08 Galante El Emperador  Ft Dilox - Mi Tentacion - Prod By Anthony The Producer & ALX.wav" },
+        { track_number: 9, title: "Casi Algo", producers: "Anthony The Producer & ALX", features: null,
+          lyrics_file: "09 Galante El Emperador - Casi Algo [LETRA]- Prod By Anthony The Producer & ALX.md",
+          audio_file: "09 Galante El Emperador - Casi Algo - Prod By Anthony The Producer & ALX.wav" },
+        { track_number: 10, title: "Cuenta Fantasma", producers: "Music Zone & ALX", features: "Dixon Versatil",
+          lyrics_file: "10 Galante El Emperador Ft Dixon Versatil - Cuenta Fantasma [LETRA]- Prod By Music Zone & ALX.md",
+          audio_file: "10 Galante El Emperador Ft Dixon Versatil - Cuenta Fantasma - Prod By Music Zone & ALX.wav" },
+        { track_number: 11, title: "Inaceptable", producers: "Anthony The Producer & ALX", features: "Manny Eztilo",
+          lyrics_file: "11 Galante El Emperador - Inaceptable Ft Manny Eztilo  [LETRA]- Prod By Anthony The Producer & ALX.md",
+          audio_file: "11 Galante El Emperador - Inaceptable Ft Manny Eztilo - Prod By Anthony The Producer & ALX.wav" },
+        { track_number: 12, title: "No Se Que Somos", producers: "Wutti & ALX", features: null,
+          lyrics_file: "12  Galante El Emperador - No Se Que Somos LETRA]- Prod By Wutti & ALX.md",
+          audio_file: "12  Galante El Emperador - No Se Que Somos - Prod By Wutti & ALX.wav" },
+        { track_number: 13, title: "No Te Enamores", producers: "Askenax, Wutti & ALX", features: "LaDeLaJotaa",
+          lyrics_file: "13 Galante El Emperador Ft. LaDeLaJotaa- No Te Enamores [LETRA] - Prod By Askenax, Wutti & ALX.md",
+          audio_file: "13 Galante El Emperador Ft. LaDeLaJotaa- No Te Enamores - Prod By Askenax, Wutti & ALX.md.wav" },
+        { track_number: 14, title: "Siguele", producers: "Anthony The Producer & ALX", features: null,
+          lyrics_file: "14 Galante El Emperador - Siguele LETRA]- Prod By Anthony The Producer & ALX.md",
+          audio_file: "14 Galante El Emperador - Siguele - Prod By Anthony The Producer & ALX.wav" },
+        { track_number: 15, title: "No Me Quieres Entender", producers: "DMT Level & ALX", features: "Lenny Low",
+          lyrics_file: "15  Galante El Emperador Ft Lenny Low - No Me Quieres Entender  [LETRA]- Prod By DMT Level & ALX.md",
+          audio_file: "15  Galante El Emperador Ft Lenny Low - No Me Quieres Entender - Prod By DMT Level & ALX.wav" },
+        { track_number: 16, title: "Sigo En La Mia", producers: "Wutti & ALX", features: "Daizak",
+          lyrics_file: "16  Galante El Emperador Ft Daizak - Sigo En La Mia LETRA] - Prod By Wutti & ALX.md",
+          audio_file: "16  Galante El Emperador Ft Daizak - Sigo En La Mia - Prod By Wutti & ALX.wav" },
+        { track_number: 17, title: "En La Nave", producers: "Wutti & ALX", features: "Sota One",
+          lyrics_file: "17  Galante El Emperador Ft Sota One - En La Nave LETRA] - Prod By Wutti & ALX.md",
+          audio_file: "17  Galante El Emperador Ft Sota One - En La Nave - Prod By Wutti & ALX.wav" },
+        { track_number: 18, title: "Tu Pirata", producers: "UBeats & ALX", features: "Pablo Nick",
+          lyrics_file: "18  Galante El Emperador Ft Pablo Nick - Tu Pirata [LETRA] - Prod By UBeats & ALX.md",
+          audio_file: "18 Galante El Emperador Ft Pablonick - Tu Pirata - Prod By UBeats & ALX.wav" },
+        { track_number: 19, title: "Al Que Se Meta Remix", producers: "Yeizel & ALX", features: "Joe Yncio",
+          lyrics_file: "19 Galante El Emperador Ft. Joe Yncio - Al Que Se Meta Remix [LETRA] - Prod By Yeizel  & ALX.md",
+          audio_file: "19 Galante El Emperador Ft. Joe Yncio - Al Que Se Meta Remix - Prod By Yeizel  & ALX.wav" },
+        { track_number: 20, title: "Pa Chingal", producers: "Wutti & ALX", features: null,
+          lyrics_file: "20 Galante El Emperador  - Pa Chingal  [LETRA] - Prod By Wutti  & ALX.md",
+          audio_file: "20 Galante El Emperador  - Pa Chingal - Prod By Wutti  & ALX.wav" },
+        { track_number: 21, title: "Las Eleven", producers: "Wutti & ALX", features: null,
+          lyrics_file: "21 Galante El Emperador  - Las Eleven  [LETRA] - Prod By Wutti  & ALX.md",
+          audio_file: "21 Galante El Emperador  - Las Eleven - Prod By Wutti  & ALX.wav" }
     ],
     
     checklistItems: [
@@ -334,15 +385,32 @@ async function seedInitialData() {
             }
         }
         
-        // Seed tracks
+        // Seed tracks with lyrics and audio paths
         for (const track of albumData.tracks) {
             const primaryProducer = track.producers.split(/,\s*&\s*|\s*&\s*|,\s*/)[0].trim();
             const producerId = producerMap[primaryProducer] || null;
             
+            // Read lyrics from Dropbox file
+            let lyrics = '';
+            const lyricsFilePath = path.join(LETRAS_PATH, track.lyrics_file);
+            try {
+                if (fs.existsSync(lyricsFilePath)) {
+                    lyrics = fs.readFileSync(lyricsFilePath, 'utf8');
+                    console.log(`  📝 Lyrics loaded for track ${track.track_number}`);
+                } else {
+                    console.log(`  ⚠️  Lyrics file not found: ${track.lyrics_file}`);
+                }
+            } catch (err) {
+                console.log(`  ⚠️  Error reading lyrics for track ${track.track_number}: ${err.message}`);
+            }
+            
+            // Store Dropbox path for audio file
+            const audioFilePath = path.join(MASTERED_PATH, track.audio_file);
+            
             await runSQL(
-                `INSERT INTO tracks (track_number, title, producer_id, features, status) 
-                 VALUES (?, ?, ?, ?, ?)`,
-                [track.track_number, track.title, producerId, track.features, 'completed']
+                `INSERT INTO tracks (track_number, title, producer_id, features, lyrics, audio_file_path, audio_file_type, status) 
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+                [track.track_number, track.title, producerId, track.features, lyrics, audioFilePath, 'Master', 'completed']
             );
             console.log(`  ✅ Track ${track.track_number}: ${track.title}`);
         }

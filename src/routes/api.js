@@ -252,4 +252,67 @@ router.post('/checklist/:id/toggle', async (req, res) => {
     }
 });
 
+// POST transcribe lyrics from audio
+router.post('/tracks/:id/transcribe', async (req, res) => {
+    try {
+        const db = getDatabase();
+        const trackId = req.params.id;
+        
+        console.log(`[API] Transcribing lyrics for track ${trackId}`);
+
+        // Get track info
+        const track = await new Promise((resolve, reject) => {
+            db.get('SELECT * FROM tracks WHERE id = ?', [trackId], (err, row) => {
+                if (err) reject(err);
+                else resolve(row);
+            });
+        });
+        
+        if (!track) {
+            return res.status(404).json({ error: 'Track not found' });
+        }
+        
+        if (!track.audio_file_path) {
+            return res.status(400).json({ error: 'No audio file available for transcription' });
+        }
+
+        // TODO: Integrate with OpenAI Whisper API or similar service
+        // For now, return a placeholder message
+        const mockTranscription = `[Transcripción pendiente - Requiere integración con servicio de IA]
+
+Para transcribir automáticamente la letra desde el audio, necesitas:
+
+1. Integrar con OpenAI Whisper API
+2. O usar AWS Transcribe
+3. O Google Cloud Speech-to-Text
+
+Audio disponible en:
+${track.audio_file_path}
+
+Track: ${track.title}
+Productor: ${track.producer_id || 'No asignado'}
+
+[La transcripción automática de letras de canciones requiere procesamiento de audio avanzado]`;
+
+        // In production, you would:
+        // 1. Read the audio file from Dropbox or local path
+        // 2. Send to transcription service (Whisper API)
+        // 3. Get the lyrics text
+        // 4. Update the database
+        // 5. Return the transcribed lyrics
+
+        res.json({ 
+            success: true, 
+            message: 'Transcription service ready (requires AI integration)',
+            lyrics: mockTranscription,
+            audioPath: track.audio_file_path,
+            trackTitle: track.title,
+            note: 'Integrate with OpenAI Whisper API for automatic transcription'
+        });
+    } catch (error) {
+        console.error('API Transcribe Error:', error);
+        res.status(500).json({ error: 'Error transcribing track' });
+    }
+});
+
 module.exports = router;

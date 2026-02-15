@@ -99,7 +99,21 @@
 
                 <div class="form-group">
                     <label>Letras/Notas</label>
-                    <textarea name="lyrics" rows="6" style="font-family: monospace; font-size: 0.9em;"><%= track.lyrics %></textarea>
+                    <textarea name="lyrics" id="lyricsTextarea" rows="6" style="font-family: monospace; font-size: 0.9em;"><%= track.lyrics %></textarea>
+                    
+                    <% if (track.audio_file_path) { %>
+                    <div style="margin-top: 15px; display: flex; gap: 10px; align-items: center;">
+                        <button type="button" id="transcribeBtn" class="btn" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none;" onclick="transcribeLyrics()">
+                            🎤 Transcribir Letra con IA
+                        </button>
+                        <span id="transcribeStatus" style="color: #888; font-size: 0.9em; display: none;">
+                            ⏳ Transcribiendo...
+                        </span>
+                    </div>
+                    <p style="font-size: 0.8em; color: #666; margin-top: 8px; margin-left: 5px;">
+                        💡 Usa IA para transcribir automáticamente la letra desde el audio subido
+                    </p>
+                    <% } %>
                 </div>
 
                 <div style="display: flex; gap: 15px; margin-top: 30px;">
@@ -396,6 +410,52 @@
                 console.error('Error:', error);
             }
         });
+
+        // Transcribe lyrics from audio
+        async function transcribeLyrics() {
+            const btn = document.getElementById('transcribeBtn');
+            const status = document.getElementById('transcribeStatus');
+            const textarea = document.getElementById('lyricsTextarea');
+            
+            btn.disabled = true;
+            status.style.display = 'inline';
+            status.textContent = '⏳ Transcribiendo con IA... (puede tomar 1-2 minutos)';
+            status.style.color = '#ffd700';
+            
+            try {
+                const response = await fetch('/api/tracks/<%= track.id %>/transcribe', {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok && result.success) {
+                    textarea.value = result.lyrics;
+                    status.textContent = '✅ Letra transcrita exitosamente!';
+                    status.style.color = '#28a745';
+                    
+                    // Auto-save the lyrics
+                    setTimeout(() => {
+                        if (confirm('¿Deseas guardar la letra transcrita?')) {
+                            document.querySelector('form').submit();
+                        }
+                    }, 500);
+                } else {
+                    throw new Error(result.error || 'Error en la transcripción');
+                }
+            } catch (error) {
+                status.textContent = '❌ Error: ' + error.message;
+                status.style.color = '#dc3545';
+                console.error('Transcription error:', error);
+                alert('❌ Error al transcribir: ' + error.message);
+            } finally {
+                btn.disabled = false;
+            }
+        }
     </script>
 </body>
 </html>

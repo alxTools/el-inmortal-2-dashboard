@@ -1,24 +1,15 @@
 {
-  "name": "el-inmortal-2-launch-dashboard",
+  "name": "el-inmortal-2-dashboard",
   "version": "1.0.0",
-  "description": "Dashboard profesional para el lanzamiento de El Inmortal 2 - Galante el Emperador",
+  "description": "Dashboard para el lanzamiento de El Inmortal 2 - Galante el Emperador",
   "main": "src/app.js",
   "scripts": {
     "start": "node src/app.js",
-    "dev": "nodemon src/app.js",
-    "test": "jest",
-    "db:init": "node src/utils/initDatabase.js",
-    "db:seed": "node src/utils/seedDatabase.js"
+    "dev": "nodemon src/app.js"
   },
-  "keywords": [
-    "music",
-    "launch",
-    "dashboard",
-    "album",
-    "galante-el-emperador"
-  ],
-  "author": "Galante el Emperador",
-  "license": "MIT",
+  "engines": {
+    "node": ">=16.0.0"
+  },
   "dependencies": {
     "bcryptjs": "^2.4.3",
     "connect-sqlite3": "^0.9.13",
@@ -35,13 +26,5 @@
     "node-cron": "^3.0.3",
     "sqlite3": "^5.1.6",
     "winston": "^3.11.0"
-  },
-  "devDependencies": {
-    "jest": "^29.7.0",
-    "nodemon": "^3.0.2",
-    "supertest": "^6.3.3"
-  },
-  "engines": {
-    "node": ">=16.0.0"
   }
 }

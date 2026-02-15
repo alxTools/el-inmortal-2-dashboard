@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %></title>
+    <link rel="stylesheet" href="/css/dashboard.css">
+</head>
+<body>
+    <%- include('../partials/navbar') %>
+
+    <div class="container" style="padding-top: 40px;">
+        <div class="section-header" style="margin-bottom: 30px;">
+            <h1>👥 Artistas & Features</h1>
+            <a href="/artists/new" class="btn">+ Nuevo Artista</a>
+        </div>
+
+        <div class="timers-grid">
+            <% artists.forEach(artist => { %>
+            <div class="timer-card artist-card" data-id="<%= artist.id %>" style="text-align: left;">
+                <h3 style="color: #ffd700; margin-bottom: 15px;">
+                    <%= artist.name %>
+                    <span class="status-badge <%= artist.artist_type === 'primary' ? 'status-done' : 'status-pending' %>" style="font-size: 0.6em; margin-left: 10px;">
+                        <%= artist.artist_type === 'primary' ? 'PRINCIPAL' : 'FEATURED' %>
+                    </span>
+                </h3>
+                <% if (artist.legal_name) { %>
+                <p style="color: #888; margin-bottom: 10px;">
+                    <strong>Nombre Legal:</strong> <%= artist.legal_name %>
+                </p>
+                <% } %>
+                <% if (artist.email) { %>
+                <p style="color: #888; margin-bottom: 10px;">
+                    <strong>Email:</strong> <%= artist.email %>
+                </p>
+                <% } %>
+                <% if (artist.record_label) { %>
+                <p style="color: #888; margin-bottom: 10px;">
+                    <strong>Disquera:</strong> <%= artist.record_label %>
+                </p>
+                <% } %>
+                <% if (artist.management) { %>
+                <p style="color: #888; margin-bottom: 10px;">
+                    <strong>Management:</strong> <%= artist.management %>
+                </p>
+                <% } %>
+                <% if (artist.social_media) { %>
+                <p style="color: #888; margin-bottom: 10px;">
+                    <strong>Redes:</strong> <%= artist.social_media %>
+                </p>
+                <% } %>
+                <p style="color: #888; margin-bottom: 15px;">
+                    <strong>Temas:</strong> <%= artist.track_count %>
+                </p>
+                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <a href="/artists/<%= artist.id %>/edit" class="btn-small">Editar</a>
+                    <button class="btn-small delete-artist-btn" 
+                            data-id="<%= artist.id %>"
+                            data-name="<%= artist.name %>"
+                            style="background: rgba(220, 53, 69, 0.2); border-color: #dc3545; color: #ff6b6b;">
+                        🗑️ Eliminar
+                    </button>
+                </div>
+            </div>
+            <% }) %>
+        </div>
+        
+        <% if (artists.length === 0) { %>
+        <div style="text-align: center; padding: 50px; color: #888;">
+            <p style="font-size: 1.2em; margin-bottom: 20px;">No hay artistas registrados aún.</p>
+            <a href="/artists/new" class="btn">+ Agregar Primer Artista</a>
+        </div>
+        <% } %>
+    </div>
+
+    <%- include('../partials/footer') %>
+
+    <script>
+        console.log('✅ JavaScript loaded for artists page');
+        
+        document.querySelectorAll('.delete-artist-btn').forEach(button => {
+            button.addEventListener('click', async function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                const id = this.getAttribute('data-id');
+                const name = this.getAttribute('data-name');
+                
+                const confirmMessage = `¿Estás seguro de que quieres eliminar al artista "${name}"?\n\n` +
+                                     `⚠️ Advertencia: Si este artista tiene temas asignados, ` +
+                                     `se eliminará esa relación.\n\n` +
+                                     `Esta acción no se puede deshacer.`;
+                
+                if (!confirm(confirmMessage)) {
+                    return;
+                }
+
+                try {
+                    const response = await fetch('/artists/' + id, {
+                        method: 'DELETE',
+                        headers: {
+                            'Accept': 'application/json'
+                        }
+                    });
+
+                    const contentType = response.headers.get('content-type');
+                    let result;
+
+                    if (contentType && contentType.includes('application/json')) {
+                        result = await response.json();
+                    } else {
+                        result = { success: response.ok };
+                    }
+
+                    if (response.ok && result.success) {
+                        alert(`✅ Artista "${name}" eliminado exitosamente`);
+                        location.reload();
+                    } else {
+                        throw new Error(result.error || result.message || 'Error al eliminar el artista');
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    alert('❌ Error: ' + error.message);
+                }
+            });
+        });
+    </script>
+</body>
+</html>

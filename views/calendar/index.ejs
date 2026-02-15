@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %></title>
+    <link rel="stylesheet" href="/css/dashboard.css">
+</head>
+<body>
+    <%- include('../partials/navbar') %>
+
+    <div class="container" style="padding-top: 40px;">
+        <h1 style="color: #ffd700; margin-bottom: 30px;">📅 Calendario de Contenido</h1>
+
+        <div class="section">
+            <div style="background: rgba(255, 215, 0, 0.1); border: 2px solid #ffd700; border-radius: 15px; padding: 25px; margin-bottom: 30px;">
+                <h3 style="color: #ffd700; margin-bottom: 15px;">📊 Resumen</h3>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 20px;">
+                    <div style="text-align: center;">
+                        <div style="font-size: 2em; font-weight: bold; color: #ffd700;"><%= events.filter(e => e.completed).length %></div>
+                        <div style="color: #888;">Completados</div>
+                    </div>
+                    <div style="text-align: center;">
+                        <div style="font-size: 2em; font-weight: bold; color: #ffd700;"><%= events.filter(e => !e.completed).length %></div>
+                        <div style="color: #888;">Pendientes</div>
+                    </div>
+                    <div style="text-align: center;">
+                        <div style="font-size: 2em; font-weight: bold; color: #ffd700;"><%= events.length %></div>
+                        <div style="color: #888;">Total Eventos</div>
+                    </div>
+                </div>
+            </div>
+
+            <% if (events.length === 0) { %>
+                <div style="text-align: center; padding: 50px; color: #888;">
+                    <p style="font-size: 1.2em;">No hay eventos en el calendario aún.</p>
+                    <p>Los eventos se agregan automáticamente desde el sistema.</p>
+                </div>
+            <% } else { %>
+                <div class="timers-grid">
+                    <% events.forEach(event => { %>
+                    <div class="timer-card" style="text-align: left;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                            <h3 style="color: #ffd700;"><%= event.title %></h3>
+                            <% if (event.completed) { %>
+                                <span class="status-badge status-done">✓</span>
+                            <% } %>
+                        </div>
+                        <p style="color: #888; margin-bottom: 10px;">
+                            <strong>Fecha:</strong> <%= new Date(event.date).toLocaleDateString() %>
+                        </p>
+                        <p style="color: #888; margin-bottom: 10px;">
+                            <strong>Tipo:</strong> <%= event.content_type %>
+                        </p>
+                        <p style="color: #888; margin-bottom: 10px;">
+                            <strong>Plataforma:</strong> <%= event.platform %>
+                        </p>
+                        <% if (event.track_title) { %>
+                            <p style="color: #888; margin-bottom: 15px;">
+                                <strong>Tema:</strong> <%= event.track_title %>
+                            </p>
+                        <% } %>
+                        <% if (event.description) { %>
+                            <p style="color: #aaa; font-size: 0.9em; margin-top: 10px;">
+                                <%= event.description %>
+                            </p>
+                        <% } %>
+                    </div>
+                    <% }) %>
+                </div>
+            <% } %>
+        </div>
+    </div>
+
+    <%- include('../partials/footer') %>
+</body>
+</html>

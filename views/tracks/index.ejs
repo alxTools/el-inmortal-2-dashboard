@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %></title>
+    <link rel="stylesheet" href="/css/dashboard.css">
+    <style>
+        .track-type-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.75em;
+            font-weight: bold;
+            margin-left: 8px;
+        }
+        .type-single {
+            background: linear-gradient(45deg, #ff6b6b, #ee5a24);
+            color: white;
+        }
+        .type-primary {
+            background: linear-gradient(45deg, #ffd700, #ffed4e);
+            color: #1a1a2e;
+        }
+        .type-album {
+            background: rgba(255, 255, 255, 0.2);
+            color: #888;
+        }
+        .filter-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 25px;
+            flex-wrap: wrap;
+        }
+        .filter-tab {
+            padding: 10px 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 25px;
+            color: #888;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-decoration: none;
+        }
+        .filter-tab:hover, .filter-tab.active {
+            background: rgba(255, 215, 0, 0.2);
+            border-color: #ffd700;
+            color: #ffd700;
+        }
+        .track-row {
+            transition: all 0.3s;
+        }
+        .track-row:hover {
+            background: rgba(255, 215, 0, 0.05);
+        }
+        .track-row.single {
+            border-left: 3px solid #ff6b6b;
+        }
+        .track-row.primary {
+            border-left: 3px solid #ffd700;
+        }
+        .track-features {
+            font-size: 0.85em;
+            color: #666;
+            margin-top: 4px;
+        }
+        .stats-overview {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+        .stat-mini {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        .stat-mini .number {
+            font-size: 2em;
+            font-weight: bold;
+            color: #ffd700;
+        }
+        .stat-mini .label {
+            font-size: 0.85em;
+            color: #888;
+        }
+    </style>
+</head>
+<body>
+    <%- include('../partials/navbar') %>
+
+    <div class="container" style="padding-top: 40px;">
+        <!-- Server Port Notice -->
+        <div id="portNotice" style="background: rgba(255, 215, 0, 0.1); border: 2px solid #ffd700; border-radius: 10px; padding: 15px; margin-bottom: 20px; text-align: center;">
+            <p style="color: #ffd700; margin: 0; font-weight: bold;">
+                🌐 Servidor activo en: <span id="currentPort">localhost:3003</span>
+            </p>
+            <p style="color: #888; font-size: 0.85em; margin: 5px 0 0 0;">
+                Si ves errores, verifica que estés usando esta URL
+            </p>
+        </div>
+
+        <div class="section-header" style="margin-bottom: 30px;">
+            <h1>🎵 El Inmortal 2 - Lista de Temas</h1>
+            <a href="/tracks/new" class="btn">+ Nuevo Tema</a>
+        </div>
+
+        <!-- Stats Overview -->
+        <div class="stats-overview">
+            <div class="stat-mini">
+                <div class="number"><%= tracks.length %></div>
+                <div class="label">Total Temas</div>
+            </div>
+            <div class="stat-mini">
+                <div class="number" style="color: #ff6b6b;"><%= tracks.filter(t => t.is_single).length %></div>
+                <div class="label">Sencillos</div>
+            </div>
+            <div class="stat-mini">
+                <div class="number" style="color: #ffd700;"><%= tracks.filter(t => t.is_primary).length %></div>
+                <div class="label">Principales</div>
+            </div>
+            <div class="stat-mini">
+                <div class="number" style="color: #28a745;"><%= tracks.filter(t => t.splitsheet_confirmed).length %></div>
+                <div class="label">Splits OK</div>
+            </div>
+        </div>
+
+        <!-- Filter Tabs -->
+        <div class="filter-tabs">
+            <a href="/tracks" class="filter-tab <%= !currentFilter ? 'active' : '' %>">Todos</a>
+            <a href="/tracks?filter=singles" class="filter-tab <%= currentFilter === 'singles' ? 'active' : '' %>">🎯 Sencillos</a>
+            <a href="/tracks?filter=primary" class="filter-tab <%= currentFilter === 'primary' ? 'active' : '' %>">⭐ Principales</a>
+            <a href="/tracks?filter=album" class="filter-tab <%= currentFilter === 'album' ? 'active' : '' %>">💿 Solo Álbum</a>
+            <a href="/tracks?filter=pending" class="filter-tab <%= currentFilter === 'pending' ? 'active' : '' %>">⚠️ Sin Splitsheet</a>
+        </div>
+
+        <div class="section">
+            <table class="tracks-table">
+                <thead>
+                    <tr>
+                        <th style="width: 50px;">#</th>
+                        <th>Título</th>
+                        <th>Productor</th>
+                        <th style="width: 120px;">Tipo</th>
+                        <th>Splitsheet</th>
+                        <th style="width: 100px;">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <% tracks.forEach(track => { %>
+                    <tr class="track-row <%= track.is_single ? 'single' : '' %> <%= track.is_primary ? 'primary' : '' %>">
+                        <td style="font-weight: bold; color: #ffd700;"><%= track.track_number %></td>
+                        <td>
+                            <strong><%= track.title || 'Sin título' %></strong>
+                            <% if (track.features) { %>
+                                <div class="track-features">Ft. <%= track.features %></div>
+                            <% } %>
+                            <div style="margin-top: 5px; font-size: 0.8em;">
+                                <% if (track.audio_file_path) { %>
+                                    <span style="color: #28a745;">🎵 <%= track.audio_file_type ? track.audio_file_type.toUpperCase() : 'AUDIO' %></span>
+                                <% } %>
+                                <% if (track.cover_image_path) { %>
+                                    <span style="color: #ffd700; margin-left: 8px;">🖼️ IMG</span>
+                                <% } %>
+                                <% if (track.lyrics) { %>
+                                    <span style="color: #888; margin-left: 8px;">📝 LETRA</span>
+                                <% } %>
+                            </div>
+                        </td>
+                        <td><%= track.producer_name || 'Sin asignar' %></td>
+                        <td>
+                            <% if (track.is_single) { %>
+                                <span class="track-type-badge type-single">🎯 SENCILLO</span>
+                            <% } else if (track.is_primary) { %>
+                                <span class="track-type-badge type-primary">⭐ PRINCIPAL</span>
+                            <% } else { %>
+                                <span class="track-type-badge type-album">💿 Álbum</span>
+                            <% } %>
+                        </td>
+                        <td>
+                            <% if (track.splitsheet_confirmed) { %>
+                                <span class="status-badge status-done">✓ Confirmado</span>
+                            <% } else if (track.splitsheet_sent) { %>
+                                <span class="status-badge status-pending">⏳ Enviado</span>
+                            <% } else { %>
+                                <span class="status-badge status-urgent">⚠️ Pendiente</span>
+                            <% } %>
+                        </td>
+                        <td>
+                            <% if (track.audio_file_path) { %>
+                                <button onclick="playTrack('<%= track.id %>', '<%= track.title %>', '<%= track.audio_file_path %>')" class="btn-small" style="margin-right: 5px; background: linear-gradient(45deg, #28a745, #20c997); border: none;">▶️ Play</button>
+                            <% } %>
+                            <a href="/tracks/<%= track.id %>/edit" class="btn-small">Editar</a>
+                        </td>
+                    </tr>
+                    <% }) %>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Quick Legend -->
+        <div style="margin-top: 30px; padding: 20px; background: rgba(255, 255, 255, 0.03); border-radius: 10px;">
+            <h3 style="color: #ffd700; margin-bottom: 15px; font-size: 1.1em;">📋 Leyenda:</h3>
+            <div style="display: flex; gap: 20px; flex-wrap: wrap; font-size: 0.9em;">
+                <span><span style="color: #ff6b6b;">█</span> Sencillo (Lanzamiento principal)</span>
+                <span><span style="color: #ffd700;">█</span> Principal (Track destacado)</span>
+                <span><span style="color: #666;">█</span> Track de álbum regular</span>
+            </div>
+            <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid rgba(255, 255, 255, 0.1); font-size: 0.85em; color: #888;">
+                <strong>Indicadores de archivos:</strong> 🎵 Audio | 🖼️ Imagen | 📝 Letra
+            </div>
+        </div>
+    </div>
+
+    <!-- Global Audio Player -->
+    <div id="globalPlayer" style="display: none; position: fixed; bottom: 0; left: 0; right: 0; background: linear-gradient(90deg, #1a1a2e, #0f0f1e); border-top: 3px solid #ffd700; padding: 15px 30px; z-index: 1000; box-shadow: 0 -5px 20px rgba(0,0,0,0.5);">
+        <div style="max-width: 1400px; margin: 0 auto; display: flex; align-items: center; gap: 20px;">
+            <div style="flex: 0 0 50px;">
+                <button onclick="togglePlay()" id="playPauseBtn" style="width: 50px; height: 50px; border-radius: 50%; background: linear-gradient(45deg, #ffd700, #ffed4e); border: none; color: #1a1a2e; font-size: 1.2em; cursor: pointer; display: flex; align-items: center; justify-content: center;">▶️</button>
+            </div>
+            <div style="flex: 1;">
+                <div id="nowPlaying" style="color: #ffd700; font-weight: bold; margin-bottom: 5px;">Selecciona un tema</div>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span id="currentTime" style="color: #888; font-size: 0.85em; font-variant-numeric: tabular-nums;">0:00</span>
+                    <div style="flex: 1; height: 6px; background: rgba(255, 255, 255, 0.1); border-radius: 3px; cursor: pointer;" onclick="seekAudio(event)">
+                        <div id="progressBar" style="height: 100%; width: 0%; background: linear-gradient(90deg, #ffd700, #ffed4e); border-radius: 3px; transition: width 0.1s;"></div>
+                    </div>
+                    <span id="totalTime" style="color: #888; font-size: 0.85em; font-variant-numeric: tabular-nums;">0:00</span>
+                </div>
+            </div>
+            <div style="flex: 0 0 150px;">
+                <input type="range" id="volumeSlider" min="0" max="100" value="100" onchange="setVolume(this.value)" style="width: 100%; accent-color: #ffd700;">
+            </div>
+            <div style="flex: 0 0 30px;">
+                <button onclick="closePlayer()" style="background: none; border: none; color: #888; font-size: 1.5em; cursor: pointer;">✕</button>
+            </div>
+        </div>
+        <audio id="audioElement" preload="metadata"></audio>
+    </div>
+
+    <%- include('../partials/footer') %>
+
+    <script>
+        let currentTrackId = null;
+        const audio = document.getElementById('audioElement');
+        const playPauseBtn = document.getElementById('playPauseBtn');
+        const nowPlaying = document.getElementById('nowPlaying');
+        const progressBar = document.getElementById('progressBar');
+        const currentTimeEl = document.getElementById('currentTime');
+        const totalTimeEl = document.getElementById('totalTime');
+        const globalPlayer = document.getElementById('globalPlayer');
+
+        function formatTime(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${mins}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        function playTrack(id, title, filePath) {
+            currentTrackId = id;
+            audio.src = filePath;
+            nowPlaying.textContent = `🎵 ${title}`;
+            globalPlayer.style.display = 'block';
+            audio.play();
+            updatePlayButton();
+        }
+
+        function togglePlay() {
+            if (audio.paused) {
+                audio.play();
+            } else {
+                audio.pause();
+            }
+            updatePlayButton();
+        }
+
+        function updatePlayButton() {
+            playPauseBtn.textContent = audio.paused ? '▶️' : '⏸️';
+        }
+
+        function setVolume(value) {
+            audio.volume = value / 100;
+        }
+
+        function seekAudio(event) {
+            const rect = event.currentTarget.getBoundingClientRect();
+            const percent = (event.clientX - rect.left) / rect.width;
+            audio.currentTime = percent * audio.duration;
+        }
+
+        function closePlayer() {
+            audio.pause();
+            globalPlayer.style.display = 'none';
+            currentTrackId = null;
+        }
+
+        // Update progress bar
+        audio.addEventListener('timeupdate', () => {
+            if (audio.duration) {
+                const percent = (audio.currentTime / audio.duration) * 100;
+                progressBar.style.width = percent + '%';
+                currentTimeEl.textContent = formatTime(audio.currentTime);
+                totalTimeEl.textContent = formatTime(audio.duration);
+            }
+        });
+
+        audio.addEventListener('loadedmetadata', () => {
+            totalTimeEl.textContent = formatTime(audio.duration);
+        });
+
+        audio.addEventListener('ended', () => {
+            updatePlayButton();
+            progressBar.style.width = '0%';
+        });
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            if (e.code === 'Space' && currentTrackId) {
+                e.preventDefault();
+                togglePlay();
+            }
+        });
+
+        // Detect current port and update notice
+        const currentPort = window.location.port || '80';
+        const currentHost = window.location.hostname;
+        const fullUrl = `${currentHost}:${currentPort}`;
+        document.getElementById('currentPort').textContent = fullUrl;
+        
+        // Test uploads endpoint
+        fetch('/uploads/test')
+            .then(r => r.json())
+            .then(data => console.log('✅ Uploads endpoint test:', data))
+            .catch(err => console.error('❌ Uploads endpoint test failed:', err));
+    </script>
+</body>
+</html>

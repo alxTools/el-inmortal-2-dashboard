@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %></title>
+    <link rel="stylesheet" href="/css/dashboard.css">
+</head>
+<body>
+    <%- include('../partials/navbar') %>
+
+    <div class="container" style="padding-top: 40px;">
+        <h1 style="color: #ffd700; margin-bottom: 30px;">✅ Checklist de Lanzamiento</h1>
+
+        <div class="section">
+            <% let totalItems = 0; let completedItems = 0; %>
+            <% Object.values(checklist).forEach(items => { %>
+                <% totalItems += items.length; %>
+                <% completedItems += items.filter(i => i.completed).length; %>
+            <% }) %>
+
+            <div class="progress-bar" style="margin-bottom: 30px; height: 30px;">
+                <div id="progressFill" class="progress-fill" style="width: <%= totalItems > 0 ? (completedItems / totalItems * 100) : 0 %>%; display: flex; align-items: center; justify-content: center; color: #000; font-weight: bold;">
+                    <span id="progressPercent"><%= totalItems > 0 ? Math.round(completedItems / totalItems * 100) : 0 %></span>%
+                </div>
+            </div>
+
+            <p style="text-align: center; color: #888; margin-bottom: 30px;">
+                <span id="completedCount"><%= completedItems %></span> de <span id="totalCount"><%= totalItems %></span> tareas completadas
+            </p>
+
+            <% Object.entries(checklist).forEach(([category, items]) => { %>
+                <div style="margin-bottom: 40px;">
+                    <h2 style="color: #ffd700; margin-bottom: 20px; border-bottom: 2px solid rgba(255, 215, 0, 0.3); padding-bottom: 10px;">
+                        <%= category %>
+                    </h2>
+                    <ul style="list-style: none;">
+                        <% items.forEach(item => { %>
+                        <li id="item-<%= item.id %>" class="checklist-item <%= item.completed ? 'completed' : '' %>" style="padding: 15px; background: rgba(255, 255, 255, 0.05); margin-bottom: 10px; border-radius: 10px; display: flex; align-items: center; gap: 15px; transition: all 0.3s;">
+                            <input type="checkbox" id="checkbox-<%= item.id %>" <%= item.completed ? 'checked' : '' %> 
+                                   onchange="toggleItem(<%= item.id %>)"
+                                   style="width: 22px; height: 22px; accent-color: #ffd700; cursor: pointer;">
+                            <span id="text-<%= item.id %>" style="flex: 1; <%= item.completed ? 'text-decoration: line-through; opacity: 0.6;' : '' %>">
+                                <%= item.item_text %>
+                            </span>
+                            <% if (item.priority === 'urgent') { %>
+                                <span class="status-badge status-urgent">Urgente</span>
+                            <% } else if (item.priority === 'high') { %>
+                                <span class="status-badge status-pending">Alta</span>
+                            <% } %>
+                        </li>
+                        <% }) %>
+                    </ul>
+                </div>
+            <% }) %>
+        </div>
+    </div>
+
+    <%- include('../partials/footer') %>
+
+    <script>
+        // Initial counts from server
+        let totalItems = <%= totalItems %>;
+        let completedItems = <%= completedItems %>;
+        
+        console.log('✅ Checklist loaded:', totalItems, 'tareas,', completedItems, 'completadas');
+        
+        async function toggleItem(id) {
+            console.log('Toggle clicked for item ID:', id);
+            
+            const checkbox = document.getElementById(`checkbox-${id}`);
+            const itemLi = document.getElementById(`item-${id}`);
+            const textSpan = document.getElementById(`text-${id}`);
+            
+            if (!checkbox || !itemLi || !textSpan) {
+                console.error('ERROR: Elements not found for ID', id);
+                alert('Error: No se encontraron elementos del DOM');
+                return;
+            }
+            
+            // Get current state
+            const isChecked = checkbox.checked;
+            console.log('Current checkbox state:', isChecked);
+            
+            try {
+                const url = `/api/checklist/${id}/toggle`;
+                console.log('Fetching:', url);
+                
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                console.log('Response status:', response.status);
+                
+                const contentType = response.headers.get('content-type');
+                let data;
+                
+                if (contentType && contentType.includes('application/json')) {
+                    data = await response.json();
+                    console.log('Response data:', data);
+                } else {
+                    const text = await response.text();
+                    console.error('Non-JSON response:', text);
+                    data = { success: response.ok };
+                }
+                
+                if (response.ok && data.success) {
+                    // Use server-confirmed state
+                    const serverCompleted = data.completed;
+                    console.log('Server confirmed state:', serverCompleted);
+                    
+                    // Update checkbox to match server
+                    checkbox.checked = serverCompleted;
+                    
+                    // Update counts based on actual change
+                    if (serverCompleted && !isChecked) {
+                        completedItems++;
+                    } else if (!serverCompleted && isChecked) {
+                        completedItems--;
+                    }
+                    
+                    // Update UI
+                    updateProgressBar();
+                    
+                    // Update item styling
+                    if (serverCompleted) {
+                        itemLi.classList.add('completed');
+                        itemLi.style.opacity = '0.5';
+                        textSpan.style.textDecoration = 'line-through';
+                        textSpan.style.opacity = '0.6';
+                    } else {
+                        itemLi.classList.remove('completed');
+                        itemLi.style.opacity = '1';
+                        textSpan.style.textDecoration = 'none';
+                        textSpan.style.opacity = '1';
+                    }
+                    
+                    console.log(`✅ Item ${id} ${serverCompleted ? 'completado' : 'desmarcado'}`);
+                } else {
+                    // Revert checkbox if failed
+                    checkbox.checked = !isChecked;
+                    throw new Error(data.error || 'Error al guardar');
+                }
+            } catch (error) {
+                console.error('Toggle error:', error);
+                checkbox.checked = !isChecked;
+                alert('❌ Error: ' + error.message);
+            }
+        }
+        
+        function updateProgressBar() {
+            const percent = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
+            
+            // Update progress bar width and text
+            const progressFill = document.getElementById('progressFill');
+            const progressPercent = document.getElementById('progressPercent');
+            const completedCount = document.getElementById('completedCount');
+            
+            if (progressFill) {
+                progressFill.style.width = percent + '%';
+            }
+            if (progressPercent) {
+                progressPercent.textContent = percent;
+            }
+            if (completedCount) {
+                completedCount.textContent = completedItems;
+            }
+            
+            // Visual feedback
+            if (percent === 100) {
+                progressFill.style.background = 'linear-gradient(90deg, #28a745, #20c997)';
+            }
+        }
+        
+        console.log('✅ Checklist cargado:', totalItems, 'tareas,', completedItems, 'completadas');
+    </script>
+</body>
+</html>

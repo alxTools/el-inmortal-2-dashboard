@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %></title>
+    <link rel="stylesheet" href="/css/dashboard.css">
+</head>
+<body>
+    <%- include('../partials/navbar') %>
+
+    <div class="container" style="padding-top: 40px; max-width: 700px;">
+        <h1 style="color: #ffd700; margin-bottom: 30px;">🎧 Agregar Nuevo Productor</h1>
+
+        <div class="section">
+            <form action="/producers" method="POST">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Nombre Artístico</label>
+                        <input type="text" name="name" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Nombre Legal</label>
+                        <input type="text" name="legal_name">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input type="email" name="email" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Teléfono</label>
+                        <input type="tel" name="phone">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Dirección</label>
+                    <textarea name="address" rows="2"></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label>Splits Estándar (ej: 50/50, 60/40)</label>
+                    <input type="text" name="split_percentage" value="50/50" placeholder="50/50">
+                </div>
+
+                <div style="display: flex; gap: 15px; margin-top: 30px;">
+                    <button type="submit" class="btn">💾 Guardar Productor</button>
+                    <a href="/producers" class="btn btn-secondary">Cancelar</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <%- include('../partials/footer') %>
+</body>
+</html>

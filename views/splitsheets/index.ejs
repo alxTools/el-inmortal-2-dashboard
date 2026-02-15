@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %></title>
+    <link rel="stylesheet" href="/css/dashboard.css">
+</head>
+<body>
+    <%- include('../partials/navbar') %>
+
+    <div class="container" style="padding-top: 40px;">
+        <h1 style="color: #ffd700; margin-bottom: 30px;">📄 Splitsheets</h1>
+
+        <div class="section">
+            <% if (splitsheets.length === 0) { %>
+                <div style="text-align: center; padding: 50px; color: #888;">
+                    <p style="font-size: 1.2em; margin-bottom: 20px;">No hay splitsheets generados aún.</p>
+                    <p>Ve a la lista de <a href="/tracks" style="color: #ffd700;">temas</a> para generar splitsheets.</p>
+                </div>
+            <% } else { %>
+                <table class="tracks-table">
+                    <thead>
+                        <tr>
+                            <th>Tema</th>
+                            <th>Productor</th>
+                            <th>Splits</th>
+                            <th>Estado</th>
+                            <th>Fecha Envío</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% splitsheets.forEach(sheet => { %>
+                        <tr>
+                            <td>#<%= sheet.track_number %> - <%= sheet.track_title %></td>
+                            <td><%= sheet.producer_name %></td>
+                            <td><%= sheet.artist_percentage %>% / <%= sheet.producer_percentage %>%</td>
+                            <td>
+                                <% if (sheet.status === 'confirmed') { %>
+                                    <span class="status-badge status-done">✓ Confirmado</span>
+                                <% } else if (sheet.status === 'sent') { %>
+                                    <span class="status-badge status-pending">⏳ Enviado</span>
+                                <% } else { %>
+                                    <span class="status-badge status-urgent">⚠️ Pendiente</span>
+                                <% } %>
+                            </td>
+                            <td><%= sheet.sent_date ? new Date(sheet.sent_date).toLocaleDateString() : '-' %></td>
+                        </tr>
+                        <% }) %>
+                    </tbody>
+                </table>
+            <% } %>
+        </div>
+    </div>
+
+    <%- include('../partials/footer') %>
+</body>
+</html>

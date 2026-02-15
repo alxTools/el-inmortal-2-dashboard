@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %></title>
+    <link rel="stylesheet" href="/css/dashboard.css">
+</head>
+<body>
+    <%- include('../partials/navbar') %>
+
+    <div class="container" style="padding-top: 40px;">
+        <div class="section-header" style="margin-bottom: 30px;">
+            <h1>🎧 Productores</h1>
+            <a href="/producers/new" class="btn">+ Nuevo Productor</a>
+        </div>
+
+        <div class="timers-grid">
+            <% producers.forEach(producer => { %>
+            <div class="timer-card producer-card" data-id="<%= producer.id %>" style="text-align: left;">
+                <h3 style="color: #ffd700; margin-bottom: 15px;"><%= producer.name %></h3>
+                <p style="color: #888; margin-bottom: 10px;">
+                    <strong>Email:</strong> <%= producer.email %>
+                </p>
+                <p style="color: #888; margin-bottom: 10px;">
+                    <strong>Temas:</strong> <%= producer.track_count %>
+                </p>
+                <p style="color: #888; margin-bottom: 15px;">
+                    <strong>Splits:</strong> <%= producer.split_percentage %>
+                </p>
+                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <a href="/producers/<%= producer.id %>/edit" class="btn-small">Editar</a>
+                    <a href="/splitsheets/generate/<%= producer.id %>" class="btn-small">Splitsheet</a>
+                    <button class="btn-small delete-producer-btn" 
+                            data-id="<%= producer.id %>"
+                            data-name="<%= producer.name %>"
+                            style="background: rgba(220, 53, 69, 0.2); border-color: #dc3545; color: #ff6b6b;">
+                        🗑️ Eliminar
+                    </button>
+                </div>
+            </div>
+            <% }) %>
+        </div>
+    </div>
+
+    <%- include('../partials/footer') %>
+
+    <script>
+        console.log('✅ JavaScript loaded for producers page');
+        
+        // Add event listeners to all delete buttons
+        document.querySelectorAll('.delete-producer-btn').forEach(button => {
+            button.addEventListener('click', async function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                const id = this.getAttribute('data-id');
+                const name = this.getAttribute('data-name');
+                
+                console.log('Delete button clicked for producer:', name, 'ID:', id);
+                
+                const confirmMessage = `¿Estás seguro de que quieres eliminar al productor "${name}"?\n\n` +
+                                     `⚠️ Advertencia: Si este productor tiene temas asignados, ` +
+                                     `esos temas quedarán sin productor asignado.\n\n` +
+                                     `Esta acción no se puede deshacer.`;
+                
+                if (!confirm(confirmMessage)) {
+                    console.log('Deletion cancelled by user');
+                    return;
+                }
+
+                try {
+                    console.log('Sending DELETE request to /producers/' + id);
+                    const response = await fetch('/producers/' + id, {
+                        method: 'DELETE',
+                        headers: {
+                            'Accept': 'application/json'
+                        }
+                    });
+
+                    console.log('Response status:', response.status);
+                    const contentType = response.headers.get('content-type');
+                    console.log('Response content-type:', contentType);
+                    
+                    let result;
+                    if (contentType && contentType.includes('application/json')) {
+                        result = await response.json();
+                        console.log('Response JSON:', result);
+                    } else {
+                        const text = await response.text();
+                        console.log('Response text:', text);
+                        result = { success: response.ok };
+                    }
+
+                    if (response.ok && result.success) {
+                        alert(`✅ Productor "${name}" eliminado exitosamente`);
+                        location.reload();
+                    } else {
+                        throw new Error(result.error || result.message || 'Error al eliminar el productor');
+                    }
+                } catch (error) {
+                    console.error('Error deleting producer:', error);
+                    alert('❌ Error: ' + error.message);
+                }
+            });
+        });
+        
+        console.log('✅ Delete buttons configured:', document.querySelectorAll('.delete-producer-btn').length);
+    </script>
+</body>
+</html>

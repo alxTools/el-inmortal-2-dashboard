@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %></title>
+    <link rel="stylesheet" href="/css/dashboard.css">
+</head>
+<body>
+    <%- include('../partials/navbar') %>
+
+    <div class="container" style="padding-top: 40px; max-width: 700px;">
+        <h1 style="color: #ffd700; margin-bottom: 30px;">👥 Agregar Nuevo Artista</h1>
+
+        <div class="section">
+            <form action="/artists" method="POST">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Nombre Artístico *</label>
+                        <input type="text" name="name" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Nombre Legal</label>
+                        <input type="text" name="legal_name" placeholder="Para contratos">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input type="email" name="email">
+                    </div>
+                    <div class="form-group">
+                        <label>Teléfono</label>
+                        <input type="tel" name="phone">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Tipo de Artista</label>
+                        <select name="artist_type">
+                            <option value="featured">🎤 Featured (Colaboración)</option>
+                            <option value="primary">⭐ Artista Principal</option>
+                            <option value="guest">👋 Invitado Especial</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Disquera (Record Label)</label>
+                        <input type="text" name="record_label" placeholder="Ej: Sony Music, Universal...">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Management / Representante</label>
+                        <input type="text" name="management" placeholder="Nombre del manager o agencia">
+                    </div>
+                    <div class="form-group">
+                        <label>Redes Sociales</label>
+                        <input type="text" name="social_media" placeholder="@instagram @twitter...">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Notas / Información Adicional</label>
+                    <textarea name="notes" rows="3" placeholder="Información importante sobre el artista, fechas disponibles, requerimientos especiales..."></textarea>
+                </div>
+
+                <div style="display: flex; gap: 15px; margin-top: 30px;">
+                    <button type="submit" class="btn">💾 Guardar Artista</button>
+                    <a href="/artists" class="btn btn-secondary">Cancelar</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <%- include('../partials/footer') %>
+</body>
+</html>

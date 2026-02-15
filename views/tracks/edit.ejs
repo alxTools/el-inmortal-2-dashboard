@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %></title>
+    <link rel="stylesheet" href="/css/dashboard.css">
+</head>
+<body>
+    <%- include('../partials/navbar') %>
+
+    <div class="container" style="padding-top: 40px; max-width: 700px;">
+        <h1 style="color: #ffd700; margin-bottom: 30px;">✏️ Editar Tema: <%= track.title %></h1>
+
+        <div class="section">
+            <form action="/tracks/<%= track.id %>?_method=PUT" method="POST">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Número de Track</label>
+                        <input type="number" name="track_number" value="<%= track.track_number %>" readonly style="background: rgba(255,255,255,0.05);">
+                    </div>
+                    <div class="form-group">
+                        <label>Título del Tema</label>
+                        <input type="text" name="title" value="<%= track.title %>" required>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Productor</label>
+                        <select name="producer_id">
+                            <option value="">Sin asignar</option>
+                            <% producers.forEach(producer => { %>
+                                <option value="<%= producer.id %>" <%= track.producer_id == producer.id ? 'selected' : '' %>><%= producer.name %></option>
+                            <% }) %>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Fecha de Grabación</label>
+                        <input type="date" name="recording_date" value="<%= track.recording_date %>">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Duración</label>
+                        <input type="text" name="duration" value="<%= track.duration %>">
+                    </div>
+                    <div class="form-group">
+                        <label>Estado</label>
+                        <select name="status">
+                            <option value="pending" <%= track.status === 'pending' ? 'selected' : '' %>>Pendiente</option>
+                            <option value="in_progress" <%= track.status === 'in_progress' ? 'selected' : '' %>>En Progreso</option>
+                            <option value="completed" <%= track.status === 'completed' ? 'selected' : '' %>>Completado</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Track Type Selection -->
+                <div style="background: rgba(255, 215, 0, 0.05); border: 1px solid rgba(255, 215, 0, 0.3); border-radius: 10px; padding: 20px; margin: 25px 0;">
+                    <h3 style="color: #ffd700; margin-bottom: 15px; font-size: 1.1em;">🎯 Tipo de Lanzamiento</h3>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                                <input type="checkbox" name="is_single" value="1" <%= track.is_single ? 'checked' : '' %> style="width: 20px; height: 20px; accent-color: #ff6b6b;">
+                                <span>🎯 Es Sencillo (Single Principal)</span>
+                            </label>
+                            <p style="font-size: 0.85em; color: #888; margin-top: 5px; margin-left: 30px;">
+                                Este tema se promocionará como sencillo principal con video y marketing intensivo
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                                <input type="checkbox" name="is_primary" value="1" <%= track.is_primary ? 'checked' : '' %> style="width: 20px; height: 20px; accent-color: #ffd700;">
+                                <span>⭐ Es Track Principal</span>
+                            </label>
+                            <p style="font-size: 0.85em; color: #888; margin-top: 5px; margin-left: 30px;">
+                                Track destacado del álbum con contenido adicional (Reels, TikToks, etc.)
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Tipo de Track (Opcional)</label>
+                            <select name="track_type">
+                                <option value="album" <%= track.track_type === 'album' || !track.track_type ? 'selected' : '' %>>💿 Track de Álbum</option>
+                                <option value="single" <%= track.track_type === 'single' ? 'selected' : '' %>>🎯 Sencillo Principal</option>
+                                <option value="promo" <%= track.track_type === 'promo' ? 'selected' : '' %>>📢 Track Promocional</option>
+                                <option value="bonus" <%= track.track_type === 'bonus' ? 'selected' : '' %>>🎁 Track Bonus</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Letras/Notas</label>
+                    <textarea name="lyrics" rows="6" style="font-family: monospace; font-size: 0.9em;"><%= track.lyrics %></textarea>
+                </div>
+
+                <div style="display: flex; gap: 15px; margin-top: 30px;">
+                    <button type="submit" class="btn">💾 Actualizar Tema</button>
+                    <a href="/tracks" class="btn btn-secondary">Cancelar</a>
+                </div>
+            </form>
+        </div>
+
+        <!-- File Upload Section -->
+        <div class="section" style="margin-top: 40px;">
+            <h2 style="color: #ffd700; margin-bottom: 25px;">📁 Archivos del Tema</h2>
+
+            <!-- Audio Player Section -->
+            <% if (track.audio_file_path) { %>
+            <div style="background: rgba(0, 0, 0, 0.3); border: 1px solid rgba(255, 215, 0, 0.3); border-radius: 10px; padding: 20px; margin-bottom: 30px;">
+                <h3 style="color: #ffd700; margin-bottom: 15px; font-size: 1.1em;">🎵 Audio Subido</h3>
+                <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 15px;">
+                    <span class="status-badge <%= track.audio_file_type === 'master' ? 'status-done' : (track.audio_file_type === 'acapella' ? 'status-pending' : 'status-urgent') %>">
+                        <%= track.audio_file_type ? track.audio_file_type.toUpperCase() : 'ARCHIVO' %>
+                    </span>
+                    <span style="color: #888; font-size: 0.9em;">
+                        <%= track.audio_file_path.split('/').pop() %>
+                    </span>
+                </div>
+                
+                <!-- Audio Player -->
+                <audio controls style="width: 100%; margin-top: 10px;" id="audioPlayer">
+                    <source src="<%= track.audio_file_path %>" type="audio/mpeg">
+                    <source src="<%= track.audio_file_path %>" type="audio/wav">
+                    Tu navegador no soporta el reproductor de audio.
+                </audio>
+                
+                <div style="display: flex; gap: 10px; margin-top: 15px;">
+                    <button onclick="playAudio()" class="btn" style="padding: 8px 15px; font-size: 0.85em;">▶️ Play</button>
+                    <button onclick="pauseAudio()" class="btn btn-secondary" style="padding: 8px 15px; font-size: 0.85em;">⏸️ Pause</button>
+                    <a href="<%= track.audio_file_path %>" download class="btn btn-secondary" style="padding: 8px 15px; font-size: 0.85em; text-decoration: none;">⬇️ Descargar</a>
+                </div>
+            </div>
+            <% } %>
+
+            <!-- Cover Image Section -->
+            <% if (track.cover_image_path) { %>
+            <div style="background: rgba(0, 0, 0, 0.3); border: 1px solid rgba(255, 215, 0, 0.3); border-radius: 10px; padding: 20px; margin-bottom: 30px;">
+                <h3 style="color: #ffd700; margin-bottom: 15px; font-size: 1.1em;">🖼️ Cover del Track</h3>
+                <img src="<%= track.cover_image_path %>" alt="Cover" style="max-width: 300px; border-radius: 10px; border: 2px solid #ffd700;">
+                <div style="margin-top: 15px;">
+                    <a href="<%= track.cover_image_path %>" download class="btn btn-secondary" style="padding: 8px 15px; font-size: 0.85em; text-decoration: none;">⬇️ Descargar Imagen</a>
+                </div>
+            </div>
+            <% } %>
+
+            <!-- Upload Audio Form -->
+            <div style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 10px; padding: 20px; margin-bottom: 25px;">
+                <h3 style="color: #ffd700; margin-bottom: 15px; font-size: 1.1em;">🎵 Subir Archivo de Audio</h3>
+                <form id="audioUploadForm" enctype="multipart/form-data">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Tipo de Archivo</label>
+                            <select name="file_type" id="fileType" required>
+                                <option value="">Seleccionar...</option>
+                                <option value="master">🎚️ MASTER - Versión final masterizada</option>
+                                <option value="acapella">🎤 ACAPELLA - Solo voz sin beat</option>
+                                <option value="beat">🥁 BEAT - Instrumental sin voz</option>
+                                <option value="show">🎭 SHOW - Versión para presentaciones en vivo</option>
+                                <option value="rough">🔧 ROUGH MIX - Mezcla preliminar</option>
+                                <option value="demo">💡 DEMO - Versión de demostración</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Archivo de Audio (WAV, MP3, M4A, FLAC - Max 100MB)</label>
+                        <input type="file" name="audio_file" id="audioFile" accept="audio/*" required 
+                               style="padding: 10px; background: rgba(0,0,0,0.3); border: 1px dashed #ffd700; border-radius: 5px; color: #fff;">
+                    </div>
+                    
+                    <div id="audioUploadProgress" style="display: none; margin-top: 15px;">
+                        <div style="background: rgba(255, 215, 0, 0.2); height: 20px; border-radius: 10px; overflow: hidden;">
+                            <div id="audioProgressBar" style="background: linear-gradient(90deg, #ffd700, #ffed4e); height: 100%; width: 0%; transition: width 0.3s;"></div>
+                        </div>
+                        <p id="audioUploadStatus" style="color: #888; font-size: 0.85em; margin-top: 5px;">Subiendo...</p>
+                    </div>
+                    
+                    <button type="submit" class="btn" style="margin-top: 15px;">
+                        📤 Subir Audio
+                    </button>
+                </form>
+            </div>
+
+            <!-- Upload Cover Image Form -->
+            <div style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 10px; padding: 20px;">
+                <h3 style="color: #ffd700; margin-bottom: 15px; font-size: 1.1em;">🖼️ Subir Cover del Track</h3>
+                <form id="coverUploadForm" enctype="multipart/form-data">
+                    <div class="form-group">
+                        <label>Imagen de Cover (JPG, PNG, WEBP - Recomendado 3000x3000px)</label>
+                        <input type="file" name="cover_image" id="coverImage" accept="image/*" required
+                               style="padding: 10px; background: rgba(0,0,0,0.3); border: 1px dashed #ffd700; border-radius: 5px; color: #fff;">
+                    </div>
+                    
+                    <div id="coverPreview" style="display: none; margin-top: 15px;">
+                        <p style="color: #888; font-size: 0.9em; margin-bottom: 10px;">Vista previa:</p>
+                        <img id="coverPreviewImg" src="" alt="Preview" style="max-width: 200px; border-radius: 10px; border: 2px solid #ffd700;">
+                    </div>
+                    
+                    <button type="submit" class="btn" style="margin-top: 15px;">
+                        📤 Subir Cover
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <%- include('../partials/footer') %>
+
+    <script>
+        // Audio player controls
+        function playAudio() {
+            const player = document.getElementById('audioPlayer');
+            if (player) player.play();
+        }
+        
+        function pauseAudio() {
+            const player = document.getElementById('audioPlayer');
+            if (player) player.pause();
+        }
+
+        // Handle audio upload
+        document.getElementById('audioUploadForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const formData = new FormData();
+            const fileInput = document.getElementById('audioFile');
+            const fileTypeInput = document.getElementById('fileType');
+            
+            // Debug logging
+            console.log('DEBUG: File selected:', fileInput.files[0]?.name || 'No file');
+            console.log('DEBUG: File type selected:', fileTypeInput.value);
+            console.log('DEBUG: Track ID:', <%= track.id %>);
+            
+            if (!fileInput.files[0]) {
+                alert('❌ Por favor selecciona un archivo de audio');
+                return;
+            }
+            
+            if (!fileTypeInput.value) {
+                alert('❌ Por favor selecciona el tipo de archivo');
+                return;
+            }
+            
+            formData.append('audio_file', fileInput.files[0]);
+            formData.append('file_type', fileTypeInput.value);
+            
+            const progressDiv = document.getElementById('audioUploadProgress');
+            const progressBar = document.getElementById('audioProgressBar');
+            const statusText = document.getElementById('audioUploadStatus');
+            
+            progressDiv.style.display = 'block';
+            progressBar.style.width = '0%';
+            
+            const uploadUrl = '/uploads/track/<%= track.id %>/audio';
+            console.log('DEBUG: Uploading to:', uploadUrl);
+            
+            try {
+                statusText.textContent = 'Enviando...';
+                console.log('DEBUG: Starting fetch request...');
+                
+                const response = await fetch('/uploads/track/<%= track.id %>/audio', {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                });
+                
+                console.log('DEBUG: Response received:', response.status, response.statusText);
+                console.log('DEBUG: Response headers:', [...response.headers.entries()]);
+                
+                // Check content type
+                const contentType = response.headers.get('content-type');
+                console.log('DEBUG: Content-Type:', contentType);
+                
+                if (!response.ok) {
+                    // Handle error response
+                    let errorMessage = `Error HTTP: ${response.status}`;
+                    
+                    if (contentType && contentType.includes('application/json')) {
+                        const errorResult = await response.json();
+                        errorMessage = errorResult.error || errorMessage;
+                    } else {
+                        const errorText = await response.text();
+                        console.error('Server error response:', errorText);
+                        if (response.status === 404) {
+                            errorMessage = 'Ruta no encontrada. Verifica que el servidor esté configurado correctamente.';
+                        } else if (response.status === 413) {
+                            errorMessage = 'Archivo demasiado grande.';
+                        } else {
+                            errorMessage = `Error del servidor: ${response.status}. Revisa la consola para más detalles.`;
+                        }
+                    }
+                    
+                    throw new Error(errorMessage);
+                }
+                
+                // Parse successful response
+                let result;
+                if (contentType && contentType.includes('application/json')) {
+                    result = await response.json();
+                } else {
+                    result = { success: true, message: 'Subida completada' };
+                }
+                
+                if (result.success) {
+                    progressBar.style.width = '100%';
+                    statusText.textContent = '✅ ' + (result.message || 'Subida completada!');
+                    statusText.style.color = '#28a745';
+                    setTimeout(() => location.reload(), 1500);
+                } else {
+                    throw new Error(result.error || 'Error en la subida');
+                }
+            } catch (error) {
+                progressBar.style.width = '0%';
+                statusText.textContent = '❌ Error: ' + error.message;
+                statusText.style.color = '#dc3545';
+                console.error('Upload Error:', error);
+            }
+        });
+
+        // Handle cover image preview
+        document.getElementById('coverImage').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    document.getElementById('coverPreviewImg').src = e.target.result;
+                    document.getElementById('coverPreview').style.display = 'block';
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        // Handle cover upload
+        document.getElementById('coverUploadForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const formData = new FormData();
+            formData.append('cover_image', document.getElementById('coverImage').files[0]);
+            
+            try {
+                const response = await fetch('/uploads/track/<%= track.id %>/cover', {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                });
+                
+                const contentType = response.headers.get('content-type');
+                
+                if (!response.ok) {
+                    let errorMessage = `Error HTTP: ${response.status}`;
+                    
+                    if (contentType && contentType.includes('application/json')) {
+                        const errorResult = await response.json();
+                        errorMessage = errorResult.error || errorMessage;
+                    } else {
+                        const errorText = await response.text();
+                        console.error('Server error response:', errorText);
+                        if (response.status === 404) {
+                            errorMessage = 'Ruta no encontrada.';
+                        } else if (response.status === 413) {
+                            errorMessage = 'Archivo demasiado grande.';
+                        }
+                    }
+                    
+                    throw new Error(errorMessage);
+                }
+                
+                let result;
+                if (contentType && contentType.includes('application/json')) {
+                    result = await response.json();
+                } else {
+                    result = { success: true };
+                }
+                
+                if (result.success) {
+                    alert('✅ ' + (result.message || 'Cover subido exitosamente!'));
+                    location.reload();
+                } else {
+                    throw new Error(result.error || 'Error en la subida');
+                }
+            } catch (error) {
+                alert('❌ Error: ' + error.message);
+                console.error('Error:', error);
+            }
+        });
+    </script>
+</body>
+</html>

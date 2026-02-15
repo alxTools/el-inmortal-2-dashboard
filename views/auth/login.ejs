@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %></title>
+    <link rel="stylesheet" href="/css/dashboard.css">
+    <style>
+        .login-container {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+        }
+        .login-box {
+            background: rgba(255, 255, 255, 0.05);
+            border: 2px solid rgba(255, 215, 0, 0.3);
+            border-radius: 20px;
+            padding: 50px;
+            width: 100%;
+            max-width: 450px;
+            text-align: center;
+        }
+        .login-box h1 {
+            font-size: 2.5em;
+            background: linear-gradient(45deg, #ffd700, #ffed4e);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+        }
+        .login-box .subtitle {
+            color: #888;
+            margin-bottom: 40px;
+        }
+        .error-message {
+            background: rgba(220, 53, 69, 0.2);
+            border: 1px solid rgba(220, 53, 69, 0.5);
+            color: #ff6b6b;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-box">
+            <h1>👑 El Inmortal 2</h1>
+            <p class="subtitle">Galante el Emperador - Launch Dashboard</p>
+
+            <% if (error) { %>
+                <div class="error-message">
+                    <%= error %>
+                </div>
+            <% } %>
+
+            <form action="/auth/login" method="POST">
+                <div class="form-group" style="text-align: left;">
+                    <label>Usuario</label>
+                    <input type="text" name="username" required autofocus>
+                </div>
+
+                <div class="form-group" style="text-align: left;">
+                    <label>Contraseña</label>
+                    <input type="password" name="password" required>
+                </div>
+
+                <button type="submit" class="btn" style="width: 100%; margin-top: 20px; padding: 15px;">
+                    Iniciar Sesión
+                </button>
+            </form>
+
+            <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid rgba(255, 255, 255, 0.1);">
+                <p style="color: #666; font-size: 0.85em;">
+                    Usuario por defecto: <strong style="color: #ffd700;">admin</strong><br>
+                    Contraseña: <strong style="color: #ffd700;">admin123</strong>
+                </p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

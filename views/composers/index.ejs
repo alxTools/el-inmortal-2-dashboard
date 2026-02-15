@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %></title>
+    <link rel="stylesheet" href="/css/dashboard.css">
+</head>
+<body>
+    <%- include('../partials/navbar') %>
+
+    <div class="container" style="padding-top: 40px;">
+        <div class="section-header" style="margin-bottom: 30px;">
+            <h1>📝 Compositores</h1>
+            <a href="/composers/new" class="btn">+ Nuevo Compositor</a>
+        </div>
+
+        <div class="timers-grid">
+            <% composers.forEach(composer => { %>
+            <div class="timer-card composer-card" data-id="<%= composer.id %>" style="text-align: left;">
+                <h3 style="color: #ffd700; margin-bottom: 15px;"><%= composer.name %></h3>
+                <% if (composer.legal_name) { %>
+                <p style="color: #888; margin-bottom: 10px;">
+                    <strong>Nombre Legal:</strong> <%= composer.legal_name %>
+                </p>
+                <% } %>
+                <% if (composer.email) { %>
+                <p style="color: #888; margin-bottom: 10px;">
+                    <strong>Email:</strong> <%= composer.email %>
+                </p>
+                <% } %>
+                <% if (composer.publisher) { %>
+                <p style="color: #888; margin-bottom: 10px;">
+                    <strong>Editora:</strong> <%= composer.publisher %>
+                </p>
+                <% } %>
+                <% if (composer.PRO_affiliation) { %>
+                <p style="color: #888; margin-bottom: 10px;">
+                    <strong>PRO:</strong> <%= composer.PRO_affiliation %>
+                    <% if (composer.IPI_number) { %>(IPI: <%= composer.IPI_number %>)<% } %>
+                </p>
+                <% } %>
+                <p style="color: #888; margin-bottom: 10px;">
+                    <strong>Temas:</strong> <%= composer.track_count %>
+                </p>
+                <p style="color: #888; margin-bottom: 15px;">
+                    <strong>Splits:</strong> <%= composer.split_percentage %>
+                </p>
+                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <a href="/composers/<%= composer.id %>/edit" class="btn-small">Editar</a>
+                    <button class="btn-small delete-composer-btn" 
+                            data-id="<%= composer.id %>"
+                            data-name="<%= composer.name %>"
+                            style="background: rgba(220, 53, 69, 0.2); border-color: #dc3545; color: #ff6b6b;">
+                        🗑️ Eliminar
+                    </button>
+                </div>
+            </div>
+            <% }) %>
+        </div>
+        
+        <% if (composers.length === 0) { %>
+        <div style="text-align: center; padding: 50px; color: #888;">
+            <p style="font-size: 1.2em; margin-bottom: 20px;">No hay compositores registrados aún.</p>
+            <a href="/composers/new" class="btn">+ Agregar Primer Compositor</a>
+        </div>
+        <% } %>
+    </div>
+
+    <%- include('../partials/footer') %>
+
+    <script>
+        console.log('✅ JavaScript loaded for composers page');
+        
+        document.querySelectorAll('.delete-composer-btn').forEach(button => {
+            button.addEventListener('click', async function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                const id = this.getAttribute('data-id');
+                const name = this.getAttribute('data-name');
+                
+                const confirmMessage = `¿Estás seguro de que quieres eliminar al compositor "${name}"?\n\n` +
+                                     `⚠️ Advertencia: Si este compositor tiene temas asignados, ` +
+                                     `se perderá esa información.\n\n` +
+                                     `Esta acción no se puede deshacer.`;
+                
+                if (!confirm(confirmMessage)) {
+                    return;
+                }
+
+                try {
+                    const response = await fetch('/composers/' + id, {
+                        method: 'DELETE',
+                        headers: {
+                            'Accept': 'application/json'
+                        }
+                    });
+
+                    const contentType = response.headers.get('content-type');
+                    let result;
+
+                    if (contentType && contentType.includes('application/json')) {
+                        result = await response.json();
+                    } else {
+                        result = { success: response.ok };
+                    }
+
+                    if (response.ok && result.success) {
+                        alert(`✅ Compositor "${name}" eliminado exitosamente`);
+                        location.reload();
+                    } else {
+                        throw new Error(result.error || result.message || 'Error al eliminar el compositor');
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    alert('❌ Error: ' + error.message);
+                }
+            });
+        });
+    </script>
+</body>
+</html>

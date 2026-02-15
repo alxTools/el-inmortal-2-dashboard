@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %></title>
+    <link rel="stylesheet" href="/css/dashboard.css">
+</head>
+<body>
+    <%- include('partials/navbar') %>
+
+    <header class="header">
+        <h1>El Inmortal 2</h1>
+        <div class="subtitle">Galante el Emperador</div>
+        <div class="countdown-main">
+            <div class="countdown-title">Lanzamiento en</div>
+            <div class="countdown-time" id="main-countdown">
+                <span id="main-days">--</span>d 
+                <span id="main-hours">--</span>h 
+                <span id="main-minutes">--</span>m
+            </div>
+        </div>
+    </header>
+
+    <!-- DAILY TIMERS SECTION -->
+    <section class="daily-timers-section">
+        <h2 class="daily-timers-title">⏰ Conteo Regresivo por Día</h2>
+        <div class="timers-grid">
+            <!-- Día -2 -->
+            <div class="timer-card" id="timer-day-minus-2">
+                <div class="timer-label">Día -2</div>
+                <div class="timer-date">Dom 15 Feb - Pre-lanzamiento</div>
+                <div class="timer-display">
+                    <div class="timer-unit">
+                        <span class="timer-number" id="tm2-days">--</span>
+                        <div class="timer-text">Días</div>
+                    </div>
+                    <div class="timer-unit">
+                        <span class="timer-number" id="tm2-hours">--</span>
+                        <div class="timer-text">Horas</div>
+                    </div>
+                    <div class="timer-unit">
+                        <span class="timer-number" id="tm2-minutes">--</span>
+                        <div class="timer-text">Mins</div>
+                    </div>
+                    <div class="timer-unit">
+                        <span class="timer-number" id="tm2-seconds">--</span>
+                        <div class="timer-text">Segs</div>
+                    </div>
+                </div>
+                <div class="timer-status status-upcoming" id="status-tm2">Próximo</div>
+            </div>
+
+            <!-- Día -1 -->
+            <div class="timer-card" id="timer-day-minus-1">
+                <div class="timer-label">Día -1</div>
+                <div class="timer-date">Lun 16 Feb - Último Push</div>
+                <div class="timer-display">
+                    <div class="timer-unit">
+                        <span class="timer-number" id="tm1-days">--</span>
+                        <div class="timer-text">Días</div>
+                    </div>
+                    <div class="timer-unit">
+                        <span class="timer-number" id="tm1-hours">--</span>
+                        <div class="timer-text">Horas</div>
+                    </div>
+                    <div class="timer-unit">
+                        <span class="timer-number" id="tm1-minutes">--</span>
+                        <div class="timer-text">Mins</div>
+                    </div>
+                    <div class="timer-unit">
+                        <span class="timer-number" id="tm1-seconds">--</span>
+                        <div class="timer-text">Segs</div>
+                    </div>
+                </div>
+                <div class="timer-status status-upcoming" id="status-tm1">Próximo</div>
+            </div>
+
+            <!-- Día 0 - LANZAMIENTO -->
+            <div class="timer-card launch-timer" id="timer-day-0">
+                <div class="timer-label">🚀 DÍA 0</div>
+                <div class="timer-date">Mar 17 Feb - LANZAMIENTO</div>
+                <div class="timer-display">
+                    <div class="timer-unit">
+                        <span class="timer-number" id="t0-days">--</span>
+                        <div class="timer-text">Días</div>
+                    </div>
+                    <div class="timer-unit">
+                        <span class="timer-number" id="t0-hours">--</span>
+                        <div class="timer-text">Horas</div>
+                    </div>
+                    <div class="timer-unit">
+                        <span class="timer-number" id="t0-minutes">--</span>
+                        <div class="timer-text">Mins</div>
+                    </div>
+                    <div class="timer-unit">
+                        <span class="timer-number" id="t0-seconds">--</span>
+                        <div class="timer-text">Segs</div>
+                    </div>
+                </div>
+                <div class="timer-status status-upcoming" id="status-t0">⏳ Esperando...</div>
+            </div>
+
+            <!-- Día 1 -->
+            <div class="timer-card" id="timer-day-1">
+                <div class="timer-label">Día 1</div>
+                <div class="timer-date">Mié 18 Feb - Post-lanzamiento</div>
+                <div class="timer-display">
+                    <div class="timer-unit">
+                        <span class="timer-number" id="t1-days">--</span>
+                        <div class="timer-text">Días</div>
+                    </div>
+                    <div class="timer-unit">
+                        <span class="timer-number" id="t1-hours">--</span>
+                        <div class="timer-text">Horas</div>
+                    </div>
+                    <div class="timer-unit">
+                        <span class="timer-number" id="t1-minutes">--</span>
+                        <div class="timer-text">Mins</div>
+                    </div>
+                    <div class="timer-unit">
+                        <span class="timer-number" id="t1-seconds">--</span>
+                        <div class="timer-text">Segs</div>
+                    </div>
+                </div>
+                <div class="timer-status status-upcoming" id="status-t1">Próximo</div>
+            </div>
+
+            <!-- Semana 1 -->
+            <div class="timer-card" id="timer-day-7">
+                <div class="timer-label">Semana 1</div>
+                <div class="timer-date">Lun 24 Feb - Resumen</div>
+                <div class="timer-display">
+                    <div class="timer-unit">
+                        <span class="timer-number" id="t7-days">--</span>
+                        <div class="timer-text">Días</div>
+                    </div>
+                    <div class="timer-unit">
+                        <span class="timer-number" id="t7-hours">--</span>
+                        <div class="timer-text">Horas</div>
+                    </div>
+                    <div class="timer-unit">
+                        <span class="timer-number" id="t7-minutes">--</span>
+                        <div class="timer-text">Mins</div>
+                    </div>
+                    <div class="timer-unit">
+                        <span class="timer-number" id="t7-seconds">--</span>
+                        <div class="timer-text">Segs</div>
+                    </div>
+                </div>
+                <div class="timer-status status-upcoming" id="status-t7">Próximo</div>
+            </div>
+
+            <!-- Día 21 -->
+            <div class="timer-card" id="timer-day-21">
+                <div class="timer-label">Fin de Campaña</div>
+                <div class="timer-date">Lun 10 Mar - 21 días</div>
+                <div class="timer-display">
+                    <div class="timer-unit">
+                        <span class="timer-number" id="t21-days">--</span>
+                        <div class="timer-text">Días</div>
+                    </div>
+                    <div class="timer-unit">
+                        <span class="timer-number" id="t21-hours">--</span>
+                        <div class="timer-text">Horas</div>
+                    </div>
+                    <div class="timer-unit">
+                        <span class="timer-number" id="t21-minutes">--</span>
+                        <div class="timer-text">Mins</div>
+                    </div>
+                    <div class="timer-unit">
+                        <span class="timer-number" id="t21-seconds">--</span>
+                        <div class="timer-text">Segs</div>
+                    </div>
+                </div>
+                <div class="timer-status status-upcoming" id="status-t21">Próximo</div>
+            </div>
+        </div>
+    </section>
+
+    <div class="container">
+        <!-- Stats Overview -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <h3>Total de Temas</h3>
+                <div class="number"><%= stats.totalTracks %>/<%= stats.totalTracksTarget %></div>
+                <div class="label">Canciones en el álbum</div>
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width: <%= (stats.totalTracks / stats.totalTracksTarget * 100) %>"></div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <h3>Productores</h3>
+                <div class="number"><%= stats.producerCount %></div>
+                <div class="label">Colaboradores</div>
+            </div>
+            <div class="stat-card">
+                <h3>Splitsheets</h3>
+                <div class="number"><%= stats.splitsheetsConfirmed %>/<%= stats.totalTracks %></div>
+                <div class="label">Confirmados</div>
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width: <%= stats.totalTracks > 0 ? (stats.splitsheetsConfirmed / stats.totalTracks * 100) : 0 %>"></div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <h3>Contenido</h3>
+                <div class="number"><%= stats.totalContent %>/<%= stats.totalContentTarget %></div>
+                <div class="label">Posts planeados</div>
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width: <%= (stats.totalContent / stats.totalContentTarget * 100) %>"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Tracks -->
+        <section class="section">
+            <div class="section-header">
+                <h2><span class="section-icon">🎵</span> Temas Recientes</h2>
+                <a href="/tracks" class="btn">Ver Todos</a>
+            </div>
+            <table class="tracks-table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Título</th>
+                        <th>Productor</th>
+                        <th>Splitsheet</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <% recentTracks.forEach(track => { %>
+                    <tr>
+                        <td><%= track.track_number %></td>
+                        <td><strong><%= track.title || 'Sin título' %></strong></td>
+                        <td><%= track.producer_name || 'Sin asignar' %></td>
+                        <td>
+                            <% if (track.splitsheet_confirmed) { %>
+                                <span class="status-badge status-done">Confirmado</span>
+                            <% } else if (track.splitsheet_sent) { %>
+                                <span class="status-badge status-pending">Enviado</span>
+                            <% } else { %>
+                                <span class="status-badge status-urgent">Pendiente</span>
+                            <% } %>
+                        </td>
+                        <td>
+                            <a href="/tracks/<%= track.id %>/edit" class="btn-small">Editar</a>
+                        </td>
+                    </tr>
+                    <% }) %>
+                </tbody>
+            </table>
+        </section>
+
+        <!-- Quick Links -->
+        <section class="section">
+            <div class="section-header">
+                <h2><span class="section-icon">⚡</span> Acceso Rápido</h2>
+            </div>
+            <div class="quick-links">
+                <a href="/tracks/new" class="quick-link">
+                    <div class="quick-link-icon">🎵</div>
+                    <div>+ Nuevo Tema</div>
+                </a>
+                <a href="/producers/new" class="quick-link">
+                    <div class="quick-link-icon">🎧</div>
+                    <div>+ Nuevo Productor</div>
+                </a>
+                <a href="/splitsheets" class="quick-link">
+                    <div class="quick-link-icon">📄</div>
+                    <div>Splitsheets</div>
+                </a>
+                <a href="/calendar" class="quick-link">
+                    <div class="quick-link-icon">📅</div>
+                    <div>Calendario</div>
+                </a>
+                <a href="/checklist" class="quick-link">
+                    <div class="quick-link-icon">✅</div>
+                    <div>Checklist</div>
+                </a>
+                <a href="/api/stats" target="_blank" class="quick-link">
+                    <div class="quick-link-icon">📊</div>
+                    <div>API Stats</div>
+                </a>
+            </div>
+        </section>
+    </div>
+
+    <%- include('partials/footer') %>
+
+    <script src="/js/dashboard.js"></script>
+    <script>
+        // Real-time countdown updates
+        function updateCountdown() {
+            fetch('/api/countdown')
+                .then(response => response.json())
+                .then(data => {
+                    // Update main countdown
+                    const launchTimer = data.timers.t0;
+                    document.getElementById('main-days').textContent = launchTimer.days;
+                    document.getElementById('main-hours').textContent = launchTimer.hours;
+                    document.getElementById('main-minutes').textContent = launchTimer.minutes;
+
+                    // Update daily timers
+                    for (const [key, timer] of Object.entries(data.timers)) {
+                        const daysEl = document.getElementById(`${key}-days`);
+                        if (daysEl) {
+                            daysEl.textContent = String(timer.days).padStart(2, '0');
+                            document.getElementById(`${key}-hours`).textContent = String(timer.hours).padStart(2, '0');
+                            document.getElementById(`${key}-minutes`).textContent = String(timer.minutes).padStart(2, '0');
+                            document.getElementById(`${key}-seconds`).textContent = String(timer.seconds).padStart(2, '0');
+
+                            // Update status
+                            const statusEl = document.getElementById(`status-${key}`);
+                            if (timer.isActive) {
+                                statusEl.textContent = key === 't0' ? '🎉 ¡LANZAMIENTO ACTIVO!' : '✨ Día Activo';
+                                statusEl.className = 'timer-status status-active';
+                            } else if (timer.isPast) {
+                                statusEl.textContent = key === 't0' ? '🚀 LANZADO' : '✓ Completado';
+                                statusEl.className = 'timer-status status-launched';
+                            } else if (timer.days === 0 && timer.hours < 24) {
+                                statusEl.textContent = '🔥 Menos de 24h!';
+                                statusEl.className = 'timer-status status-active';
+                            }
+                        }
+                    }
+                })
+                .catch(error => console.error('Error updating countdown:', error));
+        }
+
+        // Update every second
+        updateCountdown();
+        setInterval(updateCountdown, 1000);
+    </script>
+</body>
+</html>

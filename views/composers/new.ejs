@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %></title>
+    <link rel="stylesheet" href="/css/dashboard.css">
+</head>
+<body>
+    <%- include('../partials/navbar') %>
+
+    <div class="container" style="padding-top: 40px; max-width: 700px;">
+        <h1 style="color: #ffd700; margin-bottom: 30px;">📝 Agregar Nuevo Compositor</h1>
+
+        <div class="section">
+            <form action="/composers" method="POST">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Nombre Artístico *</label>
+                        <input type="text" name="name" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Nombre Legal</label>
+                        <input type="text" name="legal_name" placeholder="Para contratos">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input type="email" name="email">
+                    </div>
+                    <div class="form-group">
+                        <label>Teléfono</label>
+                        <input type="tel" name="phone">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Editora (Publisher)</label>
+                        <input type="text" name="publisher" placeholder="Ej: Universal Music Publishing">
+                    </div>
+                    <div class="form-group">
+                        <label>Afiliación PRO</label>
+                        <select name="PRO_affiliation">
+                            <option value="">Seleccionar...</option>
+                            <option value="ASCAP">ASCAP (USA)</option>
+                            <option value="BMI">BMI (USA)</option>
+                            <option value="SESAC">SESAC (USA)</option>
+                            <option value="SGAE">SGAE (España)</option>
+                            <option value="SACEM">SACEM (Francia)</option>
+                            <option value="PRS">PRS (UK)</option>
+                            <option value="BMI PR">BMI PR (Puerto Rico)</option>
+                            <option value="ACINPRO">ACINPRO (Panamá)</option>
+                            <option value="SPAC">SPAC (Panamá)</option>
+                            <option value="sayco_acinpro">SAYCO/ACINPRO (Colombia)</option>
+                            <option value="SADAIC">SADAIC (Argentina)</option>
+                            <option value="Otro">Otro</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Número IPI/CAE</label>
+                        <input type="text" name="IPI_number" placeholder="Identificador único PRO">
+                    </div>
+                    <div class="form-group">
+                        <label>Splits Estándar</label>
+                        <input type="text" name="split_percentage" value="50/50" placeholder="Ej: 50/50">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Notas / Información Adicional</label>
+                    <textarea name="notes" rows="3" placeholder="Datos importantes sobre el compositor..."></textarea>
+                </div>
+
+                <div style="display: flex; gap: 15px; margin-top: 30px;">
+                    <button type="submit" class="btn">💾 Guardar Compositor</button>
+                    <a href="/composers" class="btn btn-secondary">Cancelar</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <%- include('../partials/footer') %>
+</body>
+</html>

@@ -225,8 +225,146 @@ process.on('SIGINT', () => {
     process.exit(0);
 });
 
+// Data for El Inmortal 2 album
+const albumData = {
+    tracks: [
+        { track_number: 1, title: "Si El Mundo Se Acabara", producers: "Yow Fade & ALX", features: null },
+        { track_number: 2, title: "Toda Para Mi 2", producers: "Askenax, Anthony The Producer & ALX", features: null },
+        { track_number: 3, title: "Dime Ahora Remix", producers: "Askenax, Yow Fade & ALX", features: "Genio La Musa, Killatonez" },
+        { track_number: 4, title: "Pa Buscarte", producers: "Anthony The Producer & ALX", features: "Tiana Estebanez" },
+        { track_number: 5, title: "Come Calla", producers: "Yow Fade, Bryan LMDE & ALX", features: null },
+        { track_number: 6, title: "Ya Te Mudaste", producers: "Askenax & ALX", features: null },
+        { track_number: 7, title: "Si Te Vuelvo A Ver", producers: "Wutti, Melody & ALX", features: "Bayriton" },
+        { track_number: 8, title: "Mi Tentacion", producers: "Anthony The Producer & ALX", features: "Dilox" },
+        { track_number: 9, title: "Casi Algo", producers: "Anthony The Producer & ALX", features: null },
+        { track_number: 10, title: "Cuenta Fantasma", producers: "Music Zone & ALX", features: "Dixon Versatil" },
+        { track_number: 11, title: "Inaceptable", producers: "Anthony The Producer & ALX", features: "Manny Eztilo" },
+        { track_number: 12, title: "No Se Que Somos", producers: "Wutti & ALX", features: null },
+        { track_number: 13, title: "No Te Enamores", producers: "Askenax, Wutti & ALX", features: "LaDeLaJotaa" },
+        { track_number: 14, title: "Siguele", producers: "Anthony The Producer & ALX", features: null },
+        { track_number: 15, title: "No Me Quieres Entender", producers: "DMT Level & ALX", features: "Lenny Low" },
+        { track_number: 16, title: "Sigo En La Mia", producers: "Wutti & ALX", features: "Daizak" },
+        { track_number: 17, title: "En La Nave", producers: "Wutti & ALX", features: "Sota One" },
+        { track_number: 18, title: "Tu Pirata", producers: "UBeats & ALX", features: "Pablo Nick" },
+        { track_number: 19, title: "Al Que Se Meta Remix", producers: "Yeizel & ALX", features: "Joe Yncio" },
+        { track_number: 20, title: "Pa Chingal", producers: "Wutti & ALX", features: null },
+        { track_number: 21, title: "Las Eleven", producers: "Wutti & ALX", features: null }
+    ],
+    
+    checklistItems: [
+        // Track-specific items
+        { category: 'Distribución', item_text: 'Upload tracks to distributor', priority: 'urgent' },
+        { category: 'Metadata', item_text: 'Verify all track metadata', priority: 'high' },
+        { category: 'Contenido', item_text: 'Create lyric videos for all tracks', priority: 'normal' },
+        { category: 'Marketing', item_text: 'Create Instagram Reels content', priority: 'normal' },
+        { category: 'Marketing', item_text: 'Create TikTok content', priority: 'normal' },
+        { category: 'Planificación', item_text: 'Add all tracks to content calendar', priority: 'normal' },
+        { category: 'Diseño', item_text: 'Design cover art for all tracks', priority: 'normal' },
+        { category: 'Contenido', item_text: 'Create Spotify Canvas for tracks', priority: 'low' },
+        
+        // General items
+        { category: 'Urgente', item_text: 'Finalizar artwork del álbum', priority: 'urgent' },
+        { category: 'Urgente', item_text: 'Enviar splitsheets a todos los productores', priority: 'urgent' },
+        { category: 'Urgente', item_text: 'Confirmar recepción de todos los splitsheets', priority: 'urgent' },
+        { category: 'Marketing', item_text: 'Configurar pre-save links', priority: 'high' },
+        { category: 'Marketing', item_text: 'Actualizar perfiles de redes sociales', priority: 'high' },
+        { category: 'Marketing', item_text: 'Preparar press kit', priority: 'high' },
+        { category: 'Planificación', item_text: 'Crear calendario de contenido completo', priority: 'high' },
+        { category: 'Distribución', item_text: 'Verificar distribución en todas las plataformas', priority: 'high' },
+        { category: 'Marketing', item_text: 'Programar posts para día del lanzamiento', priority: 'high' },
+        { category: 'Marketing', item_text: 'Enviar email a lista de fans', priority: 'normal' },
+        { category: 'Marketing', item_text: 'Crear playlist de lanzamiento en Spotify', priority: 'normal' },
+        { category: 'PR', item_text: 'Contactar blogs y medios', priority: 'normal' },
+        { category: 'Ventas', item_text: 'Preparar merch (si aplica)', priority: 'low' },
+        { category: 'Eventos', item_text: 'Planificar live/stream de lanzamiento', priority: 'normal' }
+    ]
+};
+
+async function seedInitialData() {
+    const db = getDatabase();
+    
+    const runSQL = (sql, params = []) => {
+        return new Promise((resolve, reject) => {
+            db.run(sql, params, function(err) {
+                if (err) reject(err);
+                else resolve({ lastID: this.lastID, changes: this.changes });
+            });
+        });
+    };
+    
+    const getOne = (sql, params = []) => {
+        return new Promise((resolve, reject) => {
+            db.get(sql, params, (err, row) => {
+                if (err) reject(err);
+                else resolve(row);
+            });
+        });
+    };
+    
+    try {
+        // Check if data already exists
+        const existingTracks = await getOne('SELECT COUNT(*) as count FROM tracks');
+        if (existingTracks && existingTracks.count > 0) {
+            console.log('ℹ️  Database already has data, skipping seed');
+            return;
+        }
+        
+        console.log('🌱 Seeding initial data for El Inmortal 2...');
+        
+        // Extract unique producers
+        const uniqueProducers = new Set();
+        albumData.tracks.forEach(track => {
+            const producers = track.producers.split(/,\s*&\s*|\s*&\s*|,\s*/);
+            producers.forEach(p => uniqueProducers.add(p.trim()));
+        });
+        
+        // Seed producers
+        const producerMap = {};
+        for (const producerName of uniqueProducers) {
+            const existing = await getOne('SELECT id FROM producers WHERE name = ?', [producerName]);
+            if (existing) {
+                producerMap[producerName] = existing.id;
+            } else {
+                const result = await runSQL(
+                    'INSERT INTO producers (name, email, split_percentage) VALUES (?, ?, ?)',
+                    [producerName, `${producerName.toLowerCase().replace(/\s+/g, '.')}@gmail.com`, '50/50']
+                );
+                producerMap[producerName] = result.lastID;
+                console.log(`  ✅ Producer: ${producerName}`);
+            }
+        }
+        
+        // Seed tracks
+        for (const track of albumData.tracks) {
+            const primaryProducer = track.producers.split(/,\s*&\s*|\s*&\s*|,\s*/)[0].trim();
+            const producerId = producerMap[primaryProducer] || null;
+            
+            await runSQL(
+                `INSERT INTO tracks (track_number, title, producer_id, features, status) 
+                 VALUES (?, ?, ?, ?, ?)`,
+                [track.track_number, track.title, producerId, track.features, 'completed']
+            );
+            console.log(`  ✅ Track ${track.track_number}: ${track.title}`);
+        }
+        
+        // Seed checklist items
+        for (const item of albumData.checklistItems) {
+            await runSQL(
+                'INSERT INTO checklist_items (category, item_text, priority) VALUES (?, ?, ?)',
+                [item.category, item.item_text, item.priority]
+            );
+        }
+        console.log(`  ✅ ${albumData.checklistItems.length} checklist items`);
+        
+        console.log('🎉 Database seeding completed!');
+    } catch (err) {
+        console.error('❌ Error seeding database:', err.message);
+    }
+}
+
 module.exports = {
     getDatabase,
     closeDatabase,
-    initializeTables
+    initializeTables,
+    seedInitialData
 };

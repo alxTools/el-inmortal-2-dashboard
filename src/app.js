@@ -7,8 +7,25 @@ const cors = require('cors');
 const methodOverride = require('method-override');
 require('dotenv').config();
 
+const { getDatabase, seedInitialData } = require('./config/database');
+
 const app = express();
 const PORT = process.env.PORT || 10000;
+
+// Initialize database and seed data on startup
+(async () => {
+    try {
+        // Initialize database connection (this creates tables)
+        getDatabase();
+        
+        // Wait a moment for tables to be created, then seed data
+        setTimeout(async () => {
+            await seedInitialData();
+        }, 1000);
+    } catch (err) {
+        console.error('Error initializing database:', err);
+    }
+})();
 
 // Security middleware
 app.use(helmet({

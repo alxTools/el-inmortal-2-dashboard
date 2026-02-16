@@ -46,6 +46,15 @@ router.get('/', async (req, res) => {
             LIMIT 5
         `);
 
+        // Get recent tracks (last 10 added/updated)
+        const recentTracks = await getAll(`
+            SELECT t.*, p.name as producer_name
+            FROM tracks t
+            LEFT JOIN producers p ON t.producer_id = p.id
+            ORDER BY t.updated_at DESC, t.created_at DESC
+            LIMIT 10
+        `);
+
         res.render('index', {
             title: 'Dashboard - El Inmortal 2',
             stats: {
@@ -67,6 +76,7 @@ router.get('/', async (req, res) => {
             },
             singles: singles || [],
             recentActivity: recentActivity || [],
+            recentTracks: recentTracks || [],
             launchDate: new Date('2026-02-17T00:00:00'),
             artistName: 'Galante el Emperador',
             albumName: 'El Inmortal 2'

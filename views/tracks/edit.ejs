@@ -103,7 +103,7 @@
                     
                     <% if (track.audio_file_path) { %>
                     <div style="margin-top: 15px; display: flex; gap: 10px; align-items: center;">
-                        <button type="button" id="transcribeBtn" class="btn" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none;" onclick="transcribeLyrics()">
+                        <button type="button" id="transcribeBtn" class="btn" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none;">
                             🎤 Transcribir Letra con IA
                         </button>
                         <span id="transcribeStatus" style="color: #888; font-size: 0.9em; display: none;">
@@ -686,6 +686,10 @@
             // Delete audio button
             const deleteBtn = document.getElementById('deleteAudioBtn');
             if (deleteBtn) deleteBtn.addEventListener('click', deleteAudio);
+            
+            // Transcribe lyrics button
+            const transcribeBtn = document.getElementById('transcribeBtn');
+            if (transcribeBtn) transcribeBtn.addEventListener('click', transcribeLyrics);
         });
     </script>
 </body>

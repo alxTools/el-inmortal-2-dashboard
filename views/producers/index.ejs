@@ -17,8 +17,29 @@
 
         <div class="timers-grid">
             <% producers.forEach(producer => { %>
-            <div class="timer-card producer-card" data-id="<%= producer.id %>" style="text-align: left;">
-                <h3 style="color: #ffd700; margin-bottom: 15px;"><%= producer.name %></h3>
+            <div class="timer-card producer-card" data-id="<%= producer.id %>" style="text-align: left; position: relative;">
+                <!-- Avatar Section -->
+                <div class="avatar-section" style="text-align: center; margin-bottom: 15px;">
+                    <% if (producer.avatar_path) { %>
+                        <img src="<%= producer.avatar_path %>" 
+                             alt="<%= producer.name %>" 
+                             class="producer-avatar"
+                             style="width: 100px; height: 100px; border-radius: 50%; object-fit: cover; border: 3px solid #ffd700;">
+                    <% } else { %>
+                        <div class="avatar-placeholder" 
+                             style="width: 100px; height: 100px; border-radius: 50%; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: inline-flex; align-items: center; justify-content: center; color: white; font-size: 2em; border: 3px solid #ffd700;">
+                            <%= producer.name.charAt(0).toUpperCase() %>
+                        </div>
+                    <% } %>
+                    <button class="btn-small upload-avatar-btn" 
+                            data-id="<%= producer.id %>"
+                            data-type="producer"
+                            style="margin-top: 10px; display: block; margin-left: auto; margin-right: auto;">
+                        📷 Cambiar Foto
+                    </button>
+                </div>
+                
+                <h3 style="color: #ffd700; margin-bottom: 15px; text-align: center;"><%= producer.name %></h3>
                 <p style="color: #888; margin-bottom: 10px;">
                     <strong>Email:</strong> <%= producer.email %>
                 </p>
@@ -28,7 +49,7 @@
                 <p style="color: #888; margin-bottom: 15px;">
                     <strong>Splits:</strong> <%= producer.split_percentage %>
                 </p>
-                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                <div style="display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;">
                     <a href="/producers/<%= producer.id %>/edit" class="btn-small">Editar</a>
                     <a href="/splitsheets/generate/<%= producer.id %>" class="btn-small">Splitsheet</a>
                     <button class="btn-small delete-producer-btn" 
@@ -106,6 +127,130 @@
         });
         
         console.log('✅ Delete buttons configured:', document.querySelectorAll('.delete-producer-btn').length);
+        
+        // Avatar Upload with Crop functionality
+        let currentCropper = null;
+        let currentEntityId = null;
+        let currentEntityType = null;
+        
+        // Avatar Upload Modal
+        const avatarModal = document.createElement('div');
+        avatarModal.id = 'avatarModal';
+        avatarModal.innerHTML = `
+            <div style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; justify-content: center; align-items: center;">
+                <div style="background: #1a1a1a; padding: 30px; border-radius: 15px; max-width: 600px; width: 90%; max-height: 90vh; overflow-y: auto; border: 2px solid #ffd700;">
+                    <h3 style="color: #ffd700; margin-bottom: 20px;">📷 Subir Avatar</h3>
+                    <input type="file" id="avatarInput" accept="image/*" style="margin-bottom: 20px; color: white;">
+                    <div id="cropContainer" style="margin-bottom: 20px; max-height: 400px; display: none;">
+                        <img id="cropImage" style="max-width: 100%; max-height: 400px;">
+                    </div>
+                    <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                        <button id="cancelAvatar" class="btn btn-secondary">Cancelar</button>
+                        <button id="saveAvatar" class="btn" style="display: none;">💾 Guardar Avatar</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(avatarModal);
+        
+        // Upload avatar button handlers
+        document.querySelectorAll('.upload-avatar-btn').forEach(button => {
+            button.addEventListener('click', function() {
+                currentEntityId = this.getAttribute('data-id');
+                currentEntityType = this.getAttribute('data-type');
+                document.getElementById('avatarInput').value = '';
+                document.getElementById('cropContainer').style.display = 'none';
+                document.getElementById('saveAvatar').style.display = 'none';
+                avatarModal.querySelector('div').style.display = 'flex';
+            });
+        });
+        
+        // Cancel button
+        document.getElementById('cancelAvatar').addEventListener('click', function() {
+            avatarModal.querySelector('div').style.display = 'none';
+            if (currentCropper) {
+                currentCropper.destroy();
+                currentCropper = null;
+            }
+        });
+        
+        // File input handler
+        document.getElementById('avatarInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                const cropImage = document.getElementById('cropImage');
+                cropImage.src = event.target.result;
+                document.getElementById('cropContainer').style.display = 'block';
+                document.getElementById('saveAvatar').style.display = 'inline-block';
+                
+                // Simple crop implementation (square aspect ratio)
+                cropImage.onload = function() {
+                    // Simple canvas-based crop for square aspect ratio
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    const size = Math.min(cropImage.naturalWidth, cropImage.naturalHeight);
+                    const x = (cropImage.naturalWidth - size) / 2;
+                    const y = (cropImage.naturalHeight - size) / 2;
+                    
+                    canvas.width = 300;
+                    canvas.height = 300;
+                    ctx.drawImage(cropImage, x, y, size, size, 0, 0, 300, 300);
+                    
+                    cropImage.dataset.cropped = canvas.toDataURL('image/jpeg', 0.9);
+                };
+            };
+            reader.readAsDataURL(file);
+        });
+        
+        // Save avatar
+        document.getElementById('saveAvatar').addEventListener('click', async function() {
+            const cropImage = document.getElementById('cropImage');
+            const croppedDataUrl = cropImage.dataset.cropped;
+            
+            if (!croppedDataUrl) {
+                alert('❌ Error: No hay imagen para guardar');
+                return;
+            }
+            
+            // Convert data URL to blob
+            const response = await fetch(croppedDataUrl);
+            const blob = await response.blob();
+            const formData = new FormData();
+            formData.append('avatar', blob, 'avatar.jpg');
+            formData.append('cropData', JSON.stringify({ width: 300, height: 300, aspect: 1 }));
+            
+            try {
+                const uploadResponse = await fetch(`/uploads/avatar/${currentEntityType}/${currentEntityId}`, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await uploadResponse.json();
+                
+                if (uploadResponse.ok && result.success) {
+                    alert('✅ Avatar actualizado exitosamente');
+                    avatarModal.querySelector('div').style.display = 'none';
+                    location.reload();
+                } else {
+                    throw new Error(result.error || 'Error al subir avatar');
+                }
+            } catch (error) {
+                console.error('Error uploading avatar:', error);
+                alert('❌ Error: ' + error.message);
+            }
+        });
+        
+        // Close modal on outside click
+        avatarModal.addEventListener('click', function(e) {
+            if (e.target === avatarModal.querySelector('div')) {
+                avatarModal.querySelector('div').style.display = 'none';
+            }
+        });
+        
+        console.log('✅ Avatar upload system configured');
     </script>
 </body>
 </html>

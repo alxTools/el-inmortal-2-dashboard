@@ -107,30 +107,11 @@ router.post('/track/:id/audio', upload.single('audio_file'), async (req, res) =>
         
         console.log(`[UPLOADS] Processing audio upload: ${originalName}`);
         
-        let fileStoragePath;
-        let storageType = 'local';
+        // Use local storage only (no Google Drive)
+        const fileStoragePath = `/uploads/audio/${req.file.filename}`;
+        const storageType = 'local';
         
-        // Try to upload to Google Drive if configured
-        try {
-            if (process.env.GOOGLE_SERVICE_ACCOUNT_KEY) {
-                console.log('[UPLOADS] Uploading to Google Drive...');
-                const driveResult = await uploadToDrive(
-                    localFilePath, 
-                    `${Date.now()}_${originalName}`,
-                    req.file.mimetype || 'audio/wav'
-                );
-                fileStoragePath = driveResult.downloadUrl;
-                storageType = 'gdrive';
-                console.log(`[UPLOADS] Google Drive upload successful: ${driveResult.fileId}`);
-            } else {
-                // Fallback to local storage
-                console.log('[UPLOADS] Google Drive not configured, using local storage');
-                fileStoragePath = `/uploads/audio/${req.file.filename}`;
-            }
-        } catch (driveError) {
-            console.error('[UPLOADS] Google Drive upload failed, using local:', driveError.message);
-            fileStoragePath = `/uploads/audio/${req.file.filename}`;
-        }
+        console.log(`[UPLOADS] Audio saved locally: ${fileStoragePath}`);
         
         await run(
             `UPDATE tracks 
@@ -334,6 +315,54 @@ router.post('/track/:id/audio/replace', upload.single('audio_file'), async (req,
     } catch (error) {
         console.error('Error replacing audio:', error);
         res.status(500).json({ error: 'Error reemplazando archivo de audio' });
+    }
+});
+
+// POST upload avatar for producer/artist/composer with crop
+router.post('/avatar/:type/:id', upload.single('avatar'), async (req, res) => {
+    try {
+        const { type, id } = req.params; // type: 'producer', 'composer', 'artist'
+        const { cropData } = req.body; // JSON with crop coordinates
+        
+        if (!req.file) {
+            return res.status(400).json({ error: 'No se subió ninguna imagen' });
+        }
+        
+        // Validate type
+        const validTypes = ['producer', 'composer', 'artist'];
+        if (!validTypes.includes(type)) {
+            return res.status(400).json({ error: 'Tipo inválido' });
+        }
+        
+        const filePath = `/uploads/avatars/${req.file.filename}`;
+        
+        // Update database
+        let tableName;
+        switch(type) {
+            case 'producer': tableName = 'producers'; break;
+            case 'composer': tableName = 'composers'; break;
+            case 'artist': tableName = 'artists'; break;
+        }
+        
+        await run(
+            `UPDATE ${tableName} 
+             SET avatar_path = ?, avatar_crop_data = ?
+             WHERE id = ?`,
+            [filePath, cropData || null, id]
+        );
+        
+        await logActivity('AVATAR_UPLOAD', type, id, `Avatar actualizado`);
+        
+        res.json({ 
+            success: true, 
+            message: 'Avatar subido exitosamente',
+            filePath: filePath,
+            type: type,
+            id: id
+        });
+    } catch (error) {
+        console.error('Error uploading avatar:', error);
+        res.status(500).json({ error: 'Error subiendo avatar' });
     }
 });
 

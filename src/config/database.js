@@ -154,6 +154,8 @@ async function initializeTables() {
                     address TEXT,
                     split_percentage VARCHAR(50) DEFAULT '50/50',
                     status VARCHAR(50) DEFAULT 'active',
+                    avatar_path VARCHAR(500),
+                    avatar_crop_data JSON,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )`
             },
@@ -164,6 +166,8 @@ async function initializeTables() {
                     name VARCHAR(255) NOT NULL,
                     email VARCHAR(255),
                     phone VARCHAR(50),
+                    avatar_path VARCHAR(500),
+                    avatar_crop_data JSON,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )`
             },
@@ -174,6 +178,8 @@ async function initializeTables() {
                     name VARCHAR(255) NOT NULL,
                     email VARCHAR(255),
                     phone VARCHAR(50),
+                    avatar_path VARCHAR(500),
+                    avatar_crop_data JSON,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )`
             },

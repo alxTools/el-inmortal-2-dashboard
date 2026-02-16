@@ -148,11 +148,11 @@
                 </audio>
                 
                 <div style="display: flex; gap: 10px; margin-top: 15px; flex-wrap: wrap;">
-                    <button onclick="playAudio()" class="btn" style="padding: 8px 15px; font-size: 0.85em;">▶️ Play</button>
-                    <button onclick="pauseAudio()" class="btn btn-secondary" style="padding: 8px 15px; font-size: 0.85em;">⏸️ Pause</button>
+                    <button id="playAudioBtn" class="btn" style="padding: 8px 15px; font-size: 0.85em;">▶️ Play</button>
+                    <button id="pauseAudioBtn" class="btn btn-secondary" style="padding: 8px 15px; font-size: 0.85em;">⏸️ Pause</button>
                     <a href="<%= track.audio_file_path %>" download class="btn btn-secondary" style="padding: 8px 15px; font-size: 0.85em; text-decoration: none;">⬇️ Descargar</a>
-                    <button onclick="showReplaceAudio()" class="btn" style="padding: 8px 15px; font-size: 0.85em; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none;">🔄 Reemplazar</button>
-                    <button onclick="deleteAudio()" class="btn btn-danger" style="padding: 8px 15px; font-size: 0.85em; background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%); border: none;">🗑️ Eliminar</button>
+                    <button id="showReplaceBtn" class="btn" style="padding: 8px 15px; font-size: 0.85em; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none;">🔄 Reemplazar</button>
+                    <button id="deleteAudioBtn" class="btn btn-danger" style="padding: 8px 15px; font-size: 0.85em; background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%); border: none;">🗑️ Eliminar</button>
                 </div>
                 
                 <!-- Replace Audio Section (Hidden by default) -->
@@ -178,7 +178,7 @@
                         </div>
                         <div style="display: flex; gap: 10px;">
                             <button type="submit" class="btn" style="padding: 8px 15px; font-size: 0.85em;">✅ Confirmar Reemplazo</button>
-                            <button type="button" onclick="hideReplaceAudio()" class="btn btn-secondary" style="padding: 8px 15px; font-size: 0.85em;">❌ Cancelar</button>
+                            <button type="button" id="hideReplaceBtn" class="btn btn-secondary" style="padding: 8px 15px; font-size: 0.85em;">❌ Cancelar</button>
                         </div>
                     </form>
                 </div>
@@ -666,8 +666,27 @@
             }).join('');
         }
 
-        // Load activity log on page load
-        document.addEventListener('DOMContentLoaded', loadActivityLog);
+        // Add event listeners for buttons (not using inline onclick due to CSP)
+        document.addEventListener('DOMContentLoaded', function() {
+            // Load activity log
+            loadActivityLog();
+            
+            // Audio player buttons
+            const playBtn = document.getElementById('playAudioBtn');
+            const pauseBtn = document.getElementById('pauseAudioBtn');
+            if (playBtn) playBtn.addEventListener('click', playAudio);
+            if (pauseBtn) pauseBtn.addEventListener('click', pauseAudio);
+            
+            // Replace audio buttons
+            const showReplaceBtn = document.getElementById('showReplaceBtn');
+            const hideReplaceBtn = document.getElementById('hideReplaceBtn');
+            if (showReplaceBtn) showReplaceBtn.addEventListener('click', showReplaceAudio);
+            if (hideReplaceBtn) hideReplaceBtn.addEventListener('click', hideReplaceAudio);
+            
+            // Delete audio button
+            const deleteBtn = document.getElementById('deleteAudioBtn');
+            if (deleteBtn) deleteBtn.addEventListener('click', deleteAudio);
+        });
     </script>
 </body>
 </html>

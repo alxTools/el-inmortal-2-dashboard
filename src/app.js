@@ -4,6 +4,8 @@ const session = require('express-session');
 const helmet = require('helmet');
 const cors = require('cors');
 const methodOverride = require('method-override');
+const crypto = require('crypto');
+const { exec } = require('child_process');
 require('dotenv').config();
 
 const { initializeTables, seedInitialData } = require('./config/database');
@@ -24,6 +26,33 @@ app.use(helmet({
 }));
 
 app.use(cors());
+
+// Webhook for auto-deploy (must be before body parsing to get raw body)
+app.post('/webhook/deploy', express.raw({ type: 'application/json' }), (req, res) => {
+    const secret = process.env.WEBHOOK_SECRET || 'your-webhook-secret';
+    const signature = req.headers['x-hub-signature-256'];
+
+    if (!signature) {
+        return res.status(401).json({ error: 'No signature' });
+    }
+
+    const hmac = crypto.createHmac('sha256', secret);
+    const digest = 'sha256=' + hmac.update(req.body).digest('hex');
+
+    if (signature !== digest) {
+        return res.status(401).json({ error: 'Invalid signature' });
+    }
+
+    // Execute git pull and pm2 reload
+    exec('cd /var/www/el-inmortal-2-dashboard && git pull && pm2 reload app', (error, stdout, stderr) => {
+        if (error) {
+            console.error('Deploy error:', error);
+            return res.status(500).json({ error: 'Deploy failed', details: error.message });
+        }
+        console.log('Deploy output:', stdout);
+        res.json({ success: true, message: 'Deployed successfully' });
+    });
+});
 
 // Body parsing middleware
 app.use(express.json());
@@ -105,36 +134,6 @@ app.use('/api', requireAuth, apiRouter);
 app.use('/uploads', requireAuth, uploadsRouter);
 app.use('/bulk-upload', requireAuth, bulkUploadRouter);
 app.use('/settings', requireAuth, settingsRouter);
-
-// Webhook for auto-deploy (no auth required)
-const crypto = require('crypto');
-const { exec } = require('child_process');
-
-app.post('/webhook/deploy', express.raw({ type: 'application/json' }), (req, res) => {
-    const secret = process.env.WEBHOOK_SECRET || 'your-webhook-secret';
-    const signature = req.headers['x-hub-signature-256'];
-    
-    if (!signature) {
-        return res.status(401).json({ error: 'No signature' });
-    }
-    
-    const hmac = crypto.createHmac('sha256', secret);
-    const digest = 'sha256=' + hmac.update(req.body).digest('hex');
-    
-    if (signature !== digest) {
-        return res.status(401).json({ error: 'Invalid signature' });
-    }
-    
-    // Execute git pull and pm2 reload
-    exec('cd /var/www/el-inmortal-2-dashboard && git pull && pm2 reload app', (error, stdout, stderr) => {
-        if (error) {
-            console.error('Deploy error:', error);
-            return res.status(500).json({ error: 'Deploy failed', details: error.message });
-        }
-        console.log('Deploy output:', stdout);
-        res.json({ success: true, message: 'Deployed successfully' });
-    });
-});
 
 // Multer error handling
 app.use((err, req, res, next) => {

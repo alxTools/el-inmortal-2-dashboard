@@ -1,32 +1,25 @@
 const express = require('express');
 const router = express.Router();
-const { getDatabase } = require('../config/database');
+const { getAll } = require('../config/database');
 
 // GET checklist
 router.get('/', async (req, res) => {
     try {
-        const db = getDatabase();
-        
-        const items = await new Promise((resolve, reject) => {
-            db.all(`
-                SELECT * FROM checklist_items
-                ORDER BY 
-                    CASE priority 
-                        WHEN 'urgent' THEN 1 
-                        WHEN 'high' THEN 2 
-                        WHEN 'normal' THEN 3 
-                        ELSE 4 
-                    END,
-                    created_at DESC
-            `, (err, rows) => {
-                if (err) reject(err);
-                else resolve(rows);
-            });
-        });
+        const items = await getAll(`
+            SELECT * FROM checklist_items
+            ORDER BY 
+                CASE priority 
+                    WHEN 'urgent' THEN 1 
+                    WHEN 'high' THEN 2 
+                    WHEN 'normal' THEN 3 
+                    ELSE 4 
+                END,
+                created_at DESC
+        `);
 
         // Group by category
         const grouped = {};
-        items.forEach(item => {
+        (items || []).forEach(item => {
             if (!grouped[item.category]) {
                 grouped[item.category] = [];
             }

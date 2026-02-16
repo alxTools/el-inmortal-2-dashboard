@@ -3,25 +3,19 @@ const router = express.Router();
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
-const { getDatabase } = require('../config/database');
+const { getAll, getOne, run } = require('../config/database');
 
 // Helper function to log activity
-async function logActivity(db, action, entityType, entityId, details) {
-    return new Promise((resolve, reject) => {
-        db.run(
-            `INSERT INTO activity_log (action, entity_type, entity_id, details, created_at) 
-             VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)`,
-            [action, entityType, entityId, details],
-            (err) => {
-                if (err) {
-                    console.error('Error logging activity:', err);
-                    reject(err);
-                } else {
-                    resolve();
-                }
-            }
+async function logActivity(action, entityType, entityId, details) {
+    try {
+        await run(
+            `INSERT INTO activity_log (action, entity_type, entity_id, details) 
+             VALUES (?, ?, ?, ?)`,
+            [action, entityType, entityId, details]
         );
-    });
+    } catch (err) {
+        console.error('Error logging activity:', err);
+    }
 }
 
 // Debug: Log all requests to this router
@@ -100,7 +94,6 @@ const upload = multer({
 // POST upload audio file for a track
 router.post('/track/:id/audio', upload.single('audio_file'), async (req, res) => {
     try {
-        const db = getDatabase();
         const trackId = req.params.id;
         const { file_type } = req.body; // master, acapella, beat, show
         
@@ -110,19 +103,15 @@ router.post('/track/:id/audio', upload.single('audio_file'), async (req, res) =>
         
         const filePath = `/uploads/audio/${req.file.filename}`;
         
-        await new Promise((resolve, reject) => {
-            db.run(`
-                UPDATE tracks 
-                SET audio_file_path = ?, audio_file_type = ?, updated_at = CURRENT_TIMESTAMP
-                WHERE id = ?
-            `, [filePath, file_type || 'master', trackId], (err) => {
-                if (err) reject(err);
-                else resolve();
-            });
-        });
+        await run(
+            `UPDATE tracks 
+             SET audio_file_path = ?, audio_file_type = ?
+             WHERE id = ?`,
+            [filePath, file_type || 'master', trackId]
+        );
         
         // Log activity
-        await logActivity(db, 'AUDIO_UPLOAD', 'track', trackId, 
+        await logActivity('AUDIO_UPLOAD', 'track', trackId, 
             `Audio subido: ${req.file.originalname} (${file_type || 'master'})`);
         
         res.json({ 
@@ -140,7 +129,6 @@ router.post('/track/:id/audio', upload.single('audio_file'), async (req, res) =>
 // POST upload cover image for a track
 router.post('/track/:id/cover', upload.single('cover_image'), async (req, res) => {
     try {
-        const db = getDatabase();
         const trackId = req.params.id;
         
         if (!req.file) {
@@ -149,16 +137,12 @@ router.post('/track/:id/cover', upload.single('cover_image'), async (req, res) =
         
         const filePath = `/uploads/images/${req.file.filename}`;
         
-        await new Promise((resolve, reject) => {
-            db.run(`
-                UPDATE tracks 
-                SET cover_image_path = ?, updated_at = CURRENT_TIMESTAMP
-                WHERE id = ?
-            `, [filePath, trackId], (err) => {
-                if (err) reject(err);
-                else resolve();
-            });
-        });
+        await run(
+            `UPDATE tracks 
+             SET cover_image_path = ?
+             WHERE id = ?`,
+            [filePath, trackId]
+        );
         
         res.json({ 
             success: true, 
@@ -174,34 +158,22 @@ router.post('/track/:id/cover', upload.single('cover_image'), async (req, res) =
 // POST upload album cover
 router.post('/album/cover', upload.single('album_cover'), async (req, res) => {
     try {
-        const db = getDatabase();
-        
         if (!req.file) {
             return res.status(400).json({ error: 'No se subió ninguna imagen' });
         }
         
         const filePath = `/uploads/images/${req.file.filename}`;
         
-        // Update or insert album info
-        await new Promise((resolve, reject) => {
-            db.get('SELECT id FROM album_info LIMIT 1', (err, row) => {
-                if (err) {
-                    reject(err);
-                } else if (row) {
-                    db.run('UPDATE album_info SET cover_image_path = ? WHERE id = ?', 
-                        [filePath, row.id], (err) => {
-                        if (err) reject(err);
-                        else resolve();
-                    });
-                } else {
-                    db.run('INSERT INTO album_info (name, artist, cover_image_path) VALUES (?, ?, ?)',
-                        ['El Inmortal 2', 'Galante el Emperador', filePath], (err) => {
-                        if (err) reject(err);
-                        else resolve();
-                    });
-                }
-            });
-        });
+        // Check if album info exists
+        const albumInfo = await getOne('SELECT id FROM album_info LIMIT 1');
+        
+        if (albumInfo) {
+            await run('UPDATE album_info SET cover_image_path = ? WHERE id = ?', 
+                [filePath, albumInfo.id]);
+        } else {
+            await run('INSERT INTO album_info (name, artist, cover_image_path) VALUES (?, ?, ?)',
+                ['El Inmortal 2', 'Galante el Emperador', filePath]);
+        }
         
         res.json({ 
             success: true, 
@@ -217,15 +189,9 @@ router.post('/album/cover', upload.single('album_cover'), async (req, res) => {
 // GET audio file for playback
 router.get('/track/:id/audio', async (req, res) => {
     try {
-        const db = getDatabase();
         const trackId = req.params.id;
         
-        const track = await new Promise((resolve, reject) => {
-            db.get('SELECT audio_file_path FROM tracks WHERE id = ?', [trackId], (err, row) => {
-                if (err) reject(err);
-                else resolve(row);
-            });
-        });
+        const track = await getOne('SELECT audio_file_path FROM tracks WHERE id = ?', [trackId]);
         
         if (!track || !track.audio_file_path) {
             return res.status(404).json({ error: 'No hay archivo de audio para este track' });
@@ -233,7 +199,7 @@ router.get('/track/:id/audio', async (req, res) => {
         
         const filePath = path.join(__dirname, '../../public', track.audio_file_path);
         
-        if (!require('fs').existsSync(filePath)) {
+        if (!fs.existsSync(filePath)) {
             return res.status(404).json({ error: 'Archivo no encontrado en el servidor' });
         }
         
@@ -247,16 +213,10 @@ router.get('/track/:id/audio', async (req, res) => {
 // DELETE audio file for a track
 router.delete('/track/:id/audio', async (req, res) => {
     try {
-        const db = getDatabase();
         const trackId = req.params.id;
         
         // Get current audio info
-        const track = await new Promise((resolve, reject) => {
-            db.get('SELECT * FROM tracks WHERE id = ?', [trackId], (err, row) => {
-                if (err) reject(err);
-                else resolve(row);
-            });
-        });
+        const track = await getOne('SELECT * FROM tracks WHERE id = ?', [trackId]);
         
         if (!track || !track.audio_file_path) {
             return res.status(404).json({ error: 'No hay archivo de audio para eliminar' });
@@ -272,19 +232,15 @@ router.delete('/track/:id/audio', async (req, res) => {
         }
         
         // Update database
-        await new Promise((resolve, reject) => {
-            db.run(`
-                UPDATE tracks 
-                SET audio_file_path = NULL, audio_file_type = NULL, updated_at = CURRENT_TIMESTAMP
-                WHERE id = ?
-            `, [trackId], (err) => {
-                if (err) reject(err);
-                else resolve();
-            });
-        });
+        await run(
+            `UPDATE tracks 
+             SET audio_file_path = NULL, audio_file_type = NULL
+             WHERE id = ?`,
+            [trackId]
+        );
         
         // Log activity
-        await logActivity(db, 'AUDIO_DELETE', 'track', trackId, 
+        await logActivity('AUDIO_DELETE', 'track', trackId, 
             `Audio eliminado: ${fileName}`);
         
         res.json({ 
@@ -301,7 +257,6 @@ router.delete('/track/:id/audio', async (req, res) => {
 // POST replace audio file for a track
 router.post('/track/:id/audio/replace', upload.single('audio_file'), async (req, res) => {
     try {
-        const db = getDatabase();
         const trackId = req.params.id;
         const { file_type } = req.body;
         
@@ -310,12 +265,7 @@ router.post('/track/:id/audio/replace', upload.single('audio_file'), async (req,
         }
         
         // Get old audio info
-        const track = await new Promise((resolve, reject) => {
-            db.get('SELECT * FROM tracks WHERE id = ?', [trackId], (err, row) => {
-                if (err) reject(err);
-                else resolve(row);
-            });
-        });
+        const track = await getOne('SELECT * FROM tracks WHERE id = ?', [trackId]);
         
         const oldFilePath = track?.audio_file_path;
         const oldFileName = oldFilePath ? oldFilePath.split('/').pop() : 'ninguno';
@@ -332,19 +282,15 @@ router.post('/track/:id/audio/replace', upload.single('audio_file'), async (req,
         }
         
         // Update database with new file
-        await new Promise((resolve, reject) => {
-            db.run(`
-                UPDATE tracks 
-                SET audio_file_path = ?, audio_file_type = ?, updated_at = CURRENT_TIMESTAMP
-                WHERE id = ?
-            `, [newFilePath, file_type || 'master', trackId], (err) => {
-                if (err) reject(err);
-                else resolve();
-            });
-        });
+        await run(
+            `UPDATE tracks 
+             SET audio_file_path = ?, audio_file_type = ?
+             WHERE id = ?`,
+            [newFilePath, file_type || 'master', trackId]
+        );
         
         // Log activity
-        await logActivity(db, 'AUDIO_REPLACE', 'track', trackId, 
+        await logActivity('AUDIO_REPLACE', 'track', trackId, 
             `Audio reemplazado: ${oldFileName} → ${newFileName} (${file_type || 'master'})`);
         
         res.json({ 
@@ -364,24 +310,18 @@ router.post('/track/:id/audio/replace', upload.single('audio_file'), async (req,
 // GET activity log for a track
 router.get('/track/:id/log', async (req, res) => {
     try {
-        const db = getDatabase();
         const trackId = req.params.id;
         
-        const activities = await new Promise((resolve, reject) => {
-            db.all(`
-                SELECT * FROM activity_log 
-                WHERE entity_type = 'track' AND entity_id = ?
-                ORDER BY created_at DESC
-            `, [trackId], (err, rows) => {
-                if (err) reject(err);
-                else resolve(rows);
-            });
-        });
+        const activities = await getAll(`
+            SELECT * FROM activity_log 
+            WHERE entity_type = 'track' AND entity_id = ?
+            ORDER BY created_at DESC
+        `, [trackId]);
         
         res.json({
             success: true,
             trackId: trackId,
-            activities: activities
+            activities: activities || []
         });
     } catch (error) {
         console.error('Error fetching activity log:', error);

@@ -1,29 +1,22 @@
 const express = require('express');
 const router = express.Router();
 const { body, validationResult } = require('express-validator');
-const { getDatabase } = require('../config/database');
+const { getAll, getOne, run } = require('../config/database');
 
 // GET all artists
 router.get('/', async (req, res) => {
     try {
-        const db = getDatabase();
-        
-        const artists = await new Promise((resolve, reject) => {
-            db.all(`
-                SELECT a.*, COUNT(ta.id) as track_count
-                FROM artists a
-                LEFT JOIN track_artists ta ON a.id = ta.artist_id
-                GROUP BY a.id
-                ORDER BY a.name
-            `, (err, rows) => {
-                if (err) reject(err);
-                else resolve(rows);
-            });
-        });
+        const artists = await getAll(`
+            SELECT a.*, COUNT(ta.id) as track_count
+            FROM artists a
+            LEFT JOIN track_artists ta ON a.id = ta.artist_id
+            GROUP BY a.id
+            ORDER BY a.name
+        `);
 
         res.render('artists/index', {
             title: 'Artistas - El Inmortal 2',
-            artists: artists
+            artists: artists || []
         });
     } catch (error) {
         console.error('Error fetching artists:', error);
@@ -57,21 +50,12 @@ router.post('/', [
     }
 
     try {
-        const db = getDatabase();
-        const { 
-            name, legal_name, email, phone, artist_type,
-            record_label, management, social_media, notes 
-        } = req.body;
+        const { name, email, phone } = req.body;
 
-        await new Promise((resolve, reject) => {
-            db.run(`
-                INSERT INTO artists (name, legal_name, email, phone, artist_type, record_label, management, social_media, notes)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            `, [name, legal_name, email, phone, artist_type || 'featured', record_label, management, social_media, notes], function(err) {
-                if (err) reject(err);
-                else resolve(this.lastID);
-            });
-        });
+        await run(
+            `INSERT INTO artists (name, email, phone) VALUES (?, ?, ?)`,
+            [name, email, phone]
+        );
 
         res.redirect('/artists');
     } catch (error) {
@@ -87,15 +71,9 @@ router.post('/', [
 // GET edit form
 router.get('/:id/edit', async (req, res) => {
     try {
-        const db = getDatabase();
         const artistId = req.params.id;
 
-        const artist = await new Promise((resolve, reject) => {
-            db.get('SELECT * FROM artists WHERE id = ?', [artistId], (err, row) => {
-                if (err) reject(err);
-                else resolve(row);
-            });
-        });
+        const artist = await getOne('SELECT * FROM artists WHERE id = ?', [artistId]);
 
         if (!artist) {
             return res.status(404).render('error', {
@@ -122,24 +100,15 @@ router.get('/:id/edit', async (req, res) => {
 // PUT update artist
 router.put('/:id', async (req, res) => {
     try {
-        const db = getDatabase();
         const artistId = req.params.id;
-        const { 
-            name, legal_name, email, phone, artist_type,
-            record_label, management, social_media, notes, status 
-        } = req.body;
+        const { name, email, phone } = req.body;
 
-        await new Promise((resolve, reject) => {
-            db.run(`
-                UPDATE artists 
-                SET name = ?, legal_name = ?, email = ?, phone = ?, artist_type = ?,
-                    record_label = ?, management = ?, social_media = ?, notes = ?, status = ?
-                WHERE id = ?
-            `, [name, legal_name, email, phone, artist_type, record_label, management, social_media, notes, status, artistId], (err) => {
-                if (err) reject(err);
-                else resolve();
-            });
-        });
+        await run(
+            `UPDATE artists 
+             SET name = ?, email = ?, phone = ?
+             WHERE id = ?`,
+            [name, email, phone, artistId]
+        );
 
         res.redirect('/artists');
     } catch (error) {
@@ -155,15 +124,9 @@ router.put('/:id', async (req, res) => {
 // DELETE artist
 router.delete('/:id', async (req, res) => {
     try {
-        const db = getDatabase();
         const artistId = req.params.id;
 
-        await new Promise((resolve, reject) => {
-            db.run('DELETE FROM artists WHERE id = ?', [artistId], (err) => {
-                if (err) reject(err);
-                else resolve();
-            });
-        });
+        await run('DELETE FROM artists WHERE id = ?', [artistId]);
 
         res.json({ success: true, message: 'Artista eliminado' });
     } catch (error) {

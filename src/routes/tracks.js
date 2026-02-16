@@ -1,43 +1,39 @@
 const express = require('express');
 const router = express.Router();
 const { body, validationResult } = require('express-validator');
-const { getDatabase } = require('../config/database');
+const { getAll, getOne, run } = require('../config/database');
 
 // GET all tracks
 router.get('/', async (req, res) => {
     try {
-        const db = getDatabase();
         const filter = req.query.filter;
         
-        let query = `
+        let sql = `
             SELECT t.*, p.name as producer_name, p.email as producer_email
             FROM tracks t
             LEFT JOIN producers p ON t.producer_id = p.id
         `;
         
+        const params = [];
+        
         // Apply filters
         if (filter === 'singles') {
-            query += ' WHERE t.is_single = 1';
+            sql += ' WHERE t.is_single = 1';
         } else if (filter === 'primary') {
-            query += ' WHERE t.is_primary = 1';
+            sql += ' WHERE t.is_primary = 1';
         } else if (filter === 'album') {
-            query += ' WHERE t.is_single = 0 AND t.is_primary = 0';
+            sql += ' WHERE t.is_single = 0 AND t.is_primary = 0';
         } else if (filter === 'pending') {
-            query += ' WHERE t.splitsheet_confirmed = 0';
+            sql += ' WHERE t.splitsheet_confirmed = 0';
         }
         
-        query += ' ORDER BY t.track_number';
+        sql += ' ORDER BY t.track_number';
         
-        const tracks = await new Promise((resolve, reject) => {
-            db.all(query, (err, rows) => {
-                if (err) reject(err);
-                else resolve(rows);
-            });
-        });
+        const tracks = await getAll(sql, params);
 
         res.render('tracks/index', {
             title: 'Lista de Temas - El Inmortal 2',
-            tracks: tracks,
+            tracks: tracks || [],
             currentFilter: filter
         });
     } catch (error) {
@@ -53,18 +49,11 @@ router.get('/', async (req, res) => {
 // GET new track form
 router.get('/new', async (req, res) => {
     try {
-        const db = getDatabase();
-        
-        const producers = await new Promise((resolve, reject) => {
-            db.all('SELECT * FROM producers ORDER BY name', (err, rows) => {
-                if (err) reject(err);
-                else resolve(rows);
-            });
-        });
+        const producers = await getAll('SELECT * FROM producers ORDER BY name');
 
         res.render('tracks/new', {
             title: 'Nuevo Tema - El Inmortal 2',
-            producers: producers
+            producers: producers || []
         });
     } catch (error) {
         console.error('Error:', error);
@@ -92,18 +81,13 @@ router.post('/', [
     }
 
     try {
-        const db = getDatabase();
         const { track_number, title, producer_id, recording_date, duration, lyrics } = req.body;
 
-        await new Promise((resolve, reject) => {
-            db.run(`
-                INSERT INTO tracks (track_number, title, producer_id, recording_date, duration, lyrics)
-                VALUES (?, ?, ?, ?, ?, ?)
-            `, [track_number, title, producer_id || null, recording_date, duration, lyrics], function(err) {
-                if (err) reject(err);
-                else resolve(this.lastID);
-            });
-        });
+        await run(
+            `INSERT INTO tracks (track_number, title, producer_id, recording_date, duration, lyrics)
+             VALUES (?, ?, ?, ?, ?, ?)`,
+            [track_number, title, producer_id || null, recording_date, duration, lyrics]
+        );
 
         res.redirect('/tracks');
     } catch (error) {
@@ -119,15 +103,9 @@ router.post('/', [
 // GET edit track form
 router.get('/:id/edit', async (req, res) => {
     try {
-        const db = getDatabase();
         const trackId = req.params.id;
 
-        const track = await new Promise((resolve, reject) => {
-            db.get('SELECT * FROM tracks WHERE id = ?', [trackId], (err, row) => {
-                if (err) reject(err);
-                else resolve(row);
-            });
-        });
+        const track = await getOne('SELECT * FROM tracks WHERE id = ?', [trackId]);
 
         if (!track) {
             return res.status(404).render('error', {
@@ -137,17 +115,12 @@ router.get('/:id/edit', async (req, res) => {
             });
         }
 
-        const producers = await new Promise((resolve, reject) => {
-            db.all('SELECT * FROM producers ORDER BY name', (err, rows) => {
-                if (err) reject(err);
-                else resolve(rows);
-            });
-        });
+        const producers = await getAll('SELECT * FROM producers ORDER BY name');
 
         res.render('tracks/edit', {
             title: `Editar: ${track.title}`,
             track: track,
-            producers: producers
+            producers: producers || []
         });
     } catch (error) {
         console.error('Error:', error);
@@ -162,19 +135,16 @@ router.get('/:id/edit', async (req, res) => {
 // PUT update track
 router.put('/:id', async (req, res) => {
     try {
-        const db = getDatabase();
         const trackId = req.params.id;
         const { title, producer_id, recording_date, duration, lyrics, status, is_single, is_primary, track_type } = req.body;
 
-        await new Promise((resolve, reject) => {
-            db.run(`
-                UPDATE tracks 
-                SET title = ?, producer_id = ?, recording_date = ?, 
-                    duration = ?, lyrics = ?, status = ?, 
-                    is_single = ?, is_primary = ?, track_type = ?,
-                    updated_at = CURRENT_TIMESTAMP
-                WHERE id = ?
-            `, [
+        await run(
+            `UPDATE tracks 
+             SET title = ?, producer_id = ?, recording_date = ?, 
+                 duration = ?, lyrics = ?, status = ?, 
+                 is_single = ?, is_primary = ?, track_type = ?
+             WHERE id = ?`,
+            [
                 title, 
                 producer_id || null, 
                 recording_date, 
@@ -185,11 +155,8 @@ router.put('/:id', async (req, res) => {
                 is_primary ? 1 : 0, 
                 track_type || 'album', 
                 trackId
-            ], (err) => {
-                if (err) reject(err);
-                else resolve();
-            });
-        });
+            ]
+        );
 
         res.redirect('/tracks');
     } catch (error) {
@@ -205,15 +172,9 @@ router.put('/:id', async (req, res) => {
 // DELETE track
 router.delete('/:id', async (req, res) => {
     try {
-        const db = getDatabase();
         const trackId = req.params.id;
 
-        await new Promise((resolve, reject) => {
-            db.run('DELETE FROM tracks WHERE id = ?', [trackId], (err) => {
-                if (err) reject(err);
-                else resolve();
-            });
-        });
+        await run('DELETE FROM tracks WHERE id = ?', [trackId]);
 
         res.json({ success: true, message: 'Tema eliminado' });
     } catch (error) {

@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { getDatabase } = require('../config/database');
+const { getAll, getOne, run } = require('../config/database');
 const OpenAI = require('openai');
 const fs = require('fs');
 const path = require('path');
@@ -12,75 +12,53 @@ const openai = new OpenAI({
 });
 
 // Helper function to log activity
-async function logActivity(db, action, entityType, entityId, details) {
-    return new Promise((resolve, reject) => {
-        db.run(
-            `INSERT INTO activity_log (action, entity_type, entity_id, details, created_at) 
-             VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)`,
-            [action, entityType, entityId, details],
-            (err) => {
-                if (err) {
-                    console.error('Error logging activity:', err);
-                    reject(err);
-                } else {
-                    resolve();
-                }
-            }
+async function logActivity(action, entityType, entityId, details) {
+    try {
+        await run(
+            `INSERT INTO activity_log (action, entity_type, entity_id, details) 
+             VALUES (?, ?, ?, ?)`,
+            [action, entityType, entityId, details]
         );
-    });
+    } catch (err) {
+        console.error('Error logging activity:', err);
+    }
 }
 
 // GET dashboard stats
 router.get('/stats', async (req, res) => {
     try {
-        const db = getDatabase();
-        
-        const stats = await new Promise((resolve, reject) => {
-            db.get(`
-                SELECT 
-                    COUNT(*) as total_tracks,
-                    SUM(CASE WHEN splitsheet_sent = 1 THEN 1 ELSE 0 END) as splitsheets_sent,
-                    SUM(CASE WHEN splitsheet_confirmed = 1 THEN 1 ELSE 0 END) as splitsheets_confirmed,
-                    SUM(content_count) as total_content
-                FROM tracks
-            `, (err, row) => {
-                if (err) reject(err);
-                else resolve(row);
-            });
-        });
+        const stats = await getOne(`
+            SELECT 
+                COUNT(*) as total_tracks,
+                SUM(CASE WHEN splitsheet_sent = 1 THEN 1 ELSE 0 END) as splitsheets_sent,
+                SUM(CASE WHEN splitsheet_confirmed = 1 THEN 1 ELSE 0 END) as splitsheets_confirmed,
+                SUM(content_count) as total_content
+            FROM tracks
+        `);
 
-        const producerCount = await new Promise((resolve, reject) => {
-            db.get('SELECT COUNT(*) as count FROM producers', (err, row) => {
-                if (err) reject(err);
-                else resolve(row.count);
-            });
-        });
+        const producerResult = await getOne('SELECT COUNT(*) as count FROM producers');
+        const producerCount = producerResult?.count || 0;
 
-        const checklistStats = await new Promise((resolve, reject) => {
-            db.get(`
-                SELECT 
-                    COUNT(*) as total,
-                    SUM(CASE WHEN completed = 1 THEN 1 ELSE 0 END) as completed,
-                    SUM(CASE WHEN priority = 'urgent' AND completed = 0 THEN 1 ELSE 0 END) as urgent
-                FROM checklist_items
-            `, (err, row) => {
-                if (err) reject(err);
-                else resolve(row);
-            });
-        });
+        const checklistStats = await getOne(`
+            SELECT 
+                COUNT(*) as total,
+                SUM(CASE WHEN completed = 1 THEN 1 ELSE 0 END) as completed,
+                SUM(CASE WHEN priority = 'urgent' AND completed = 0 THEN 1 ELSE 0 END) as urgent
+            FROM checklist_items
+        `);
 
         res.json({
             tracks: {
-                total: stats.total_tracks || 0,
+                total: stats?.total_tracks || 0,
                 target: 21
             },
             splitsheets: {
-                sent: stats.splitsheets_sent || 0,
-                confirmed: stats.splitsheets_confirmed || 0,
-                pending: (stats.total_tracks || 0) - (stats.splitsheets_confirmed || 0)
+                sent: stats?.splitsheets_sent || 0,
+                confirmed: stats?.splitsheets_confirmed || 0,
+                pending: (stats?.total_tracks || 0) - (stats?.splitsheets_confirmed || 0)
             },
             content: {
-                total: stats.total_content || 0,
+                total: stats?.total_content || 0,
                 target: 63
             },
             producers: producerCount || 0,
@@ -95,21 +73,14 @@ router.get('/stats', async (req, res) => {
 // GET all tracks
 router.get('/tracks', async (req, res) => {
     try {
-        const db = getDatabase();
-        
-        const tracks = await new Promise((resolve, reject) => {
-            db.all(`
-                SELECT t.*, p.name as producer_name, p.email as producer_email
-                FROM tracks t
-                LEFT JOIN producers p ON t.producer_id = p.id
-                ORDER BY t.track_number
-            `, (err, rows) => {
-                if (err) reject(err);
-                else resolve(rows);
-            });
-        });
+        const tracks = await getAll(`
+            SELECT t.*, p.name as producer_name, p.email as producer_email
+            FROM tracks t
+            LEFT JOIN producers p ON t.producer_id = p.id
+            ORDER BY t.track_number
+        `);
 
-        res.json(tracks);
+        res.json(tracks || []);
     } catch (error) {
         console.error('API Tracks Error:', error);
         res.status(500).json({ error: 'Error fetching tracks' });
@@ -119,22 +90,15 @@ router.get('/tracks', async (req, res) => {
 // GET all producers
 router.get('/producers', async (req, res) => {
     try {
-        const db = getDatabase();
-        
-        const producers = await new Promise((resolve, reject) => {
-            db.all(`
-                SELECT p.*, COUNT(t.id) as track_count
-                FROM producers p
-                LEFT JOIN tracks t ON p.id = t.producer_id
-                GROUP BY p.id
-                ORDER BY p.name
-            `, (err, rows) => {
-                if (err) reject(err);
-                else resolve(rows);
-            });
-        });
+        const producers = await getAll(`
+            SELECT p.*, COUNT(t.id) as track_count
+            FROM producers p
+            LEFT JOIN tracks t ON p.id = t.producer_id
+            GROUP BY p.id
+            ORDER BY p.name
+        `);
 
-        res.json(producers);
+        res.json(producers || []);
     } catch (error) {
         console.error('API Producers Error:', error);
         res.status(500).json({ error: 'Error fetching producers' });
@@ -179,7 +143,6 @@ router.get('/countdown', (req, res) => {
 // POST update track status
 router.post('/tracks/:id/status', async (req, res) => {
     try {
-        const db = getDatabase();
         const trackId = req.params.id;
         const { field, value } = req.body;
 
@@ -188,14 +151,10 @@ router.post('/tracks/:id/status', async (req, res) => {
             return res.status(400).json({ error: 'Invalid field' });
         }
 
-        await new Promise((resolve, reject) => {
-            db.run(`
-                UPDATE tracks SET ${field} = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?
-            `, [value, trackId], (err) => {
-                if (err) reject(err);
-                else resolve();
-            });
-        });
+        await run(
+            `UPDATE tracks SET ${field} = ? WHERE id = ?`,
+            [value, trackId]
+        );
 
         res.json({ success: true, message: 'Status updated' });
     } catch (error) {
@@ -207,26 +166,19 @@ router.post('/tracks/:id/status', async (req, res) => {
 // GET checklist items
 router.get('/checklist', async (req, res) => {
     try {
-        const db = getDatabase();
-        
-        const items = await new Promise((resolve, reject) => {
-            db.all(`
-                SELECT * FROM checklist_items
-                ORDER BY 
-                    CASE priority 
-                        WHEN 'urgent' THEN 1 
-                        WHEN 'high' THEN 2 
-                        WHEN 'normal' THEN 3 
-                        ELSE 4 
-                    END,
-                    created_at DESC
-            `, (err, rows) => {
-                if (err) reject(err);
-                else resolve(rows);
-            });
-        });
+        const items = await getAll(`
+            SELECT * FROM checklist_items
+            ORDER BY 
+                CASE priority 
+                    WHEN 'urgent' THEN 1 
+                    WHEN 'high' THEN 2 
+                    WHEN 'normal' THEN 3 
+                    ELSE 4 
+                END,
+                created_at DESC
+        `);
 
-        res.json(items);
+        res.json(items || []);
     } catch (error) {
         console.error('API Checklist Error:', error);
         res.status(500).json({ error: 'Error fetching checklist' });
@@ -236,18 +188,12 @@ router.get('/checklist', async (req, res) => {
 // POST toggle checklist item
 router.post('/checklist/:id/toggle', async (req, res) => {
     try {
-        const db = getDatabase();
         const itemId = req.params.id;
         
         console.log(`[API] Toggling checklist item ${itemId}`);
 
         // Get current state first
-        const currentItem = await new Promise((resolve, reject) => {
-            db.get('SELECT completed FROM checklist_items WHERE id = ?', [itemId], (err, row) => {
-                if (err) reject(err);
-                else resolve(row);
-            });
-        });
+        const currentItem = await getOne('SELECT completed FROM checklist_items WHERE id = ?', [itemId]);
         
         if (!currentItem) {
             return res.status(404).json({ error: 'Item not found' });
@@ -255,17 +201,13 @@ router.post('/checklist/:id/toggle', async (req, res) => {
         
         const newState = currentItem.completed === 1 ? 0 : 1;
 
-        await new Promise((resolve, reject) => {
-            db.run(`
-                UPDATE checklist_items 
-                SET completed = ?,
-                    completed_at = CASE WHEN ? = 1 THEN CURRENT_TIMESTAMP ELSE NULL END
-                WHERE id = ?
-            `, [newState, newState, itemId], (err) => {
-                if (err) reject(err);
-                else resolve();
-            });
-        });
+        await run(
+            `UPDATE checklist_items 
+             SET completed = ?,
+                 completed_at = CASE WHEN ? = 1 THEN CURRENT_TIMESTAMP ELSE NULL END
+             WHERE id = ?`,
+            [newState, newState, itemId]
+        );
 
         console.log(`[API] Item ${itemId} toggled to ${newState === 1 ? 'completed' : 'pending'}`);
         res.json({ 
@@ -285,18 +227,12 @@ router.post('/tracks/:id/transcribe', async (req, res) => {
     let tempFilePath = null;
     
     try {
-        const db = getDatabase();
         const trackId = req.params.id;
         
         console.log(`[API] Starting transcription for track ${trackId}`);
 
         // Get track info
-        const track = await new Promise((resolve, reject) => {
-            db.get('SELECT * FROM tracks WHERE id = ?', [trackId], (err, row) => {
-                if (err) reject(err);
-                else resolve(row);
-            });
-        });
+        const track = await getOne('SELECT * FROM tracks WHERE id = ?', [trackId]);
         
         if (!track) {
             return res.status(404).json({ error: 'Track not found' });
@@ -352,21 +288,15 @@ router.post('/tracks/:id/transcribe', async (req, res) => {
             console.log(`[API] Transcription received, length: ${transcription.length}`);
 
             // Update the database with transcribed lyrics
-            await new Promise((resolve, reject) => {
-                db.run(
-                    'UPDATE tracks SET lyrics = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-                    [transcription, trackId],
-                    (err) => {
-                        if (err) reject(err);
-                        else resolve();
-                    }
-                );
-            });
+            await run(
+                'UPDATE tracks SET lyrics = ? WHERE id = ?',
+                [transcription, trackId]
+            );
 
             console.log(`[API] Lyrics saved to database for track ${trackId}`);
 
             // Log activity
-            await logActivity(db, 'LYRICS_TRANSCRIBE', 'track', trackId, 
+            await logActivity('LYRICS_TRANSCRIBE', 'track', trackId, 
                 `Letra transcrita desde ${source} (${transcription.length} caracteres)`);
 
             res.json({ 

@@ -245,31 +245,39 @@ router.post('/tracks/:id/transcribe', async (req, res) => {
         let audioPath = track.audio_file_path;
         let source = 'local';
 
-        // Check if file exists locally
+        // Check if it's a server-local path (starts with /uploads/)
+        if (audioPath.startsWith('/uploads/')) {
+            // Build full path from public directory
+            audioPath = path.join(__dirname, '../../public', audioPath);
+            console.log(`[API] Using local server file: ${audioPath}`);
+        }
+
+        // Check if file exists
         if (!fs.existsSync(audioPath)) {
-            console.log(`[API] Local file not found: ${audioPath}`);
+            console.log(`[API] File not found at: ${audioPath}`);
             
             // Check if it's a Dropbox path
-            if (isDropboxPath(audioPath)) {
+            if (isDropboxPath(track.audio_file_path)) {
                 console.log(`[API] Attempting to download from Dropbox...`);
                 
                 try {
-                    const dropboxPath = convertToDropboxPath(audioPath);
+                    const dropboxPath = convertToDropboxPath(track.audio_file_path);
                     tempFilePath = await downloadFromDropbox(dropboxPath);
                     audioPath = tempFilePath;
                     source = 'dropbox';
                 } catch (dropboxError) {
                     console.error('[API] Dropbox download failed:', dropboxError);
                     return res.status(404).json({ 
-                        error: 'Audio file not found locally and failed to download from Dropbox',
+                        error: 'Audio file not found and failed to download from Dropbox',
                         details: dropboxError.message,
                         path: track.audio_file_path
                     });
                 }
             } else {
                 return res.status(404).json({ 
-                    error: 'Audio file not found at the specified path',
-                    path: audioPath
+                    error: 'Audio file not found on server',
+                    path: audioPath,
+                    note: 'Files uploaded to server may be lost after redeploy on free tier'
                 });
             }
         }

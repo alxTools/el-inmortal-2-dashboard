@@ -4,7 +4,8 @@ const { getAll, getOne, run } = require('../config/database');
 const OpenAI = require('openai');
 const fs = require('fs');
 const path = require('path');
-const { downloadFromDropbox, cleanupTempFile, isDropboxPath, convertToDropboxPath } = require('../utils/dropboxHelper');
+const { downloadFromDropbox, cleanupTempFile: cleanupDropboxTemp, isDropboxPath, convertToDropboxPath } = require('../utils/dropboxHelper');
+const { downloadFromDrive, cleanupTempFile: cleanupDriveTemp, isGoogleDrivePath } = require('../utils/googleDriveHelper');
 
 // Initialize OpenAI client
 const openai = new OpenAI({
@@ -244,42 +245,58 @@ router.post('/tracks/:id/transcribe', async (req, res) => {
 
         let audioPath = track.audio_file_path;
         let source = 'local';
+        let tempFileToCleanup = null;
 
+        // Check if it's a Google Drive path
+        if (isGoogleDrivePath(audioPath)) {
+            console.log(`[API] Detected Google Drive path: ${audioPath}`);
+            try {
+                tempFilePath = await downloadFromDrive(audioPath);
+                audioPath = tempFilePath;
+                tempFileToCleanup = tempFilePath;
+                source = 'gdrive';
+                console.log(`[API] Downloaded from Google Drive: ${audioPath}`);
+            } catch (driveError) {
+                console.error('[API] Google Drive download failed:', driveError);
+                return res.status(404).json({ 
+                    error: 'Failed to download from Google Drive',
+                    details: driveError.message
+                });
+            }
+        }
+        // Check if it's a Dropbox path
+        else if (isDropboxPath(audioPath)) {
+            console.log(`[API] Detected Dropbox path: ${audioPath}`);
+            try {
+                const dropboxPath = convertToDropboxPath(audioPath);
+                tempFilePath = await downloadFromDropbox(dropboxPath);
+                audioPath = tempFilePath;
+                tempFileToCleanup = tempFilePath;
+                source = 'dropbox';
+                console.log(`[API] Downloaded from Dropbox: ${audioPath}`);
+            } catch (dropboxError) {
+                console.error('[API] Dropbox download failed:', dropboxError);
+                return res.status(404).json({ 
+                    error: 'Failed to download from Dropbox',
+                    details: dropboxError.message
+                });
+            }
+        }
         // Check if it's a server-local path (starts with /uploads/)
-        if (audioPath.startsWith('/uploads/')) {
+        else if (audioPath.startsWith('/uploads/')) {
             // Build full path from public directory
             audioPath = path.join(__dirname, '../../public', audioPath);
             console.log(`[API] Using local server file: ${audioPath}`);
         }
 
-        // Check if file exists
+        // Check if file exists locally
         if (!fs.existsSync(audioPath)) {
             console.log(`[API] File not found at: ${audioPath}`);
-            
-            // Check if it's a Dropbox path
-            if (isDropboxPath(track.audio_file_path)) {
-                console.log(`[API] Attempting to download from Dropbox...`);
-                
-                try {
-                    const dropboxPath = convertToDropboxPath(track.audio_file_path);
-                    tempFilePath = await downloadFromDropbox(dropboxPath);
-                    audioPath = tempFilePath;
-                    source = 'dropbox';
-                } catch (dropboxError) {
-                    console.error('[API] Dropbox download failed:', dropboxError);
-                    return res.status(404).json({ 
-                        error: 'Audio file not found and failed to download from Dropbox',
-                        details: dropboxError.message,
-                        path: track.audio_file_path
-                    });
-                }
-            } else {
-                return res.status(404).json({ 
-                    error: 'Audio file not found on server',
-                    path: audioPath,
-                    note: 'Files uploaded to server may be lost after redeploy on free tier'
-                });
-            }
+            return res.status(404).json({ 
+                error: 'Audio file not found on server',
+                path: audioPath,
+                note: 'Files may be lost after redeploy on free tier. Consider using Google Drive or Dropbox storage.'
+            });
         }
 
         console.log(`[API] Using audio from ${source}: ${audioPath}`);
@@ -328,9 +345,13 @@ router.post('/tracks/:id/transcribe', async (req, res) => {
         console.error('[API] Transcribe Error:', error);
         res.status(500).json({ error: 'Error transcribing track' });
     } finally {
-        // Clean up temporary file if downloaded from Dropbox
-        if (tempFilePath) {
-            cleanupTempFile(tempFilePath);
+        // Clean up temporary files
+        if (tempFileToCleanup) {
+            if (source === 'gdrive') {
+                cleanupDriveTemp(tempFileToCleanup);
+            } else if (source === 'dropbox') {
+                cleanupDropboxTemp(tempFileToCleanup);
+            }
         }
     }
 });

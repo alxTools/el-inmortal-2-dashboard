@@ -4,6 +4,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const { getAll, getOne, run } = require('../config/database');
+const { uploadToDrive, isGoogleDrivePath } = require('../utils/googleDriveHelper');
 
 // Helper function to log activity
 async function logActivity(action, entityType, entityId, details) {
@@ -101,28 +102,57 @@ router.post('/track/:id/audio', upload.single('audio_file'), async (req, res) =>
             return res.status(400).json({ error: 'No se subió ningún archivo' });
         }
         
-        const filePath = `/uploads/audio/${req.file.filename}`;
+        const localFilePath = req.file.path;
+        const originalName = req.file.originalname;
+        
+        console.log(`[UPLOADS] Processing audio upload: ${originalName}`);
+        
+        let fileStoragePath;
+        let storageType = 'local';
+        
+        // Try to upload to Google Drive if configured
+        try {
+            if (process.env.GOOGLE_SERVICE_ACCOUNT_KEY) {
+                console.log('[UPLOADS] Uploading to Google Drive...');
+                const driveResult = await uploadToDrive(
+                    localFilePath, 
+                    `${Date.now()}_${originalName}`,
+                    req.file.mimetype || 'audio/wav'
+                );
+                fileStoragePath = driveResult.downloadUrl;
+                storageType = 'gdrive';
+                console.log(`[UPLOADS] Google Drive upload successful: ${driveResult.fileId}`);
+            } else {
+                // Fallback to local storage
+                console.log('[UPLOADS] Google Drive not configured, using local storage');
+                fileStoragePath = `/uploads/audio/${req.file.filename}`;
+            }
+        } catch (driveError) {
+            console.error('[UPLOADS] Google Drive upload failed, using local:', driveError.message);
+            fileStoragePath = `/uploads/audio/${req.file.filename}`;
+        }
         
         await run(
             `UPDATE tracks 
              SET audio_file_path = ?, audio_file_type = ?
              WHERE id = ?`,
-            [filePath, file_type || 'master', trackId]
+            [fileStoragePath, file_type || 'master', trackId]
         );
         
         // Log activity
         await logActivity('AUDIO_UPLOAD', 'track', trackId, 
-            `Audio subido: ${req.file.originalname} (${file_type || 'master'})`);
+            `Audio subido (${storageType}): ${originalName} (${file_type || 'master'})`);
         
         res.json({ 
             success: true, 
-            message: 'Archivo de audio subido exitosamente',
-            filePath: filePath,
-            fileType: file_type || 'master'
+            message: `Archivo de audio subido exitosamente (${storageType})`,
+            filePath: fileStoragePath,
+            fileType: file_type || 'master',
+            storage: storageType
         });
     } catch (error) {
         console.error('Error uploading audio:', error);
-        res.status(500).json({ error: 'Error subiendo archivo de audio' });
+        res.status(500).json({ error: 'Error subiendo archivo de audio', details: error.message });
     }
 });
 

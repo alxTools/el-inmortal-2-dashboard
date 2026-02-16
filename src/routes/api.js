@@ -4,6 +4,7 @@ const { getDatabase } = require('../config/database');
 const OpenAI = require('openai');
 const fs = require('fs');
 const path = require('path');
+const { downloadFromDropbox, cleanupTempFile, isDropboxPath, convertToDropboxPath } = require('../utils/dropboxHelper');
 
 // Initialize OpenAI client
 const openai = new OpenAI({
@@ -281,6 +282,8 @@ router.post('/checklist/:id/toggle', async (req, res) => {
 
 // POST transcribe lyrics from audio using OpenAI Whisper
 router.post('/tracks/:id/transcribe', async (req, res) => {
+    let tempFilePath = null;
+    
     try {
         const db = getDatabase();
         const trackId = req.params.id;
@@ -303,16 +306,39 @@ router.post('/tracks/:id/transcribe', async (req, res) => {
             return res.status(400).json({ error: 'No audio file available for transcription' });
         }
 
-        // Check if file exists
-        const audioPath = track.audio_file_path;
+        let audioPath = track.audio_file_path;
+        let source = 'local';
+
+        // Check if file exists locally
         if (!fs.existsSync(audioPath)) {
-            return res.status(404).json({ 
-                error: 'Audio file not found at the specified path',
-                path: audioPath
-            });
+            console.log(`[API] Local file not found: ${audioPath}`);
+            
+            // Check if it's a Dropbox path
+            if (isDropboxPath(audioPath)) {
+                console.log(`[API] Attempting to download from Dropbox...`);
+                
+                try {
+                    const dropboxPath = convertToDropboxPath(audioPath);
+                    tempFilePath = await downloadFromDropbox(dropboxPath);
+                    audioPath = tempFilePath;
+                    source = 'dropbox';
+                } catch (dropboxError) {
+                    console.error('[API] Dropbox download failed:', dropboxError);
+                    return res.status(404).json({ 
+                        error: 'Audio file not found locally and failed to download from Dropbox',
+                        details: dropboxError.message,
+                        path: track.audio_file_path
+                    });
+                }
+            } else {
+                return res.status(404).json({ 
+                    error: 'Audio file not found at the specified path',
+                    path: audioPath
+                });
+            }
         }
 
-        console.log(`[API] Sending audio to Whisper API: ${audioPath}`);
+        console.log(`[API] Using audio from ${source}: ${audioPath}`);
 
         try {
             // Call OpenAI Whisper API
@@ -341,14 +367,15 @@ router.post('/tracks/:id/transcribe', async (req, res) => {
 
             // Log activity
             await logActivity(db, 'LYRICS_TRANSCRIBE', 'track', trackId, 
-                `Letra transcrita automáticamente usando Whisper API (${transcription.length} caracteres)`);
+                `Letra transcrita desde ${source} (${transcription.length} caracteres)`);
 
             res.json({ 
                 success: true, 
-                message: 'Transcription completed successfully',
+                message: `Transcription completed successfully (source: ${source})`,
                 lyrics: transcription,
                 trackTitle: track.title,
-                trackId: trackId
+                trackId: trackId,
+                source: source
             });
 
         } catch (openaiError) {
@@ -362,6 +389,11 @@ router.post('/tracks/:id/transcribe', async (req, res) => {
     } catch (error) {
         console.error('[API] Transcribe Error:', error);
         res.status(500).json({ error: 'Error transcribing track' });
+    } finally {
+        // Clean up temporary file if downloaded from Dropbox
+        if (tempFilePath) {
+            cleanupTempFile(tempFilePath);
+        }
     }
 });
 

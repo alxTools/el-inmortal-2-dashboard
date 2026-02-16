@@ -93,11 +93,100 @@
 
                 <div style="margin-top: 30px; text-align: center;">
                     <button class="btn" onclick="window.print()" style="background: #000; color: #fff;">🖨️ Imprimir / Guardar PDF</button>
+                    <button id="sendEmailBtn" class="btn" style="background: #ffd700; color: #1a1a2e; margin-left: 10px;">
+                        📧 Enviar por Email
+                    </button>
                     <a href="/tracks" class="btn btn-secondary" style="margin-left: 10px;">Volver a Temas</a>
+                </div>
+
+                <!-- Email Modal -->
+                <div id="emailModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; justify-content: center; align-items: center;">
+                    <div style="background: #1a1a2e; padding: 30px; border-radius: 15px; border: 2px solid #ffd700; max-width: 500px; width: 90%;">
+                        <h3 style="color: #ffd700; margin-bottom: 20px;">📧 Enviar Splitsheet</h3>
+                        <form id="emailForm">
+                            <div class="form-group" style="margin-bottom: 15px;">
+                                <label style="display: block; color: #888; margin-bottom: 5px;">Email del Productor:</label>
+                                <input type="email" id="producerEmail" value="<%= track.producer_email || '' %>" required style="width: 100%; padding: 10px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,215,0,0.5); border-radius: 5px; color: #fff;">
+                            </div>
+                            <div class="form-group" style="margin-bottom: 15px;">
+                                <label style="display: block; color: #888; margin-bottom: 5px;">Email del Artista:</label>
+                                <input type="email" id="artistEmail" value="<%= artistEmail || 'galante@el-emperador.com' %>" required style="width: 100%; padding: 10px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,215,0,0.5); border-radius: 5px; color: #fff;">
+                            </div>
+                            <div class="form-group" style="margin-bottom: 20px;">
+                                <label style="display: block; color: #888; margin-bottom: 5px;">Mensaje Adicional:</label>
+                                <textarea id="emailMessage" rows="3" placeholder="Mensaje opcional para incluir en el email..." style="width: 100%; padding: 10px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,215,0,0.5); border-radius: 5px; color: #fff; resize: vertical;"></textarea>
+                            </div>
+                            <div style="display: flex; gap: 10px;">
+                                <button type="submit" class="btn" style="flex: 1;">📤 Enviar</button>
+                                <button type="button" onclick="closeEmailModal()" class="btn btn-secondary" style="flex: 1;">Cancelar</button>
+                            </div>
+                        </form>
+                        <div id="emailStatus" style="margin-top: 15px; text-align: center; display: none;"></div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
+
+    <script>
+        // Email modal functions
+        document.getElementById('sendEmailBtn').addEventListener('click', function() {
+            document.getElementById('emailModal').style.display = 'flex';
+        });
+
+        function closeEmailModal() {
+            document.getElementById('emailModal').style.display = 'none';
+            document.getElementById('emailStatus').style.display = 'none';
+        }
+
+        // Handle email form submission
+        document.getElementById('emailForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const producerEmail = document.getElementById('producerEmail').value;
+            const artistEmail = document.getElementById('artistEmail').value;
+            const message = document.getElementById('emailMessage').value;
+            const statusDiv = document.getElementById('emailStatus');
+            
+            statusDiv.style.display = 'block';
+            statusDiv.innerHTML = '<span style="color: #ffd700;">⏳ Enviando emails...</span>';
+            
+            try {
+                const response = await fetch('/splitsheets/<%= track.id %>/send', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        producerEmail,
+                        artistEmail,
+                        message
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok && result.success) {
+                    statusDiv.innerHTML = '<span style="color: #4ade80;">✅ Emails enviados exitosamente!</span>';
+                    setTimeout(() => {
+                        closeEmailModal();
+                    }, 2000);
+                } else {
+                    statusDiv.innerHTML = '<span style="color: #ff6b6b;">❌ Error: ' + (result.error || 'No se pudieron enviar los emails') + '</span>';
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                statusDiv.innerHTML = '<span style="color: #ff6b6b;">❌ Error de conexión</span>';
+            }
+        });
+
+        // Close modal on outside click
+        document.getElementById('emailModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeEmailModal();
+            }
+        });
+    </script>
 
     <%- include('../partials/footer') %>
 </body>

@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: el-inmortal-2-dashboard
+    runtime: node
+    buildCommand: npm install
+    startCommand: npm start
+    plan: free
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: RENDER_DISK_PATH
+        value: /data/database
+    disk:
+      name: database-disk
+      mountPath: /data
+      sizeGB: 1

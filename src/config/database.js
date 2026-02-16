@@ -2,7 +2,14 @@ const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 const fs = require('fs');
 
-const DB_PATH = path.join(__dirname, '../../database/el_inmortal_2.db');
+// Support for Render's persistent disk
+const DB_DIR = process.env.RENDER_DISK_PATH || path.join(__dirname, '../../database');
+const DB_PATH = path.join(DB_DIR, 'el_inmortal_2.db');
+
+// Ensure database directory exists
+if (!fs.existsSync(DB_DIR)) {
+    fs.mkdirSync(DB_DIR, { recursive: true });
+}
 
 let db = null;
 

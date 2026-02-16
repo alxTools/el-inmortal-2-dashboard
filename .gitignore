@@ -9,13 +9,12 @@ yarn-error.log*
 .env.local
 .env.*.local
 
-# Database files (keep structure, ignore data)
-# IMPORTANT: Main database is tracked for Render deployment
-database/sessions.db
+# Database files (NEVER commit these - they contain live data)
+# On Render, the database lives in a persistent disk at /data/database/
+database/*.db
 database/*.db-journal
 database/*.db-shm
 database/*.db-wal
-!database/el_inmortal_2.db
 !database/.gitkeep
 
 # Logs

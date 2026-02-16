@@ -84,10 +84,30 @@ async function initializeTables() {
     try {
         console.log('🔄 Initializing MySQL tables...');
         
-        const tables = [
+        // Step 1: Drop existing tables if they exist (clean slate)
+        console.log('  🗑️ Cleaning existing tables...');
+        const dropTables = [
+            'track_composers', 'track_artists', 'splitsheets', 'content_calendar',
+            'activity_log', 'checklist_items', 'tracks', 'producers', 
+            'composers', 'artists', 'album_info'
+        ];
+        
+        for (const tableName of dropTables) {
+            try {
+                await query(`DROP TABLE IF EXISTS ${tableName}`);
+                console.log(`    Dropped: ${tableName}`);
+            } catch (dropErr) {
+                console.log(`    (Table ${tableName} did not exist)`);
+            }
+        }
+        
+        // Step 2: Create base tables (no foreign keys)
+        console.log('  📦 Creating base tables...');
+        
+        const baseTables = [
             {
                 name: 'tracks',
-                sql: `CREATE TABLE IF NOT EXISTS tracks (
+                sql: `CREATE TABLE tracks (
                     id INT AUTO_INCREMENT PRIMARY KEY,
                     track_number INT NOT NULL UNIQUE,
                     title VARCHAR(255) NOT NULL,
@@ -113,7 +133,7 @@ async function initializeTables() {
             },
             {
                 name: 'album_info',
-                sql: `CREATE TABLE IF NOT EXISTS album_info (
+                sql: `CREATE TABLE album_info (
                     id INT AUTO_INCREMENT PRIMARY KEY,
                     name VARCHAR(255) DEFAULT 'El Inmortal 2',
                     artist VARCHAR(255) DEFAULT 'Galante el Emperador',
@@ -125,7 +145,7 @@ async function initializeTables() {
             },
             {
                 name: 'producers',
-                sql: `CREATE TABLE IF NOT EXISTS producers (
+                sql: `CREATE TABLE producers (
                     id INT AUTO_INCREMENT PRIMARY KEY,
                     name VARCHAR(255) NOT NULL,
                     legal_name VARCHAR(255),
@@ -139,7 +159,7 @@ async function initializeTables() {
             },
             {
                 name: 'composers',
-                sql: `CREATE TABLE IF NOT EXISTS composers (
+                sql: `CREATE TABLE composers (
                     id INT AUTO_INCREMENT PRIMARY KEY,
                     name VARCHAR(255) NOT NULL,
                     email VARCHAR(255),
@@ -149,7 +169,7 @@ async function initializeTables() {
             },
             {
                 name: 'artists',
-                sql: `CREATE TABLE IF NOT EXISTS artists (
+                sql: `CREATE TABLE artists (
                     id INT AUTO_INCREMENT PRIMARY KEY,
                     name VARCHAR(255) NOT NULL,
                     email VARCHAR(255),
@@ -158,8 +178,48 @@ async function initializeTables() {
                 )`
             },
             {
+                name: 'checklist_items',
+                sql: `CREATE TABLE checklist_items (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    category VARCHAR(100) NOT NULL,
+                    item_text TEXT NOT NULL,
+                    priority VARCHAR(50) DEFAULT 'normal',
+                    completed BOOLEAN DEFAULT 0,
+                    notes TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    completed_at DATETIME
+                )`
+            },
+            {
+                name: 'activity_log',
+                sql: `CREATE TABLE activity_log (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    action VARCHAR(100) NOT NULL,
+                    entity_type VARCHAR(100),
+                    entity_id INT,
+                    details TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )`
+            }
+        ];
+
+        for (const table of baseTables) {
+            try {
+                await query(table.sql);
+                console.log(`    ✅ ${table.name}`);
+            } catch (tableErr) {
+                console.error(`    ❌ Error creating ${table.name}:`, tableErr.message);
+                throw tableErr;
+            }
+        }
+        
+        // Step 3: Create junction tables with foreign keys
+        console.log('  🔗 Creating junction tables...');
+        
+        const junctionTables = [
+            {
                 name: 'track_composers',
-                sql: `CREATE TABLE IF NOT EXISTS track_composers (
+                sql: `CREATE TABLE track_composers (
                     id INT AUTO_INCREMENT PRIMARY KEY,
                     track_id INT NOT NULL,
                     composer_id INT NOT NULL,
@@ -170,7 +230,7 @@ async function initializeTables() {
             },
             {
                 name: 'track_artists',
-                sql: `CREATE TABLE IF NOT EXISTS track_artists (
+                sql: `CREATE TABLE track_artists (
                     id INT AUTO_INCREMENT PRIMARY KEY,
                     track_id INT NOT NULL,
                     artist_id INT NOT NULL,
@@ -181,7 +241,7 @@ async function initializeTables() {
             },
             {
                 name: 'splitsheets',
-                sql: `CREATE TABLE IF NOT EXISTS splitsheets (
+                sql: `CREATE TABLE splitsheets (
                     id INT AUTO_INCREMENT PRIMARY KEY,
                     track_id INT NOT NULL,
                     producer_id INT NOT NULL,
@@ -199,7 +259,7 @@ async function initializeTables() {
             },
             {
                 name: 'content_calendar',
-                sql: `CREATE TABLE IF NOT EXISTS content_calendar (
+                sql: `CREATE TABLE content_calendar (
                     id INT AUTO_INCREMENT PRIMARY KEY,
                     day_number INT NOT NULL,
                     date DATE NOT NULL,
@@ -213,39 +273,15 @@ async function initializeTables() {
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (track_id) REFERENCES tracks(id) ON DELETE SET NULL
                 )`
-            },
-            {
-                name: 'checklist_items',
-                sql: `CREATE TABLE IF NOT EXISTS checklist_items (
-                    id INT AUTO_INCREMENT PRIMARY KEY,
-                    category VARCHAR(100) NOT NULL,
-                    item_text TEXT NOT NULL,
-                    priority VARCHAR(50) DEFAULT 'normal',
-                    completed BOOLEAN DEFAULT 0,
-                    notes TEXT,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    completed_at DATETIME
-                )`
-            },
-            {
-                name: 'activity_log',
-                sql: `CREATE TABLE IF NOT EXISTS activity_log (
-                    id INT AUTO_INCREMENT PRIMARY KEY,
-                    action VARCHAR(100) NOT NULL,
-                    entity_type VARCHAR(100),
-                    entity_id INT,
-                    details TEXT,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )`
             }
         ];
 
-        for (const table of tables) {
+        for (const table of junctionTables) {
             try {
                 await query(table.sql);
-                console.log(`  ✅ Table: ${table.name}`);
+                console.log(`    ✅ ${table.name}`);
             } catch (tableErr) {
-                console.error(`  ❌ Error creating table ${table.name}:`, tableErr.message);
+                console.error(`    ❌ Error creating ${table.name}:`, tableErr.message);
                 throw tableErr;
             }
         }

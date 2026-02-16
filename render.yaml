@@ -10,9 +10,19 @@ services:
         value: production
       - key: PORT
         value: 10000
-      - key: RENDER_DISK_PATH
-        value: /data/database
-    disk:
-      name: database-disk
-      mountPath: /data
-      sizeGB: 1
+      # Database Configuration (MySQL)
+      - key: DB_HOST
+        value: db.artistaviral.com
+      - key: DB_USER
+        value: ailex
+      - key: DB_NAME
+        value: artistaviral
+      # Secrets - Configure manually in Render Dashboard
+      - key: DB_PASSWORD
+        sync: false  # Set manually: soyesmalandro.2
+      - key: OPENAI_API_KEY
+        sync: false  # Set manually: sk-proj-...
+      - key: DROPBOX_ACCESS_TOKEN
+        sync: false  # Set manually: sl.u....
+    # Note: Disk removed - using external MySQL database instead
+    # This allows free tier usage with persistent data

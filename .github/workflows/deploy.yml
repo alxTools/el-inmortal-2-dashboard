@@ -1,0 +1,32 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Setup SSH
+      uses: webfactory/ssh-agent@v0.8.0
+      with:
+        ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+    
+    - name: Add host to known hosts
+      run: |
+        mkdir -p ~/.ssh
+        ssh-keyscan -H 172.233.181.181 >> ~/.ssh/known_hosts
+    
+    - name: Deploy to server
+      run: |
+        ssh root@172.233.181.181 '
+          cd /var/www/el-inmortal-2-dashboard &&
+          git pull origin main &&
+          npm install &&
+          pm2 reload app
+        '

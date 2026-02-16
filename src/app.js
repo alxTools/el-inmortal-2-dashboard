@@ -35,13 +35,18 @@ app.use(methodOverride('_method'));
 // Static files
 app.use(express.static(path.join(__dirname, '../public')));
 
+// Trust proxy (needed for Nginx + Secure Cookies)
+app.set('trust proxy', 1);
+
 // Session configuration - using memory store for now (can be changed to MySQL later)
 app.use(session({
     secret: process.env.SESSION_SECRET || 'el-inmortal-2-secret-key-2026',
     resave: false,
     saveUninitialized: false,
     cookie: {
-        secure: process.env.NODE_ENV === 'production',
+        secure: process.env.NODE_ENV === 'production', // Requires HTTPS
+        httpOnly: true,
+        sameSite: 'lax',
         maxAge: 1000 * 60 * 60 * 24 // 24 hours
     }
 }));
@@ -62,6 +67,7 @@ app.use((req, res, next) => {
 // Routes
 const indexRouter = require('./routes/index');
 const tracksRouter = require('./routes/tracks');
+const albumsRouter = require('./routes/albums');
 const producersRouter = require('./routes/producers');
 const composersRouter = require('./routes/composers');
 const artistsRouter = require('./routes/artists');
@@ -71,18 +77,64 @@ const checklistRouter = require('./routes/checklist');
 const apiRouter = require('./routes/api');
 const authRouter = require('./routes/auth');
 const uploadsRouter = require('./routes/uploads');
+const bulkUploadRouter = require('./routes/bulk-upload');
+const settingsRouter = require('./routes/settings');
 
-app.use('/', indexRouter);
-app.use('/tracks', tracksRouter);
-app.use('/producers', producersRouter);
-app.use('/composers', composersRouter);
-app.use('/artists', artistsRouter);
-app.use('/splitsheets', splitsheetsRouter);
-app.use('/calendar', calendarRouter);
-app.use('/checklist', checklistRouter);
-app.use('/api', apiRouter);
+// Authentication middleware
+function requireAuth(req, res, next) {
+    if (!req.session.user) {
+        return res.redirect('/auth/login');
+    }
+    next();
+}
+
+// Public routes (no auth required)
 app.use('/auth', authRouter);
-app.use('/uploads', uploadsRouter);
+
+// Protected routes (auth required)
+app.use('/', requireAuth, indexRouter);
+app.use('/tracks', requireAuth, tracksRouter);
+app.use('/albums', requireAuth, albumsRouter);
+app.use('/producers', requireAuth, producersRouter);
+app.use('/composers', requireAuth, composersRouter);
+app.use('/artists', requireAuth, artistsRouter);
+app.use('/splitsheets', requireAuth, splitsheetsRouter);
+app.use('/calendar', requireAuth, calendarRouter);
+app.use('/checklist', requireAuth, checklistRouter);
+app.use('/api', requireAuth, apiRouter);
+app.use('/uploads', requireAuth, uploadsRouter);
+app.use('/bulk-upload', requireAuth, bulkUploadRouter);
+app.use('/settings', requireAuth, settingsRouter);
+
+// Webhook for auto-deploy (no auth required)
+const crypto = require('crypto');
+const { exec } = require('child_process');
+
+app.post('/webhook/deploy', express.raw({ type: 'application/json' }), (req, res) => {
+    const secret = process.env.WEBHOOK_SECRET || 'your-webhook-secret';
+    const signature = req.headers['x-hub-signature-256'];
+    
+    if (!signature) {
+        return res.status(401).json({ error: 'No signature' });
+    }
+    
+    const hmac = crypto.createHmac('sha256', secret);
+    const digest = 'sha256=' + hmac.update(req.body).digest('hex');
+    
+    if (signature !== digest) {
+        return res.status(401).json({ error: 'Invalid signature' });
+    }
+    
+    // Execute git pull and pm2 reload
+    exec('cd /var/www/el-inmortal-2-dashboard && git pull && pm2 reload app', (error, stdout, stderr) => {
+        if (error) {
+            console.error('Deploy error:', error);
+            return res.status(500).json({ error: 'Deploy failed', details: error.message });
+        }
+        console.log('Deploy output:', stdout);
+        res.json({ success: true, message: 'Deployed successfully' });
+    });
+});
 
 // Multer error handling
 app.use((err, req, res, next) => {
@@ -143,15 +195,14 @@ app.use((req, res) => {
 // Initialize database and start server
 async function startServer() {
     try {
-        console.log('🔄 Initializing database...');
+        console.log('🔄 Checking database...');
         
-        // Initialize tables
-        await initializeTables();
-        console.log('✅ Database tables initialized');
+        // NOTE: In production, we don't auto-initialize tables to preserve data
+        // Tables should be created manually or via migration scripts
+        // await initializeTables(); // DISABLED - prevents data loss on restart
+        // await seedInitialData(); // DISABLED - prevents data overwrite
         
-        // Seed initial data
-        await seedInitialData();
-        console.log('✅ Initial data seeded');
+        console.log('✅ Database connection ready');
         
         // Start server
         const server = app.listen(PORT, '0.0.0.0', () => {

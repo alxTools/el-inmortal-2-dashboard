@@ -208,9 +208,13 @@ router.get('/track/:id/audio', async (req, res) => {
             return res.status(404).json({ error: 'No hay archivo de audio para este track' });
         }
         
-        const filePath = path.join(__dirname, '../../public', track.audio_file_path);
+        const appRoot = process.cwd();
+        const filePath = path.join(appRoot, 'public', track.audio_file_path);
+        
+        console.log(`[UPLOADS] Serving audio: ${filePath}`);
         
         if (!fs.existsSync(filePath)) {
+            console.log(`[UPLOADS] Audio file not found: ${filePath}`);
             return res.status(404).json({ error: 'Archivo no encontrado en el servidor' });
         }
         
@@ -237,9 +241,14 @@ router.delete('/track/:id/audio', async (req, res) => {
         const fileName = oldFilePath.split('/').pop();
         
         // Delete physical file if it exists
-        const fullPath = path.join(__dirname, '../../public', oldFilePath);
+        const appRoot = process.cwd();
+        const fullPath = path.join(appRoot, 'public', oldFilePath);
+        console.log(`[UPLOADS] Deleting file: ${fullPath}`);
         if (fs.existsSync(fullPath)) {
             fs.unlinkSync(fullPath);
+            console.log(`[UPLOADS] File deleted successfully`);
+        } else {
+            console.log(`[UPLOADS] File not found at: ${fullPath}`);
         }
         
         // Update database
@@ -286,9 +295,12 @@ router.post('/track/:id/audio/replace', upload.single('audio_file'), async (req,
         
         // Delete old file if it exists
         if (oldFilePath) {
-            const fullOldPath = path.join(__dirname, '../../public', oldFilePath);
+            const appRoot = process.cwd();
+            const fullOldPath = path.join(appRoot, 'public', oldFilePath);
+            console.log(`[UPLOADS] Replacing - deleting old file: ${fullOldPath}`);
             if (fs.existsSync(fullOldPath)) {
                 fs.unlinkSync(fullOldPath);
+                console.log(`[UPLOADS] Old file deleted`);
             }
         }
         

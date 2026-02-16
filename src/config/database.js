@@ -84,161 +84,173 @@ async function initializeTables() {
     try {
         console.log('🔄 Initializing MySQL tables...');
         
-        // Create tables (if not exists)
-        await query(`
-            CREATE TABLE IF NOT EXISTS tracks (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                track_number INT NOT NULL UNIQUE,
-                title VARCHAR(255) NOT NULL,
-                producer_id INT,
-                recording_date DATE,
-                duration VARCHAR(20),
-                lyrics LONGTEXT,
-                status VARCHAR(50) DEFAULT 'pending',
-                splitsheet_sent BOOLEAN DEFAULT 0,
-                splitsheet_confirmed BOOLEAN DEFAULT 0,
-                content_count INT DEFAULT 0,
-                track_type VARCHAR(50) DEFAULT 'album',
-                is_single BOOLEAN DEFAULT 0,
-                is_primary BOOLEAN DEFAULT 0,
-                features VARCHAR(255),
-                file_path VARCHAR(500),
-                audio_file_path VARCHAR(500),
-                audio_file_type VARCHAR(50),
-                cover_image_path VARCHAR(500),
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-            )
-        `);
+        const tables = [
+            {
+                name: 'tracks',
+                sql: `CREATE TABLE IF NOT EXISTS tracks (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    track_number INT NOT NULL UNIQUE,
+                    title VARCHAR(255) NOT NULL,
+                    producer_id INT,
+                    recording_date DATE,
+                    duration VARCHAR(20),
+                    lyrics LONGTEXT,
+                    status VARCHAR(50) DEFAULT 'pending',
+                    splitsheet_sent BOOLEAN DEFAULT 0,
+                    splitsheet_confirmed BOOLEAN DEFAULT 0,
+                    content_count INT DEFAULT 0,
+                    track_type VARCHAR(50) DEFAULT 'album',
+                    is_single BOOLEAN DEFAULT 0,
+                    is_primary BOOLEAN DEFAULT 0,
+                    features VARCHAR(255),
+                    file_path VARCHAR(500),
+                    audio_file_path VARCHAR(500),
+                    audio_file_type VARCHAR(50),
+                    cover_image_path VARCHAR(500),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+                )`
+            },
+            {
+                name: 'album_info',
+                sql: `CREATE TABLE IF NOT EXISTS album_info (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    name VARCHAR(255) DEFAULT 'El Inmortal 2',
+                    artist VARCHAR(255) DEFAULT 'Galante el Emperador',
+                    cover_image_path VARCHAR(500),
+                    release_date DATE,
+                    status VARCHAR(50) DEFAULT 'upcoming',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )`
+            },
+            {
+                name: 'producers',
+                sql: `CREATE TABLE IF NOT EXISTS producers (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    name VARCHAR(255) NOT NULL,
+                    legal_name VARCHAR(255),
+                    email VARCHAR(255) NOT NULL UNIQUE,
+                    phone VARCHAR(50),
+                    address TEXT,
+                    split_percentage VARCHAR(50) DEFAULT '50/50',
+                    status VARCHAR(50) DEFAULT 'active',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )`
+            },
+            {
+                name: 'composers',
+                sql: `CREATE TABLE IF NOT EXISTS composers (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    name VARCHAR(255) NOT NULL,
+                    email VARCHAR(255),
+                    phone VARCHAR(50),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )`
+            },
+            {
+                name: 'artists',
+                sql: `CREATE TABLE IF NOT EXISTS artists (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    name VARCHAR(255) NOT NULL,
+                    email VARCHAR(255),
+                    phone VARCHAR(50),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )`
+            },
+            {
+                name: 'track_composers',
+                sql: `CREATE TABLE IF NOT EXISTS track_composers (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    track_id INT NOT NULL,
+                    composer_id INT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (track_id) REFERENCES tracks(id) ON DELETE CASCADE,
+                    FOREIGN KEY (composer_id) REFERENCES composers(id) ON DELETE CASCADE
+                )`
+            },
+            {
+                name: 'track_artists',
+                sql: `CREATE TABLE IF NOT EXISTS track_artists (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    track_id INT NOT NULL,
+                    artist_id INT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (track_id) REFERENCES tracks(id) ON DELETE CASCADE,
+                    FOREIGN KEY (artist_id) REFERENCES artists(id) ON DELETE CASCADE
+                )`
+            },
+            {
+                name: 'splitsheets',
+                sql: `CREATE TABLE IF NOT EXISTS splitsheets (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    track_id INT NOT NULL,
+                    producer_id INT NOT NULL,
+                    artist_percentage INT DEFAULT 50,
+                    producer_percentage INT DEFAULT 50,
+                    document_path VARCHAR(500),
+                    sent_date DATETIME,
+                    confirmed_date DATETIME,
+                    status VARCHAR(50) DEFAULT 'pending',
+                    notes TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (track_id) REFERENCES tracks(id) ON DELETE CASCADE,
+                    FOREIGN KEY (producer_id) REFERENCES producers(id) ON DELETE CASCADE
+                )`
+            },
+            {
+                name: 'content_calendar',
+                sql: `CREATE TABLE IF NOT EXISTS content_calendar (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    day_number INT NOT NULL,
+                    date DATE NOT NULL,
+                    title VARCHAR(255) NOT NULL,
+                    content_type VARCHAR(100) NOT NULL,
+                    platform VARCHAR(100) NOT NULL,
+                    description TEXT,
+                    status VARCHAR(50) DEFAULT 'pending',
+                    completed BOOLEAN DEFAULT 0,
+                    track_id INT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (track_id) REFERENCES tracks(id) ON DELETE SET NULL
+                )`
+            },
+            {
+                name: 'checklist_items',
+                sql: `CREATE TABLE IF NOT EXISTS checklist_items (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    category VARCHAR(100) NOT NULL,
+                    item_text TEXT NOT NULL,
+                    priority VARCHAR(50) DEFAULT 'normal',
+                    completed BOOLEAN DEFAULT 0,
+                    notes TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    completed_at DATETIME
+                )`
+            },
+            {
+                name: 'activity_log',
+                sql: `CREATE TABLE IF NOT EXISTS activity_log (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    action VARCHAR(100) NOT NULL,
+                    entity_type VARCHAR(100),
+                    entity_id INT,
+                    details TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )`
+            }
+        ];
 
-        await query(`
-            CREATE TABLE IF NOT EXISTS album_info (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                name VARCHAR(255) DEFAULT 'El Inmortal 2',
-                artist VARCHAR(255) DEFAULT 'Galante el Emperador',
-                cover_image_path VARCHAR(500),
-                release_date DATE,
-                status VARCHAR(50) DEFAULT 'upcoming',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        `);
+        for (const table of tables) {
+            try {
+                await query(table.sql);
+                console.log(`  ✅ Table: ${table.name}`);
+            } catch (tableErr) {
+                console.error(`  ❌ Error creating table ${table.name}:`, tableErr.message);
+                throw tableErr;
+            }
+        }
 
-        await query(`
-            CREATE TABLE IF NOT EXISTS producers (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                name VARCHAR(255) NOT NULL,
-                legal_name VARCHAR(255),
-                email VARCHAR(255) NOT NULL UNIQUE,
-                phone VARCHAR(50),
-                address TEXT,
-                split_percentage VARCHAR(50) DEFAULT '50/50',
-                status VARCHAR(50) DEFAULT 'active',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        `);
-
-        await query(`
-            CREATE TABLE IF NOT EXISTS composers (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                name VARCHAR(255) NOT NULL,
-                email VARCHAR(255),
-                phone VARCHAR(50),
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        `);
-
-        await query(`
-            CREATE TABLE IF NOT EXISTS artists (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                name VARCHAR(255) NOT NULL,
-                email VARCHAR(255),
-                phone VARCHAR(50),
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        `);
-
-        await query(`
-            CREATE TABLE IF NOT EXISTS track_composers (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                track_id INT NOT NULL,
-                composer_id INT NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (track_id) REFERENCES tracks(id),
-                FOREIGN KEY (composer_id) REFERENCES composers(id)
-            )
-        `);
-
-        await query(`
-            CREATE TABLE IF NOT EXISTS track_artists (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                track_id INT NOT NULL,
-                artist_id INT NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (track_id) REFERENCES tracks(id),
-                FOREIGN KEY (artist_id) REFERENCES artists(id)
-            )
-        `);
-
-        await query(`
-            CREATE TABLE IF NOT EXISTS splitsheets (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                track_id INT NOT NULL,
-                producer_id INT NOT NULL,
-                artist_percentage INT DEFAULT 50,
-                producer_percentage INT DEFAULT 50,
-                document_path VARCHAR(500),
-                sent_date DATETIME,
-                confirmed_date DATETIME,
-                status VARCHAR(50) DEFAULT 'pending',
-                notes TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (track_id) REFERENCES tracks(id),
-                FOREIGN KEY (producer_id) REFERENCES producers(id)
-            )
-        `);
-
-        await query(`
-            CREATE TABLE IF NOT EXISTS content_calendar (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                day_number INT NOT NULL,
-                date DATE NOT NULL,
-                title VARCHAR(255) NOT NULL,
-                content_type VARCHAR(100) NOT NULL,
-                platform VARCHAR(100) NOT NULL,
-                description TEXT,
-                status VARCHAR(50) DEFAULT 'pending',
-                completed BOOLEAN DEFAULT 0,
-                track_id INT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (track_id) REFERENCES tracks(id)
-            )
-        `);
-
-        await query(`
-            CREATE TABLE IF NOT EXISTS checklist_items (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                category VARCHAR(100) NOT NULL,
-                item_text TEXT NOT NULL,
-                priority VARCHAR(50) DEFAULT 'normal',
-                completed BOOLEAN DEFAULT 0,
-                notes TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                completed_at DATETIME
-            )
-        `);
-
-        await query(`
-            CREATE TABLE IF NOT EXISTS activity_log (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                action VARCHAR(100) NOT NULL,
-                entity_type VARCHAR(100),
-                entity_id INT,
-                details TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        `);
-
-        console.log('✅ MySQL tables initialized');
+        console.log('✅ All MySQL tables initialized');
     } catch (err) {
         console.error('❌ Error initializing tables:', err.message);
         throw err;

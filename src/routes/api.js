@@ -285,7 +285,9 @@ router.post('/tracks/:id/transcribe', async (req, res) => {
         // Check if it's a server-local path (starts with /uploads/)
         else if (audioPath.startsWith('/uploads/')) {
             // Build full path from public directory
-            audioPath = path.join(__dirname, '../../public', audioPath);
+            // Use process.cwd() to get the app root directory
+            const appRoot = process.cwd();
+            audioPath = path.join(appRoot, 'public', audioPath);
             console.log(`[API] Using local server file: ${audioPath}`);
         }
 

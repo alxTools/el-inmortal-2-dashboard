@@ -1,31 +1,15 @@
 const express = require('express');
 const path = require('path');
 const session = require('express-session');
-const SQLiteStore = require('connect-sqlite3')(session);
 const helmet = require('helmet');
 const cors = require('cors');
 const methodOverride = require('method-override');
 require('dotenv').config();
 
-const { getDatabase, seedInitialData } = require('./config/database');
+const { initializeTables, seedInitialData } = require('./config/database');
 
 const app = express();
 const PORT = process.env.PORT || 10000;
-
-// Initialize database and seed data on startup
-(async () => {
-    try {
-        // Initialize database connection (this creates tables)
-        getDatabase();
-        
-        // Wait a moment for tables to be created, then seed data
-        setTimeout(async () => {
-            await seedInitialData();
-        }, 1000);
-    } catch (err) {
-        console.error('Error initializing database:', err);
-    }
-})();
 
 // Security middleware
 app.use(helmet({
@@ -51,12 +35,8 @@ app.use(methodOverride('_method'));
 // Static files
 app.use(express.static(path.join(__dirname, '../public')));
 
-// Session configuration
+// Session configuration - using memory store for now (can be changed to MySQL later)
 app.use(session({
-    store: new SQLiteStore({
-        db: 'sessions.db',
-        dir: path.join(__dirname, '../database')
-    }),
     secret: process.env.SESSION_SECRET || 'el-inmortal-2-secret-key-2026',
     resave: false,
     saveUninitialized: false,
@@ -160,9 +140,22 @@ app.use((req, res) => {
     }
 });
 
-// Start server
-const server = app.listen(PORT, '0.0.0.0', () => {
-    console.log(`
+// Initialize database and start server
+async function startServer() {
+    try {
+        console.log('🔄 Initializing database...');
+        
+        // Initialize tables
+        await initializeTables();
+        console.log('✅ Database tables initialized');
+        
+        // Seed initial data
+        await seedInitialData();
+        console.log('✅ Initial data seeded');
+        
+        // Start server
+        const server = app.listen(PORT, '0.0.0.0', () => {
+            console.log(`
     🎵🎤👑 EL INMORTAL 2 LAUNCH DASHBOARD 👑🎤🎵
     
     Servidor corriendo en: http://localhost:${PORT}
@@ -171,11 +164,21 @@ const server = app.listen(PORT, '0.0.0.0', () => {
     📝 API Docs: http://localhost:${PORT}/api
     
     Presiona Ctrl+C para detener.
-    `);
-});
+            `);
+        });
 
-server.on('error', (err) => {
-    console.error('Server error:', err);
-});
+        server.on('error', (err) => {
+            console.error('Server error:', err);
+        });
+        
+    } catch (err) {
+        console.error('❌ Fatal error starting server:', err.message);
+        console.error(err.stack);
+        process.exit(1);
+    }
+}
+
+// Start the application
+startServer();
 
 module.exports = app;

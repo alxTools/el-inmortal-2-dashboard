@@ -1,13 +1,20 @@
 <nav class="navbar">
-    <a href="/" class="navbar-brand">👑 El Inmortal 2</a>
+    <a href="/" class="navbar-brand"><img src="/images/logo.png" alt="Galante el Emperador" style="height: 35px; vertical-align: middle;"></a>
     <ul class="navbar-nav">
-        <li><a href="/">Dashboard</a></li>
-        <li><a href="/tracks">🎵 Temas</a></li>
-        <li><a href="/producers">🎧 Productores</a></li>
-        <li><a href="/composers">📝 Compositores</a></li>
-        <li><a href="/artists">👥 Artistas</a></li>
-        <li><a href="/splitsheets">📄 Splitsheets</a></li>
-        <li><a href="/calendar">📅 Calendario</a></li>
-        <li><a href="/checklist">✅ Checklist</a></li>
+        <% if (typeof user !== 'undefined' && user) { %>
+            <li><a href="/">Dashboard</a></li>
+            <li><a href="/albums">💿 Álbumes</a></li>
+            <li><a href="/tracks">🎵 Temas</a></li>
+            <li><a href="/producers">🎧 Productores</a></li>
+            <li><a href="/composers">📝 Compositores</a></li>
+            <li><a href="/artists">👥 Artistas</a></li>
+            <li><a href="/splitsheets">📄 Splitsheets</a></li>
+            <li><a href="/calendar">📅 Calendario</a></li>
+            <li><a href="/checklist">✅ Checklist</a></li>
+            <li><a href="/settings">⚙️ Config</a></li>
+            <li><a href="/auth/logout" style="color: #ff6b6b;">🚪 Salir</a></li>
+        <% } else { %>
+            <li><a href="/auth/login">🔐 Login</a></li>
+        <% } %>
     </ul>
 </nav>

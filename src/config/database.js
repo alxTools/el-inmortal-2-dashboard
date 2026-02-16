@@ -11,23 +11,45 @@ const DB_CONFIG = {
     connectionLimit: 10,
     queueLimit: 0,
     enableKeepAlive: true,
-    keepAliveInitialDelay: 10000
+    keepAliveInitialDelay: 10000,
+    // SSL configuration for remote connections (required by many MySQL hosts)
+    ssl: {
+        rejectUnauthorized: false  // Allow self-signed certificates
+    }
 };
 
 let pool = null;
+let connectionTested = false;
 
 // Get or create connection pool
-function getPool() {
+async function getPool() {
     if (!pool) {
-        pool = mysql.createPool(DB_CONFIG);
-        console.log('✅ Connected to MySQL database');
+        try {
+            pool = mysql.createPool(DB_CONFIG);
+            
+            // Test connection
+            if (!connectionTested) {
+                const [rows] = await pool.execute('SELECT 1 as test');
+                console.log('✅ MySQL connected successfully');
+                connectionTested = true;
+            }
+        } catch (err) {
+            console.error('❌ MySQL Connection Error:', err.message);
+            console.error('Config:', {
+                host: DB_CONFIG.host,
+                user: DB_CONFIG.user,
+                database: DB_CONFIG.database,
+                // Don't log password
+            });
+            throw err;
+        }
     }
     return pool;
 }
 
 // Execute query
 async function query(sql, params = []) {
-    const pool = getPool();
+    const pool = await getPool();
     try {
         const [results] = await pool.execute(sql, params);
         return results;

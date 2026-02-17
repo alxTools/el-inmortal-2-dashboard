@@ -1,5 +1,6 @@
 const express = require('express');
 const path = require('path');
+const fs = require('fs');
 const session = require('express-session');
 const helmet = require('helmet');
 const cors = require('cors');
@@ -60,6 +61,20 @@ app.use(express.urlencoded({ extended: true }));
 
 // Method override for PUT/DELETE from forms
 app.use(methodOverride('_method'));
+
+// Local image fallback: if missing locally, use production URL
+app.get('/uploads/images/:filename', (req, res, next) => {
+    const localPath = path.join(__dirname, '../public/uploads/images', req.params.filename);
+    if (fs.existsSync(localPath)) {
+        return res.sendFile(localPath);
+    }
+
+    if (process.env.NODE_ENV !== 'production') {
+        return res.redirect(`https://dash.galanteelemperador.com/uploads/images/${encodeURIComponent(req.params.filename)}`);
+    }
+
+    return next();
+});
 
 // Static files
 app.use(express.static(path.join(__dirname, '../public')));

@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node src/app.js",
     "dev": "nodemon src/app.js",
-    "sync:images": "node scripts/sync-local-images.js"
+    "sync:images": "node scripts/sync-local-images.js",
+    "api:key:create": "node scripts/create-api-key.js"
   },
   "engines": {
     "node": ">=16.0.0"

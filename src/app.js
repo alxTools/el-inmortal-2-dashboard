@@ -123,6 +123,8 @@ const authRouter = require('./routes/auth');
 const uploadsRouter = require('./routes/uploads');
 const bulkUploadRouter = require('./routes/bulk-upload');
 const settingsRouter = require('./routes/settings');
+const apiV1Router = require('./routes/api-v1');
+const { apiKeyAuth } = require('./middleware/apiKeyAuth');
 
 // Authentication middleware
 function requireAuth(req, res, next) {
@@ -134,6 +136,9 @@ function requireAuth(req, res, next) {
 
 // Public routes (no auth required)
 app.use('/auth', authRouter);
+app.use('/api/v1', apiV1Router);
+app.use('/api/v1/uploads', apiKeyAuth, uploadsRouter);
+app.use('/api/v1/bulk-upload', apiKeyAuth, bulkUploadRouter);
 
 // Protected routes (auth required)
 app.use('/', requireAuth, indexRouter);

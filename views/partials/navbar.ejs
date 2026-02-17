@@ -1,5 +1,8 @@
 <nav class="navbar">
-    <a href="/" class="navbar-brand"><img src="/images/logo.png" alt="Galante el Emperador" style="height: 35px; vertical-align: middle;"></a>
+    <a href="/" class="navbar-brand navbar-brand-logo">
+        <img src="/images/logo.png" alt="Galante el Emperador" class="navbar-logo" onerror="this.style.display='none';this.nextElementSibling.style.display='inline';">
+        <span class="navbar-logo-fallback" style="display:none;">Galante</span>
+    </a>
     <ul class="navbar-nav">
         <% if (typeof user !== 'undefined' && user) { %>
             <li><a href="/">Dashboard</a></li>

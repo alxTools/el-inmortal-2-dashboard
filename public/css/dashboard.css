@@ -35,6 +35,26 @@ body {
     text-decoration: none;
 }
 
+.navbar-brand-logo {
+    background: none;
+    -webkit-text-fill-color: initial;
+    display: inline-flex;
+    align-items: center;
+}
+
+.navbar-logo {
+    height: 40px;
+    width: auto;
+    display: block;
+    filter: drop-shadow(0 0 8px rgba(255, 215, 0, 0.25));
+}
+
+.navbar-logo-fallback {
+    font-size: 1.1em;
+    font-weight: 700;
+    color: #ffd700;
+}
+
 .navbar-nav {
     display: flex;
     gap: 25px;

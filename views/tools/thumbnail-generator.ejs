@@ -124,6 +124,14 @@
                     <input id="videoFile" class="tool-input" type="file" accept="video/*">
 
                     <div style="margin-top: 15px;">
+                        <label class="tool-label">O pega link de YouTube / Dropbox</label>
+                        <input id="videoUrl" class="tool-input" type="url" placeholder="https://youtu.be/... o https://www.dropbox.com/...">
+                        <div class="tool-actions" style="margin-top: 10px;">
+                            <button id="loadUrlBtn" class="btn btn-secondary" type="button">Cargar desde Link</button>
+                        </div>
+                    </div>
+
+                    <div style="margin-top: 15px;">
                         <label class="tool-label">Tiempo del frame (segundos)</label>
                         <input id="captureTime" class="tool-input" type="number" min="0" step="0.1" value="1.0">
                     </div>
@@ -177,6 +185,8 @@
         const videoFileInput = document.getElementById('videoFile');
         const captureTimeInput = document.getElementById('captureTime');
         const outputFormatSelect = document.getElementById('outputFormat');
+        const videoUrlInput = document.getElementById('videoUrl');
+        const loadUrlBtn = document.getElementById('loadUrlBtn');
         const generateBtn = document.getElementById('generateBtn');
         const downloadBtn = document.getElementById('downloadBtn');
         const generateSizesBtn = document.getElementById('generateSizesBtn');
@@ -201,6 +211,7 @@
         let currentFilename = 'thumbnail.png';
         let baseImage = null;
         let generatedSizes = [];
+        let remoteVideoSourceUrl = null;
 
         function setStatus(text, isError = false) {
             statusText.textContent = text;
@@ -212,7 +223,66 @@
             sizesStatus.style.color = isError ? '#f87171' : '#9ca3af';
         }
 
-        function waitForEvent(target, eventName) {
+        function parseYouTubeId(url) {
+            try {
+                const u = new URL(url);
+                if (u.hostname.includes('youtu.be')) {
+                    return u.pathname.replace('/', '').trim() || null;
+                }
+                if (u.hostname.includes('youtube.com')) {
+                    return u.searchParams.get('v');
+                }
+                return null;
+            } catch (e) {
+                return null;
+            }
+        }
+
+        function isDropboxUrl(url) {
+            try {
+                const u = new URL(url);
+                return u.hostname.includes('dropbox.com') || u.hostname.includes('dropboxusercontent.com');
+            } catch (e) {
+                return false;
+            }
+        }
+
+        function resetGeneratedSizes() {
+            generatedSizes = [];
+            sizesGrid.innerHTML = '';
+            generateSizesBtn.disabled = true;
+            downloadAllBtn.disabled = true;
+        }
+
+        async function loadImageBlobViaProxy(sourceUrl) {
+            const proxyUrl = `/tools/proxy/image?url=${encodeURIComponent(sourceUrl)}`;
+            const response = await fetch(proxyUrl);
+            if (!response.ok) {
+                throw new Error(`No se pudo cargar imagen (${response.status})`);
+            }
+            return response.blob();
+        }
+
+        async function useImageBlobAsBase(blob, filenameHint) {
+            if (currentBlobUrl) URL.revokeObjectURL(currentBlobUrl);
+            currentBlobUrl = URL.createObjectURL(blob);
+            currentFilename = filenameHint;
+
+            await new Promise((resolve, reject) => {
+                const img = new Image();
+                img.onload = () => {
+                    baseImage = img;
+                    previewBox.innerHTML = `<img src="${currentBlobUrl}" alt="Thumbnail preview">`;
+                    downloadBtn.disabled = false;
+                    generateSizesBtn.disabled = false;
+                    resolve();
+                };
+                img.onerror = () => reject(new Error('No se pudo abrir la imagen base'));
+                img.src = currentBlobUrl;
+            });
+        }
+
+        function waitForEvent(target, eventName, timeoutMs = 10000) {
             return new Promise((resolve, reject) => {
                 const onSuccess = () => {
                     cleanup();
@@ -220,12 +290,18 @@
                 };
                 const onError = () => {
                     cleanup();
-                    reject(new Error('No se pudo procesar el video'));
+                    reject(new Error('No se pudo decodificar el video (codec no soportado o archivo dañado).'));
+                };
+                const onTimeout = () => {
+                    cleanup();
+                    reject(new Error(`Timeout esperando evento: ${eventName}`));
                 };
                 const cleanup = () => {
+                    clearTimeout(timer);
                     target.removeEventListener(eventName, onSuccess);
                     target.removeEventListener('error', onError);
                 };
+                const timer = setTimeout(onTimeout, timeoutMs);
                 target.addEventListener(eventName, onSuccess, { once: true });
                 target.addEventListener('error', onError, { once: true });
             });
@@ -258,8 +334,8 @@
 
         async function generateThumbnail() {
             const file = videoFileInput.files[0];
-            if (!file) {
-                setStatus('Selecciona un video primero.', true);
+            if (!file && !remoteVideoSourceUrl) {
+                setStatus('Selecciona un video o carga un link primero.', true);
                 return;
             }
 
@@ -273,15 +349,20 @@
             setSizesStatus('Esperando thumbnail base...');
 
             try {
-                const localVideoUrl = URL.createObjectURL(file);
-                videoElement.src = localVideoUrl;
+                const localVideoUrl = file ? URL.createObjectURL(file) : null;
+                videoElement.src = remoteVideoSourceUrl || localVideoUrl;
 
-                await waitForEvent(videoElement, 'loadedmetadata');
+                await waitForEvent(videoElement, 'loadedmetadata', 15000);
 
                 const requestedTime = Number(captureTimeInput.value || 0);
-                const validTime = Math.max(0, Math.min(requestedTime, Math.max(videoElement.duration - 0.1, 0)));
+                const duration = Number(videoElement.duration);
+                const safeDuration = Number.isFinite(duration) && duration > 0 ? duration : 0;
+                const validTime = safeDuration > 0
+                    ? Math.max(0, Math.min(requestedTime, Math.max(safeDuration - 0.1, 0)))
+                    : 0;
                 videoElement.currentTime = validTime;
-                await waitForEvent(videoElement, 'seeked');
+                await waitForEvent(videoElement, 'seeked', 15000);
+                await waitForEvent(videoElement, 'loadeddata', 15000).catch(() => {});
 
                 const width = videoElement.videoWidth || 1280;
                 const height = videoElement.videoHeight || 720;
@@ -318,11 +399,66 @@
                     img.src = currentBlobUrl;
                 }, format, 0.92);
 
-                URL.revokeObjectURL(localVideoUrl);
+                if (localVideoUrl) URL.revokeObjectURL(localVideoUrl);
             } catch (error) {
                 console.error(error);
-                setStatus('Error generando thumbnail. Verifica el archivo.', true);
+                setStatus('Error generando thumbnail: ' + (error.message || 'Verifica el archivo.'), true);
                 generateBtn.disabled = false;
+            }
+        }
+
+        async function loadFromUrl() {
+            const inputUrl = (videoUrlInput.value || '').trim();
+            if (!inputUrl) {
+                setStatus('Pega un link de YouTube o Dropbox.', true);
+                return;
+            }
+
+            setStatus('Cargando recurso desde link...');
+            downloadBtn.disabled = true;
+            resetGeneratedSizes();
+            remoteVideoSourceUrl = null;
+
+            try {
+                const ytId = parseYouTubeId(inputUrl);
+                if (ytId) {
+                    const candidates = [
+                        `https://i.ytimg.com/vi/${ytId}/maxresdefault.jpg`,
+                        `https://i.ytimg.com/vi/${ytId}/hqdefault.jpg`
+                    ];
+
+                    let imageBlob = null;
+                    for (const candidate of candidates) {
+                        try {
+                            imageBlob = await loadImageBlobViaProxy(candidate);
+                            if (imageBlob && imageBlob.size > 1024) break;
+                        } catch (e) {
+                            // try next
+                        }
+                    }
+
+                    if (!imageBlob) {
+                        throw new Error('No se pudo cargar thumbnail de YouTube');
+                    }
+
+                    await useImageBlobAsBase(imageBlob, `youtube_${ytId}.jpg`);
+                    setStatus('Thumbnail de YouTube cargado.');
+                    setSizesStatus('Base lista desde YouTube. Puedes generar todos los sizes.');
+                    return;
+                }
+
+                if (isDropboxUrl(inputUrl)) {
+                    remoteVideoSourceUrl = `/tools/proxy/video?url=${encodeURIComponent(inputUrl)}`;
+                    videoFileInput.value = '';
+                    setStatus('Video de Dropbox cargado. Ahora presiona "Generar Thumbnail".');
+                    setSizesStatus('Luego de generar base, podras crear todos los sizes.');
+                    return;
+                }
+
+                throw new Error('Solo se aceptan links de YouTube o Dropbox.');
+            } catch (error) {
+                console.error(error);
+                setStatus(error.message || 'No se pudo cargar el link.', true);
             }
         }
 
@@ -420,8 +556,17 @@
         }
 
         generateBtn.addEventListener('click', generateThumbnail);
+        loadUrlBtn.addEventListener('click', loadFromUrl);
         generateSizesBtn.addEventListener('click', generateSocialSizes);
         downloadAllBtn.addEventListener('click', downloadAllSizes);
+
+        videoFileInput.addEventListener('change', () => {
+            if (videoFileInput.files[0]) {
+                remoteVideoSourceUrl = null;
+                videoUrlInput.value = '';
+                setStatus('Video local seleccionado.');
+            }
+        });
 
         downloadBtn.addEventListener('click', () => {
             if (!currentBlobUrl) return;

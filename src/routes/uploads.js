@@ -147,6 +147,21 @@ router.post('/track/:id/cover', upload.single('cover_image'), async (req, res) =
         }
         
         const filePath = `/uploads/images/${req.file.filename}`;
+
+        // Remove previous cover file if it exists and is local
+        const existingTrack = await getOne('SELECT cover_image_path FROM tracks WHERE id = ?', [trackId]);
+        const previousCoverPath = existingTrack?.cover_image_path;
+        if (previousCoverPath && previousCoverPath.startsWith('/uploads/images/')) {
+            const appRoot = process.cwd();
+            const fullPreviousPath = path.join(appRoot, 'public', previousCoverPath);
+            if (fs.existsSync(fullPreviousPath)) {
+                try {
+                    fs.unlinkSync(fullPreviousPath);
+                } catch (unlinkError) {
+                    console.warn('[UPLOADS] Could not remove previous cover:', unlinkError.message);
+                }
+            }
+        }
         
         await run(
             `UPDATE tracks 
@@ -154,6 +169,8 @@ router.post('/track/:id/cover', upload.single('cover_image'), async (req, res) =
              WHERE id = ?`,
             [filePath, trackId]
         );
+
+        await logActivity('COVER_UPLOAD', 'track', trackId, `Cover subido: ${req.file.originalname}`);
         
         res.json({ 
             success: true, 
@@ -163,6 +180,41 @@ router.post('/track/:id/cover', upload.single('cover_image'), async (req, res) =
     } catch (error) {
         console.error('Error uploading cover:', error);
         res.status(500).json({ error: 'Error subiendo imagen de cover' });
+    }
+});
+
+// DELETE cover image for a track
+router.delete('/track/:id/cover', async (req, res) => {
+    try {
+        const trackId = req.params.id;
+
+        const track = await getOne('SELECT id, cover_image_path FROM tracks WHERE id = ?', [trackId]);
+        if (!track || !track.cover_image_path) {
+            return res.status(404).json({ error: 'No hay cover para eliminar' });
+        }
+
+        const oldCoverPath = track.cover_image_path;
+        const oldCoverName = oldCoverPath.split('/').pop();
+
+        if (oldCoverPath.startsWith('/uploads/images/')) {
+            const appRoot = process.cwd();
+            const fullPath = path.join(appRoot, 'public', oldCoverPath);
+            if (fs.existsSync(fullPath)) {
+                fs.unlinkSync(fullPath);
+            }
+        }
+
+        await run('UPDATE tracks SET cover_image_path = NULL WHERE id = ?', [trackId]);
+        await logActivity('COVER_DELETE', 'track', trackId, `Cover eliminado: ${oldCoverName}`);
+
+        res.json({
+            success: true,
+            message: 'Cover eliminado exitosamente',
+            deletedFile: oldCoverName
+        });
+    } catch (error) {
+        console.error('Error deleting cover:', error);
+        res.status(500).json({ error: 'Error eliminando cover' });
     }
 });
 

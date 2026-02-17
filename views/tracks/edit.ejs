@@ -190,8 +190,9 @@
             <div style="background: rgba(0, 0, 0, 0.3); border: 1px solid rgba(255, 215, 0, 0.3); border-radius: 10px; padding: 20px; margin-bottom: 30px;">
                 <h3 style="color: #ffd700; margin-bottom: 15px; font-size: 1.1em;">🖼️ Cover del Track</h3>
                 <img src="<%= track.cover_image_path %>" alt="Cover" style="max-width: 300px; border-radius: 10px; border: 2px solid #ffd700;">
-                <div style="margin-top: 15px;">
+                <div style="margin-top: 15px; display: flex; gap: 10px; flex-wrap: wrap;">
                     <a href="<%= track.cover_image_path %>" download class="btn btn-secondary" style="padding: 8px 15px; font-size: 0.85em; text-decoration: none;">⬇️ Descargar Imagen</a>
+                    <button id="deleteCoverBtn" class="btn btn-danger" style="padding: 8px 15px; font-size: 0.85em; background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%); border: none;">🗑️ Eliminar Cover</button>
                 </div>
             </div>
             <% } %>
@@ -523,10 +524,6 @@
         document.getElementById('replaceAudioForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             
-            if (!confirm('⚠️ ¿Estás seguro de que deseas reemplazar el audio actual?\n\nEl archivo anterior será eliminado permanentemente.')) {
-                return;
-            }
-            
             const formData = new FormData();
             const fileInput = document.getElementById('replaceAudioFile');
             const fileTypeInput = document.getElementById('replaceFileType');
@@ -565,14 +562,6 @@
 
         // Delete Audio
         async function deleteAudio() {
-            if (!confirm('⚠️ ¿Estás seguro de que deseas eliminar el audio?\n\nEsta acción no se puede deshacer.')) {
-                return;
-            }
-            
-            if (!confirm('🗑️ Confirmación final: ¿Eliminar permanentemente el archivo de audio?')) {
-                return;
-            }
-            
             try {
                 const response = await fetch('/uploads/track/<%= track.id %>/audio', {
                     method: 'DELETE',
@@ -592,6 +581,30 @@
             } catch (error) {
                 alert('❌ Error: ' + error.message);
                 console.error('Delete error:', error);
+            }
+        }
+
+        // Delete Cover
+        async function deleteCover() {
+            try {
+                const response = await fetch('/uploads/track/<%= track.id %>/cover', {
+                    method: 'DELETE',
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                });
+
+                const result = await response.json();
+
+                if (response.ok && result.success) {
+                    alert('✅ ' + (result.message || 'Cover eliminado exitosamente!'));
+                    location.reload();
+                } else {
+                    throw new Error(result.error || 'Error al eliminar el cover');
+                }
+            } catch (error) {
+                alert('❌ Error: ' + error.message);
+                console.error('Delete cover error:', error);
             }
         }
 
@@ -645,6 +658,14 @@
                         icon = '🎤';
                         color = '#ffd700';
                         break;
+                    case 'COVER_UPLOAD':
+                        icon = '🖼️';
+                        color = '#22c55e';
+                        break;
+                    case 'COVER_DELETE':
+                        icon = '🗂️';
+                        color = '#f97316';
+                        break;
                 }
                 
                 return `
@@ -686,6 +707,10 @@
             // Delete audio button
             const deleteBtn = document.getElementById('deleteAudioBtn');
             if (deleteBtn) deleteBtn.addEventListener('click', deleteAudio);
+
+            // Delete cover button
+            const deleteCoverBtn = document.getElementById('deleteCoverBtn');
+            if (deleteCoverBtn) deleteCoverBtn.addEventListener('click', deleteCover);
             
             // Transcribe lyrics button
             const transcribeBtn = document.getElementById('transcribeBtn');

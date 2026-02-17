@@ -58,6 +58,45 @@
             font-size: 0.9rem;
             margin-top: 10px;
         }
+        .size-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+            gap: 14px;
+            margin-top: 18px;
+        }
+        .size-card {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 10px;
+        }
+        .size-preview {
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            border: 1px dashed rgba(255, 255, 255, 0.25);
+            border-radius: 8px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            background: rgba(0, 0, 0, 0.2);
+            margin-bottom: 8px;
+        }
+        .size-preview img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            display: block;
+        }
+        .size-title {
+            font-size: 0.86rem;
+            font-weight: 600;
+            color: #f3f4f6;
+        }
+        .size-dim {
+            font-size: 0.78rem;
+            color: #9ca3af;
+        }
         @media (max-width: 900px) {
             .tool-grid {
                 grid-template-columns: 1fr;
@@ -76,7 +115,7 @@
             </div>
 
             <p style="color:#9ca3af; margin-bottom: 20px;">
-                Genera thumbnails desde video (workflow inspirado en el ejemplo de MediaBunny para extracción de frames).
+                Genera thumbnails desde video (inspirado en MediaBunny) y crea automaticamente todos los sizes de social media con frame estilo "pending".
             </p>
 
             <div class="tool-grid">
@@ -99,18 +138,32 @@
 
                     <div class="tool-actions">
                         <button id="generateBtn" class="btn">Generar Thumbnail</button>
-                        <button id="downloadBtn" class="btn btn-secondary" disabled>Descargar</button>
+                        <button id="downloadBtn" class="btn btn-secondary" disabled>Descargar Thumbnail</button>
                     </div>
 
                     <div class="hint" id="statusText">Carga un video para empezar.</div>
                 </div>
 
                 <div class="tool-card">
-                    <label class="tool-label">Vista previa</label>
+                    <label class="tool-label">Vista previa del thumbnail base</label>
                     <div class="preview-box" id="previewBox">
                         <span style="color:#9ca3af;">Sin thumbnail generado</span>
                     </div>
                 </div>
+            </div>
+
+            <div class="section" style="margin-top: 22px;">
+                <div class="section-header">
+                    <h2><span class="section-icon">📱</span> Social Media Sizes (Pending Frame)</h2>
+                </div>
+
+                <div class="tool-actions" style="margin-top: 0;">
+                    <button id="generateSizesBtn" class="btn" disabled>Generar Todos los Sizes</button>
+                    <button id="downloadAllBtn" class="btn btn-secondary" disabled>Descargar Todos</button>
+                </div>
+                <p class="hint" id="sizesStatus">Primero genera el thumbnail base.</p>
+
+                <div class="size-grid" id="sizesGrid"></div>
             </div>
 
             <video id="videoElement" style="display:none;"></video>
@@ -126,17 +179,37 @@
         const outputFormatSelect = document.getElementById('outputFormat');
         const generateBtn = document.getElementById('generateBtn');
         const downloadBtn = document.getElementById('downloadBtn');
+        const generateSizesBtn = document.getElementById('generateSizesBtn');
+        const downloadAllBtn = document.getElementById('downloadAllBtn');
         const statusText = document.getElementById('statusText');
+        const sizesStatus = document.getElementById('sizesStatus');
         const previewBox = document.getElementById('previewBox');
+        const sizesGrid = document.getElementById('sizesGrid');
         const videoElement = document.getElementById('videoElement');
         const canvasElement = document.getElementById('canvasElement');
 
+        const SOCIAL_SIZES = [
+            { key: 'ig_feed', label: 'Instagram Feed', w: 1080, h: 1080 },
+            { key: 'ig_story', label: 'Instagram Story', w: 1080, h: 1920 },
+            { key: 'tiktok_cover', label: 'TikTok Cover', w: 1080, h: 1920 },
+            { key: 'youtube_thumb', label: 'YouTube Thumbnail', w: 1280, h: 720 },
+            { key: 'facebook_link', label: 'Facebook Link', w: 1200, h: 630 },
+            { key: 'x_post', label: 'X / Twitter Post', w: 1600, h: 900 }
+        ];
+
         let currentBlobUrl = null;
         let currentFilename = 'thumbnail.png';
+        let baseImage = null;
+        let generatedSizes = [];
 
         function setStatus(text, isError = false) {
             statusText.textContent = text;
             statusText.style.color = isError ? '#f87171' : '#9ca3af';
+        }
+
+        function setSizesStatus(text, isError = false) {
+            sizesStatus.textContent = text;
+            sizesStatus.style.color = isError ? '#f87171' : '#9ca3af';
         }
 
         function waitForEvent(target, eventName) {
@@ -158,6 +231,31 @@
             });
         }
 
+        function drawPendingFrame(ctx, w, h) {
+            const padding = Math.round(Math.min(w, h) * 0.05);
+            const innerW = w - padding * 2;
+            const innerH = h - padding * 2;
+
+            ctx.save();
+            ctx.strokeStyle = 'rgba(255, 215, 0, 0.95)';
+            ctx.lineWidth = Math.max(4, Math.round(Math.min(w, h) * 0.006));
+            ctx.setLineDash([20, 14]);
+            ctx.strokeRect(padding, padding, innerW, innerH);
+            ctx.setLineDash([]);
+
+            const plateH = Math.round(h * 0.12);
+            const plateY = h - plateH;
+            ctx.fillStyle = 'rgba(0,0,0,0.7)';
+            ctx.fillRect(0, plateY, w, plateH);
+
+            ctx.fillStyle = '#ffd700';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.font = `700 ${Math.max(28, Math.round(h * 0.06))}px Segoe UI, Arial, sans-serif`;
+            ctx.fillText('PENDING', w / 2, plateY + plateH / 2);
+            ctx.restore();
+        }
+
         async function generateThumbnail() {
             const file = videoFileInput.files[0];
             if (!file) {
@@ -167,7 +265,12 @@
 
             generateBtn.disabled = true;
             downloadBtn.disabled = true;
+            generateSizesBtn.disabled = true;
+            downloadAllBtn.disabled = true;
+            generatedSizes = [];
+            sizesGrid.innerHTML = '';
             setStatus('Procesando video...');
+            setSizesStatus('Esperando thumbnail base...');
 
             try {
                 const localVideoUrl = URL.createObjectURL(file);
@@ -178,12 +281,10 @@
                 const requestedTime = Number(captureTimeInput.value || 0);
                 const validTime = Math.max(0, Math.min(requestedTime, Math.max(videoElement.duration - 0.1, 0)));
                 videoElement.currentTime = validTime;
-
                 await waitForEvent(videoElement, 'seeked');
 
                 const width = videoElement.videoWidth || 1280;
                 const height = videoElement.videoHeight || 720;
-
                 canvasElement.width = width;
                 canvasElement.height = height;
                 const ctx = canvasElement.getContext('2d');
@@ -204,10 +305,17 @@
                     if (currentBlobUrl) URL.revokeObjectURL(currentBlobUrl);
                     currentBlobUrl = URL.createObjectURL(blob);
 
-                    previewBox.innerHTML = `<img src="${currentBlobUrl}" alt="Thumbnail preview">`;
-                    setStatus(`Thumbnail listo (${width}x${height}) a ${validTime.toFixed(1)}s.`);
-                    downloadBtn.disabled = false;
-                    generateBtn.disabled = false;
+                    const img = new Image();
+                    img.onload = () => {
+                        baseImage = img;
+                        previewBox.innerHTML = `<img src="${currentBlobUrl}" alt="Thumbnail preview">`;
+                        setStatus(`Thumbnail listo (${width}x${height}) a ${validTime.toFixed(1)}s.`);
+                        setSizesStatus('Thumbnail base listo. Ahora puedes generar todos los sizes.');
+                        downloadBtn.disabled = false;
+                        generateBtn.disabled = false;
+                        generateSizesBtn.disabled = false;
+                    };
+                    img.src = currentBlobUrl;
                 }, format, 0.92);
 
                 URL.revokeObjectURL(localVideoUrl);
@@ -218,7 +326,102 @@
             }
         }
 
+        function drawCoverContain(ctx, img, w, h) {
+            const imgRatio = img.width / img.height;
+            const targetRatio = w / h;
+            let drawW = w;
+            let drawH = h;
+            let drawX = 0;
+            let drawY = 0;
+
+            if (imgRatio > targetRatio) {
+                drawW = w;
+                drawH = Math.round(w / imgRatio);
+                drawY = Math.round((h - drawH) / 2);
+            } else {
+                drawH = h;
+                drawW = Math.round(h * imgRatio);
+                drawX = Math.round((w - drawW) / 2);
+            }
+
+            ctx.fillStyle = '#0b0b14';
+            ctx.fillRect(0, 0, w, h);
+            ctx.drawImage(img, drawX, drawY, drawW, drawH);
+        }
+
+        function generateSocialSizes() {
+            if (!baseImage) {
+                setSizesStatus('Primero genera el thumbnail base.', true);
+                return;
+            }
+
+            generatedSizes = [];
+            sizesGrid.innerHTML = '';
+            downloadAllBtn.disabled = true;
+
+            const format = outputFormatSelect.value;
+            const extension = format === 'image/jpeg' ? 'jpg' : 'png';
+            const baseName = currentFilename.replace(/\.[^/.]+$/, '');
+
+            for (const size of SOCIAL_SIZES) {
+                const c = document.createElement('canvas');
+                c.width = size.w;
+                c.height = size.h;
+                const ctx = c.getContext('2d');
+
+                drawCoverContain(ctx, baseImage, size.w, size.h);
+                drawPendingFrame(ctx, size.w, size.h);
+
+                const dataUrl = c.toDataURL(format, 0.92);
+                const filename = `${baseName}_${size.key}.${extension}`;
+
+                generatedSizes.push({ ...size, dataUrl, filename });
+
+                const card = document.createElement('div');
+                card.className = 'size-card';
+                card.innerHTML = `
+                    <div class="size-preview"><img src="${dataUrl}" alt="${size.label}"></div>
+                    <div class="size-title">${size.label}</div>
+                    <div class="size-dim">${size.w} x ${size.h}</div>
+                    <div style="margin-top: 8px;">
+                        <button class="btn btn-secondary" style="padding: 6px 10px; font-size: 0.8rem;" data-file="${filename}">Descargar</button>
+                    </div>
+                `;
+
+                const btn = card.querySelector('button');
+                btn.addEventListener('click', () => {
+                    const a = document.createElement('a');
+                    a.href = dataUrl;
+                    a.download = filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                });
+
+                sizesGrid.appendChild(card);
+            }
+
+            setSizesStatus(`Generados ${generatedSizes.length} sizes con frame pending.`);
+            downloadAllBtn.disabled = generatedSizes.length === 0;
+        }
+
+        function downloadAllSizes() {
+            if (!generatedSizes.length) return;
+            generatedSizes.forEach((item, index) => {
+                setTimeout(() => {
+                    const a = document.createElement('a');
+                    a.href = item.dataUrl;
+                    a.download = item.filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                }, index * 220);
+            });
+        }
+
         generateBtn.addEventListener('click', generateThumbnail);
+        generateSizesBtn.addEventListener('click', generateSocialSizes);
+        downloadAllBtn.addEventListener('click', downloadAllSizes);
 
         downloadBtn.addEventListener('click', () => {
             if (!currentBlobUrl) return;

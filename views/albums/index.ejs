@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %></title>
+    <link rel="stylesheet" href="/css/dashboard.css">
+    <style>
+        .album-card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            padding: 25px;
+            transition: all 0.3s;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .album-card:hover {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(255, 215, 0, 0.3);
+            transform: translateY(-3px);
+        }
+        .album-cover {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .album-status {
+            display: inline-block;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.8em;
+            margin-bottom: 10px;
+        }
+        .status-upcoming {
+            background: rgba(255, 193, 7, 0.2);
+            color: #ffc107;
+        }
+        .status-released {
+            background: rgba(40, 167, 69, 0.2);
+            color: #28a745;
+        }
+        .status-draft {
+            background: rgba(108, 117, 125, 0.2);
+            color: #6c757d;
+        }
+        .album-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 25px;
+        }
+        .chart-wrap {
+            margin-bottom: 30px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 14px;
+            padding: 18px;
+        }
+        .chart-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 10px 0;
+        }
+        .chart-label {
+            width: 180px;
+            color: #ddd;
+            font-size: 0.92em;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .chart-bar {
+            flex: 1;
+            height: 10px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 999px;
+            overflow: hidden;
+        }
+        .chart-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #ffd700, #ff8a00);
+        }
+        .chart-value {
+            min-width: 44px;
+            text-align: right;
+            color: #ffd700;
+            font-weight: 700;
+        }
+    </style>
+</head>
+<body>
+    <%- include('../partials/navbar') %>
+
+    <div class="container" style="padding-top: 40px;">
+        <div class="section-header" style="margin-bottom: 30px;">
+            <h1>💿 Álbumes</h1>
+            <a href="/albums/new" class="btn">+ Nuevo Álbum</a>
+        </div>
+
+        <div class="stats-grid" style="margin-bottom: 20px;">
+            <div class="stat-card">
+                <h3>Total Álbumes</h3>
+                <div class="number"><%= albumStats.total %></div>
+                <div class="label">En catálogo</div>
+            </div>
+            <div class="stat-card">
+                <h3>Lanzados</h3>
+                <div class="number"><%= albumStats.released %></div>
+                <div class="label">Status released</div>
+            </div>
+            <div class="stat-card">
+                <h3>Próximos</h3>
+                <div class="number"><%= albumStats.upcoming %></div>
+                <div class="label">Status upcoming</div>
+            </div>
+            <div class="stat-card">
+                <h3>Borradores</h3>
+                <div class="number"><%= albumStats.draft %></div>
+                <div class="label">Status draft</div>
+            </div>
+        </div>
+
+        <% if (albums.length > 0) { %>
+            <div class="chart-wrap">
+                <h3 style="margin-bottom: 8px; color: #ffd700;">📊 Gráfica de temas por álbum</h3>
+                <p style="margin: 0 0 12px; color: #9aa0a6; font-size: 0.92em;">Comparativa rápida de cantidad de tracks.</p>
+                <% albums.forEach(album => { 
+                    const trackCount = Number(album.track_count || 0);
+                    const width = Math.round((trackCount / albumStats.maxTracks) * 100);
+                %>
+                    <div class="chart-row">
+                        <div class="chart-label" title="<%= album.name %>"><%= album.name %></div>
+                        <div class="chart-bar">
+                            <div class="chart-fill" style="width: <%= width %>%;"></div>
+                        </div>
+                        <div class="chart-value"><%= trackCount %></div>
+                    </div>
+                <% }) %>
+            </div>
+        <% } %>
+
+        <div class="album-grid">
+            <% albums.forEach(album => { %>
+            <div class="album-card" data-id="<%= album.id %>">
+                <a href="/albums/<%= album.id %>" style="text-decoration: none; display: block;">
+                    <% if (album.cover_image_path) { %>
+                        <img src="<%= album.cover_image_path %>" alt="<%= album.name %>" class="album-cover" style="cursor: pointer;">
+                    <% } else { %>
+                        <div class="album-cover" style="display: flex; align-items: center; justify-content: center; color: #888; font-size: 3em; cursor: pointer;">
+                            💿
+                        </div>
+                    <% } %>
+                </a>
+                
+                <span class="album-status status-<%= album.status || 'upcoming' %>">
+                    <%= album.status === 'released' ? 'Lanzado' : album.status === 'draft' ? 'Borrador' : 'Próximamente' %>
+                </span>
+                
+                <h3 style="color: #ffd700; margin-bottom: 8px;"><%= album.name %></h3>
+                <p style="color: #888; margin-bottom: 8px;">
+                    <strong>Artista:</strong> <%= album.artist %>
+                </p>
+                <% if (album.release_date) { %>
+                    <p style="color: #888; margin-bottom: 15px;">
+                        <strong>Lanzamiento:</strong> <%= new Date(album.release_date).toLocaleDateString('es-ES') %>
+                    </p>
+                <% } %>
+                
+                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <a href="/albums/<%= album.id %>" class="btn-small">Ver Temas</a>
+                    <a href="/albums/<%= album.id %>/edit" class="btn-small">Editar</a>
+                    <button class="btn-small delete-album-btn" 
+                            data-id="<%= album.id %>"
+                            data-name="<%= album.name %>"
+                            style="background: rgba(220, 53, 69, 0.2); border-color: #dc3545; color: #ff6b6b;">
+                        🗑️ Eliminar
+                    </button>
+                </div>
+            </div>
+            <% }) %>
+        </div>
+        
+        <% if (albums.length === 0) { %>
+            <div style="text-align: center; padding: 60px 20px; color: #666;">
+                <p style="font-size: 3em; margin-bottom: 20px;">💿</p>
+                <p>No hay álbumes creados aún.</p>
+                <a href="/albums/new" class="btn" style="margin-top: 20px;">Crear Primer Álbum</a>
+            </div>
+        <% } %>
+    </div>
+
+    <%- include('../partials/footer') %>
+
+    <script>
+        // Delete album handler
+        document.querySelectorAll('.delete-album-btn').forEach(button => {
+            button.addEventListener('click', async function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                const id = this.getAttribute('data-id');
+                const name = this.getAttribute('data-name');
+                
+                try {
+                    const response = await fetch('/albums/' + id, {
+                        method: 'DELETE',
+                        headers: {
+                            'Accept': 'application/json'
+                        }
+                    });
+
+                    const result = await response.json();
+                    
+                    if (response.ok && result.success) {
+                        location.reload();
+                    } else {
+                        alert('Error: ' + (result.error || 'Error al eliminar'));
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    alert('Error eliminando álbum');
+                }
+            });
+        });
+    </script>
+</body>
+</html>

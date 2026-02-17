@@ -4,6 +4,9 @@ const { getAll, getOne, run } = require('../config/database');
 const OpenAI = require('openai');
 const fs = require('fs');
 const path = require('path');
+const { exec } = require('child_process');
+const { promisify } = require('util');
+const execAsync = promisify(exec);
 const { downloadFromDropbox, cleanupTempFile: cleanupDropboxTemp, isDropboxPath, convertToDropboxPath } = require('../utils/dropboxHelper');
 const { downloadFromDrive, cleanupTempFile: cleanupDriveTemp, isGoogleDrivePath } = require('../utils/googleDriveHelper');
 
@@ -11,6 +14,30 @@ const { downloadFromDrive, cleanupTempFile: cleanupDriveTemp, isGoogleDrivePath 
 const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY
 });
+
+// Helper function to convert audio to MP3 using ffmpeg
+async function convertToMp3(inputPath, outputPath) {
+    try {
+        console.log(`[FFmpeg] Converting ${inputPath} to MP3...`);
+        // Convert to MP3 with 128k bitrate (good quality, smaller size)
+        // -ar 44100 sets sample rate, -ac 2 sets stereo
+        const command = `ffmpeg -i "${inputPath}" -codec:a libmp3lame -q:a 4 -ar 44100 -ac 2 -y "${outputPath}"`;
+        const { stdout, stderr } = await execAsync(command);
+        
+        if (stderr && stderr.includes('Error')) {
+            throw new Error(`FFmpeg error: ${stderr}`);
+        }
+        
+        // Check output file size
+        const stats = fs.statSync(outputPath);
+        console.log(`[FFmpeg] Conversion complete. Output size: ${(stats.size / 1024 / 1024).toFixed(2)} MB`);
+        
+        return outputPath;
+    } catch (error) {
+        console.error('[FFmpeg] Conversion failed:', error);
+        throw error;
+    }
+}
 
 // Helper function to log activity
 async function logActivity(action, entityType, entityId, details) {
@@ -108,16 +135,22 @@ router.get('/producers', async (req, res) => {
 
 // GET countdown data
 router.get('/countdown', (req, res) => {
-    const launchDate = new Date('2026-02-17T00:00:00');
+    // Puerto Rico time is AST (UTC-4) year-round.
+    // We store target dates as PR local midnight and convert to UTC for accurate diffs.
+    const prDateToUtc = (year, month, day, hour = 0, minute = 0, second = 0) => {
+        return new Date(Date.UTC(year, month - 1, day, hour + 4, minute, second));
+    };
+
+    const launchDate = prDateToUtc(2026, 2, 17, 0, 0, 0);
     const now = new Date();
     
     const dailyTimers = {
-        'tm2': new Date('2026-02-15T00:00:00'),
-        'tm1': new Date('2026-02-16T00:00:00'),
-        't0': new Date('2026-02-17T00:00:00'),
-        't1': new Date('2026-02-18T00:00:00'),
-        't7': new Date('2026-02-24T00:00:00'),
-        't21': new Date('2026-03-10T00:00:00')
+        'tm2': prDateToUtc(2026, 2, 15, 0, 0, 0),
+        'tm1': prDateToUtc(2026, 2, 16, 0, 0, 0),
+        't0': prDateToUtc(2026, 2, 17, 0, 0, 0),
+        't1': prDateToUtc(2026, 2, 18, 0, 0, 0),
+        't7': prDateToUtc(2026, 2, 24, 0, 0, 0),
+        't21': prDateToUtc(2026, 3, 10, 0, 0, 0)
     };
 
     const timers = {};
@@ -226,6 +259,9 @@ router.post('/checklist/:id/toggle', async (req, res) => {
 // POST transcribe lyrics from audio using OpenAI Whisper
 router.post('/tracks/:id/transcribe', async (req, res) => {
     let tempFilePath = null;
+    let tempFileToCleanup = null;
+    let convertedFilePath = null;
+    let source = 'local';
     
     try {
         const trackId = req.params.id;
@@ -244,8 +280,6 @@ router.post('/tracks/:id/transcribe', async (req, res) => {
         }
 
         let audioPath = track.audio_file_path;
-        let source = 'local';
-        let tempFileToCleanup = null;
 
         // Check if it's a Google Drive path
         if (isGoogleDrivePath(audioPath)) {
@@ -303,6 +337,30 @@ router.post('/tracks/:id/transcribe', async (req, res) => {
 
         console.log(`[API] Using audio from ${source}: ${audioPath}`);
 
+        // Check file size and convert to MP3 if too large (OpenAI limit is 25MB)
+        const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB in bytes
+        let convertedFilePath = null;
+        
+        try {
+            const stats = fs.statSync(audioPath);
+            console.log(`[API] File size: ${(stats.size / 1024 / 1024).toFixed(2)} MB`);
+            
+            if (stats.size > MAX_FILE_SIZE) {
+                console.log(`[API] File too large (${(stats.size / 1024 / 1024).toFixed(2)} MB), converting to MP3...`);
+                const tempDir = path.join(process.cwd(), 'temp');
+                if (!fs.existsSync(tempDir)) {
+                    fs.mkdirSync(tempDir, { recursive: true });
+                }
+                convertedFilePath = path.join(tempDir, `converted_${Date.now()}.mp3`);
+                await convertToMp3(audioPath, convertedFilePath);
+                audioPath = convertedFilePath;
+                console.log(`[API] Using converted MP3: ${audioPath}`);
+            }
+        } catch (sizeError) {
+            console.error('[API] Error checking file size:', sizeError);
+            // Continue with original file if size check fails
+        }
+
         try {
             // Call OpenAI Whisper API
             const transcription = await openai.audio.transcriptions.create({
@@ -355,7 +413,272 @@ router.post('/tracks/:id/transcribe', async (req, res) => {
                 cleanupDropboxTemp(tempFileToCleanup);
             }
         }
+        
+        // Clean up converted MP3 file
+        if (convertedFilePath && fs.existsSync(convertedFilePath)) {
+            try {
+                fs.unlinkSync(convertedFilePath);
+                console.log(`[API] Cleaned up converted file: ${convertedFilePath}`);
+            } catch (cleanupError) {
+                console.error('[API] Error cleaning up converted file:', cleanupError);
+            }
+        }
     }
 });
+
+// POST generate lyrics for all tracks in album that don't have lyrics
+router.post('/albums/:id/generate-lyrics', async (req, res) => {
+    try {
+        const albumId = req.params.id;
+        
+        console.log(`[API] Starting batch lyrics generation for album ${albumId}`);
+        
+        // Get all tracks in album without lyrics but with audio
+        const tracks = await getAll(
+            `SELECT id, track_number, title, audio_file_path, lyrics 
+             FROM tracks 
+             WHERE album_id = ? AND audio_file_path IS NOT NULL 
+             AND (lyrics IS NULL OR lyrics = '' OR LENGTH(TRIM(lyrics)) < 50)
+             ORDER BY track_number`,
+            [albumId]
+        );
+        
+        if (tracks.length === 0) {
+            return res.json({
+                success: true,
+                message: 'Todos los temas ya tienen letras generadas',
+                processed: 0,
+                tracks: []
+            });
+        }
+        
+        console.log(`[API] Found ${tracks.length} tracks without lyrics`);
+        
+        const results = [];
+        const MAX_FILE_SIZE = 25 * 1024 * 1024;
+        
+        for (const track of tracks) {
+            console.log(`[API] Processing track ${track.track_number}: ${track.title}`);
+            
+            try {
+                let audioPath = track.audio_file_path;
+                let tempFileToCleanup = null;
+                let convertedFilePath = null;
+                
+                // Handle Dropbox paths
+                if (isDropboxPath(audioPath)) {
+                    try {
+                        const dropboxPath = convertToDropboxPath(audioPath);
+                        const tempFilePath = await downloadFromDropbox(dropboxPath);
+                        audioPath = tempFilePath;
+                        tempFileToCleanup = tempFilePath;
+                    } catch (err) {
+                        console.error(`[API] Failed to download from Dropbox for track ${track.id}:`, err);
+                        results.push({
+                            trackId: track.id,
+                            title: track.title,
+                            status: 'error',
+                            error: 'Failed to download from Dropbox'
+                        });
+                        continue;
+                    }
+                }
+                
+                // Convert to local path if needed
+                if (audioPath.startsWith('/uploads/')) {
+                    const appRoot = process.cwd();
+                    audioPath = path.join(appRoot, 'public', audioPath);
+                }
+                
+                if (!fs.existsSync(audioPath)) {
+                    console.log(`[API] Audio file not found: ${audioPath}`);
+                    results.push({
+                        trackId: track.id,
+                        title: track.title,
+                        status: 'error',
+                        error: 'Audio file not found'
+                    });
+                    continue;
+                }
+                
+                // Check file size and convert if needed
+                try {
+                    const stats = fs.statSync(audioPath);
+                    if (stats.size > MAX_FILE_SIZE) {
+                        const tempDir = path.join(process.cwd(), 'temp');
+                        if (!fs.existsSync(tempDir)) {
+                            fs.mkdirSync(tempDir, { recursive: true });
+                        }
+                        convertedFilePath = path.join(tempDir, `converted_${Date.now()}_${track.id}.mp3`);
+                        await convertToMp3(audioPath, convertedFilePath);
+                        audioPath = convertedFilePath;
+                    }
+                } catch (err) {
+                    console.error(`[API] Size check error for track ${track.id}:`, err);
+                }
+                
+                // Transcribe with OpenAI Whisper
+                const transcription = await openai.audio.transcriptions.create({
+                    file: fs.createReadStream(audioPath),
+                    model: 'whisper-1',
+                    language: 'es',
+                    response_format: 'text'
+                });
+                
+                // Format the lyrics with proper structure
+                const formattedLyrics = formatLyrics(transcription);
+                
+                // Save to database
+                await run('UPDATE tracks SET lyrics = ? WHERE id = ?', [formattedLyrics, track.id]);
+                
+                // Log activity
+                await logActivity('LYRICS_GENERATE', 'track', track.id, 
+                    `Letra generada automáticamente para track ${track.track_number} (${formattedLyrics.length} caracteres)`);
+                
+                results.push({
+                    trackId: track.id,
+                    trackNumber: track.track_number,
+                    title: track.title,
+                    status: 'success',
+                    lyricsLength: formattedLyrics.length
+                });
+                
+                console.log(`[API] ✓ Track ${track.track_number} completed`);
+                
+                // Cleanup temp files
+                if (tempFileToCleanup) {
+                    cleanupDropboxTemp(tempFileToCleanup);
+                }
+                if (convertedFilePath && fs.existsSync(convertedFilePath)) {
+                    fs.unlinkSync(convertedFilePath);
+                }
+                
+                // Small delay to avoid rate limits
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+            } catch (error) {
+                console.error(`[API] Error processing track ${track.id}:`, error);
+                results.push({
+                    trackId: track.id,
+                    title: track.title,
+                    status: 'error',
+                    error: error.message
+                });
+            }
+        }
+        
+        const successCount = results.filter(r => r.status === 'success').length;
+        const errorCount = results.filter(r => r.status === 'error').length;
+        
+        res.json({
+            success: true,
+            message: `Generación completada: ${successCount} exitosos, ${errorCount} errores`,
+            processed: tracks.length,
+            successful: successCount,
+            errors: errorCount,
+            results: results
+        });
+        
+    } catch (error) {
+        console.error('[API] Batch lyrics generation error:', error);
+        res.status(500).json({
+            error: 'Error generando letras en batch',
+            details: error.message
+        });
+    }
+});
+
+// Helper function to format lyrics with proper structure
+function formatLyrics(rawText) {
+    if (!rawText || rawText.trim().length === 0) {
+        return '';
+    }
+    
+    // Split into lines
+    let lines = rawText.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+    
+    if (lines.length === 0) {
+        return '';
+    }
+    
+    const formatted = [];
+    let currentSection = '';
+    let lineCount = 0;
+    
+    // Detect if first lines look like an intro (short, repeated, or spoken style)
+    const firstFewLines = lines.slice(0, 3).join(' ').toLowerCase();
+    const looksLikeIntro = firstFewLines.includes('yeah') || 
+                          firstFewLines.includes('ey') || 
+                          firstFewLines.includes('listen') ||
+                          lines[0].length < 20;
+    
+    // Process first few lines as Intro if detected
+    let startIndex = 0;
+    if (looksLikeIntro && lines.length > 4) {
+        formatted.push('[Intro]');
+        let introLines = 0;
+        for (let i = 0; i < lines.length && introLines < 4; i++) {
+            if (lines[i].length < 30 || lines[i].match(/^(yeah|ey|oh|listen|ok|okay)/i)) {
+                formatted.push(lines[i]);
+                startIndex = i + 1;
+                introLines++;
+            } else {
+                break;
+            }
+        }
+        formatted.push('');
+    }
+    
+    // Process remaining lines
+    let inCoro = false;
+    let inVerso = false;
+    let blankLines = 0;
+    
+    for (let i = startIndex; i < lines.length; i++) {
+        const line = lines[i];
+        
+        // Skip empty lines
+        if (line.length === 0) {
+            blankLines++;
+            continue;
+        }
+        
+        // Detect coro patterns (repeated lines, shorter lines)
+        const isShortLine = line.length < 25;
+        const isRepeated = i > 0 && lines.slice(0, i).some(l => l.toLowerCase() === line.toLowerCase());
+        const looksLikeCoro = isShortLine || isRepeated;
+        
+        // Section transitions based on blank lines and patterns
+        if (blankLines >= 1 && !inCoro && looksLikeCoro) {
+            formatted.push('');
+            formatted.push('[Coro]');
+            inCoro = true;
+            inVerso = false;
+        } else if (blankLines >= 1 && inCoro && !looksLikeCoro) {
+            formatted.push('');
+            formatted.push('[Verso]');
+            inCoro = false;
+            inVerso = true;
+        } else if (blankLines >= 2 && !inVerso && !inCoro) {
+            formatted.push('');
+            formatted.push('[Verso]');
+            inVerso = true;
+        }
+        
+        formatted.push(line);
+        blankLines = 0;
+    }
+    
+    // Add outro if last lines look like outro
+    const lastLines = lines.slice(-3);
+    const looksLikeOutro = lastLines.some(l => l.length < 15 || l.match(/^(yeah|ey|oh)/i));
+    if (looksLikeOutro && formatted.length > 0) {
+        formatted.push('');
+        formatted.push('[Outro]');
+        lastLines.forEach(l => formatted.push(l));
+    }
+    
+    return formatted.join('\n');
+}
 
 module.exports = router;

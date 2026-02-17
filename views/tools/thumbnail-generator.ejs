@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %></title>
+    <link rel="stylesheet" href="/css/dashboard.css">
+    <style>
+        .tool-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        .tool-card {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 12px;
+            padding: 18px;
+        }
+        .tool-label {
+            display: block;
+            font-size: 0.9rem;
+            color: #9ca3af;
+            margin-bottom: 8px;
+        }
+        .tool-input,
+        .tool-select {
+            width: 100%;
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: rgba(0, 0, 0, 0.25);
+            color: #fff;
+        }
+        .preview-box {
+            min-height: 250px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px dashed rgba(255, 255, 255, 0.3);
+            border-radius: 10px;
+            background: rgba(0, 0, 0, 0.2);
+            overflow: hidden;
+        }
+        .preview-box img {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+        .tool-actions {
+            margin-top: 15px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .hint {
+            color: #9ca3af;
+            font-size: 0.9rem;
+            margin-top: 10px;
+        }
+        @media (max-width: 900px) {
+            .tool-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <%- include('../partials/navbar') %>
+
+    <div class="container" style="padding-top: 30px;">
+        <section class="section">
+            <div class="section-header">
+                <h2><span class="section-icon">🖼️</span> Thumbnail Generator</h2>
+                <a href="/tools" class="btn btn-secondary">Volver a Tools</a>
+            </div>
+
+            <p style="color:#9ca3af; margin-bottom: 20px;">
+                Genera thumbnails desde video (workflow inspirado en el ejemplo de MediaBunny para extracción de frames).
+            </p>
+
+            <div class="tool-grid">
+                <div class="tool-card">
+                    <label class="tool-label">Video (MP4/MOV/WebM)</label>
+                    <input id="videoFile" class="tool-input" type="file" accept="video/*">
+
+                    <div style="margin-top: 15px;">
+                        <label class="tool-label">Tiempo del frame (segundos)</label>
+                        <input id="captureTime" class="tool-input" type="number" min="0" step="0.1" value="1.0">
+                    </div>
+
+                    <div style="margin-top: 15px;">
+                        <label class="tool-label">Formato de salida</label>
+                        <select id="outputFormat" class="tool-select">
+                            <option value="image/png">PNG</option>
+                            <option value="image/jpeg">JPG</option>
+                        </select>
+                    </div>
+
+                    <div class="tool-actions">
+                        <button id="generateBtn" class="btn">Generar Thumbnail</button>
+                        <button id="downloadBtn" class="btn btn-secondary" disabled>Descargar</button>
+                    </div>
+
+                    <div class="hint" id="statusText">Carga un video para empezar.</div>
+                </div>
+
+                <div class="tool-card">
+                    <label class="tool-label">Vista previa</label>
+                    <div class="preview-box" id="previewBox">
+                        <span style="color:#9ca3af;">Sin thumbnail generado</span>
+                    </div>
+                </div>
+            </div>
+
+            <video id="videoElement" style="display:none;"></video>
+            <canvas id="canvasElement" style="display:none;"></canvas>
+        </section>
+    </div>
+
+    <%- include('../partials/footer') %>
+
+    <script>
+        const videoFileInput = document.getElementById('videoFile');
+        const captureTimeInput = document.getElementById('captureTime');
+        const outputFormatSelect = document.getElementById('outputFormat');
+        const generateBtn = document.getElementById('generateBtn');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const statusText = document.getElementById('statusText');
+        const previewBox = document.getElementById('previewBox');
+        const videoElement = document.getElementById('videoElement');
+        const canvasElement = document.getElementById('canvasElement');
+
+        let currentBlobUrl = null;
+        let currentFilename = 'thumbnail.png';
+
+        function setStatus(text, isError = false) {
+            statusText.textContent = text;
+            statusText.style.color = isError ? '#f87171' : '#9ca3af';
+        }
+
+        function waitForEvent(target, eventName) {
+            return new Promise((resolve, reject) => {
+                const onSuccess = () => {
+                    cleanup();
+                    resolve();
+                };
+                const onError = () => {
+                    cleanup();
+                    reject(new Error('No se pudo procesar el video'));
+                };
+                const cleanup = () => {
+                    target.removeEventListener(eventName, onSuccess);
+                    target.removeEventListener('error', onError);
+                };
+                target.addEventListener(eventName, onSuccess, { once: true });
+                target.addEventListener('error', onError, { once: true });
+            });
+        }
+
+        async function generateThumbnail() {
+            const file = videoFileInput.files[0];
+            if (!file) {
+                setStatus('Selecciona un video primero.', true);
+                return;
+            }
+
+            generateBtn.disabled = true;
+            downloadBtn.disabled = true;
+            setStatus('Procesando video...');
+
+            try {
+                const localVideoUrl = URL.createObjectURL(file);
+                videoElement.src = localVideoUrl;
+
+                await waitForEvent(videoElement, 'loadedmetadata');
+
+                const requestedTime = Number(captureTimeInput.value || 0);
+                const validTime = Math.max(0, Math.min(requestedTime, Math.max(videoElement.duration - 0.1, 0)));
+                videoElement.currentTime = validTime;
+
+                await waitForEvent(videoElement, 'seeked');
+
+                const width = videoElement.videoWidth || 1280;
+                const height = videoElement.videoHeight || 720;
+
+                canvasElement.width = width;
+                canvasElement.height = height;
+                const ctx = canvasElement.getContext('2d');
+                ctx.drawImage(videoElement, 0, 0, width, height);
+
+                const format = outputFormatSelect.value;
+                const extension = format === 'image/jpeg' ? 'jpg' : 'png';
+                const fileBase = file.name.replace(/\.[^/.]+$/, '');
+                currentFilename = `${fileBase}_thumb_${validTime.toFixed(1)}s.${extension}`;
+
+                canvasElement.toBlob((blob) => {
+                    if (!blob) {
+                        setStatus('No se pudo generar el thumbnail.', true);
+                        generateBtn.disabled = false;
+                        return;
+                    }
+
+                    if (currentBlobUrl) URL.revokeObjectURL(currentBlobUrl);
+                    currentBlobUrl = URL.createObjectURL(blob);
+
+                    previewBox.innerHTML = `<img src="${currentBlobUrl}" alt="Thumbnail preview">`;
+                    setStatus(`Thumbnail listo (${width}x${height}) a ${validTime.toFixed(1)}s.`);
+                    downloadBtn.disabled = false;
+                    generateBtn.disabled = false;
+                }, format, 0.92);
+
+                URL.revokeObjectURL(localVideoUrl);
+            } catch (error) {
+                console.error(error);
+                setStatus('Error generando thumbnail. Verifica el archivo.', true);
+                generateBtn.disabled = false;
+            }
+        }
+
+        generateBtn.addEventListener('click', generateThumbnail);
+
+        downloadBtn.addEventListener('click', () => {
+            if (!currentBlobUrl) return;
+            const a = document.createElement('a');
+            a.href = currentBlobUrl;
+            a.download = currentFilename;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+        });
+    </script>
+</body>
+</html>

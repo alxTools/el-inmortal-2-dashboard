@@ -123,6 +123,7 @@ const authRouter = require('./routes/auth');
 const uploadsRouter = require('./routes/uploads');
 const bulkUploadRouter = require('./routes/bulk-upload');
 const settingsRouter = require('./routes/settings');
+const toolsRouter = require('./routes/tools');
 const apiV1Router = require('./routes/api-v1');
 const { apiKeyAuth } = require('./middleware/apiKeyAuth');
 
@@ -150,6 +151,7 @@ app.use('/artists', requireAuth, artistsRouter);
 app.use('/splitsheets', requireAuth, splitsheetsRouter);
 app.use('/calendar', requireAuth, calendarRouter);
 app.use('/checklist', requireAuth, checklistRouter);
+app.use('/tools', requireAuth, toolsRouter);
 app.use('/api', requireAuth, apiRouter);
 app.use('/uploads', requireAuth, uploadsRouter);
 app.use('/bulk-upload', requireAuth, bulkUploadRouter);

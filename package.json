@@ -7,7 +7,8 @@
     "start": "node src/app.js",
     "dev": "nodemon src/app.js",
     "sync:images": "node scripts/sync-local-images.js",
-    "api:key:create": "node scripts/create-api-key.js"
+    "api:key:create": "node scripts/create-api-key.js",
+    "youtube:audit": "node scripts/youtube-channel-audit.js"
   },
   "engines": {
     "node": ">=16.0.0"
@@ -31,6 +32,7 @@
     "node-cron": "^3.0.3",
     "nodemailer": "^8.0.1",
     "openai": "^6.22.0",
+    "pdfkit": "^0.17.2",
     "sqlite3": "^5.1.6",
     "winston": "^3.11.0"
   }

@@ -22,6 +22,14 @@
         </div>
     </header>
 
+    <% if (flash) { %>
+    <section class="section" style="max-width: 1200px; margin: 16px auto 0;">
+        <div style="background:#111827; border:1px solid #334155; color:#e5e7eb; border-radius:10px; padding:10px 12px; font-size:0.9rem;">
+            <strong>Estado:</strong> <%= flash %>
+        </div>
+    </section>
+    <% } %>
+
     <!-- DAILY TIMERS SECTION -->
     <section class="daily-timers-section">
         <h2 class="daily-timers-title">⏰ Conteo Regresivo por Día</h2>
@@ -290,6 +298,22 @@
                     <div class="quick-link-icon">🖼️</div>
                     <div>Thumbnail Generator</div>
                 </a>
+                <a href="/tools/youtube-metadata-audit" class="quick-link">
+                    <div class="quick-link-icon">📺</div>
+                    <div>YouTube Metadata Audit</div>
+                </a>
+            </div>
+
+            <div style="margin-top: 16px; padding: 12px; border: 1px solid #334155; border-radius: 10px; background: #0f172a;">
+                <div style="font-weight: 700; margin-bottom: 8px; color: #e5e7eb;">Enviar Reporte Diario YouTube (PDF)</div>
+                <form method="POST" action="/send-daily-report-email">
+                    <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+                        <input type="email" name="email_to" value="<%= defaultReportEmailTo || '' %>" placeholder="destino@dominio.com" style="padding:8px 10px; border-radius:8px; border:1px solid #334155; background:#111827; color:#e5e7eb; min-width:260px;">
+                        <input type="date" name="from" style="padding:8px 10px; border-radius:8px; border:1px solid #334155; background:#111827; color:#e5e7eb;">
+                        <input type="date" name="to" style="padding:8px 10px; border-radius:8px; border:1px solid #334155; background:#111827; color:#e5e7eb;">
+                        <button type="submit" class="btn">Enviar PDF por Email</button>
+                    </div>
+                </form>
             </div>
         </section>
 
@@ -302,6 +326,10 @@
                 <a href="/tools/thumbnail-generator" class="quick-link">
                     <div class="quick-link-icon">🎬</div>
                     <div>Generar Thumbnail desde Video</div>
+                </a>
+                <a href="/tools/youtube-metadata-audit" class="quick-link">
+                    <div class="quick-link-icon">📺</div>
+                    <div>Auditar y Corregir Metadata YouTube</div>
                 </a>
             </div>
         </section>

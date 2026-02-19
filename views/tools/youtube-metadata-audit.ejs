@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %></title>
+    <link rel="stylesheet" href="/css/dashboard.css">
+    <style>
+        .tool-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 12px;
+            margin-top: 16px;
+        }
+        .tool-card {
+            border: 1px solid rgba(255,255,255,0.12);
+            background: rgba(255,255,255,0.04);
+            border-radius: 12px;
+            padding: 14px;
+        }
+        .tool-label {
+            color: #9ca3af;
+            font-size: 0.82rem;
+            margin-bottom: 6px;
+        }
+        .tool-value {
+            font-size: 1.15rem;
+            font-weight: 700;
+            color: #f9fafb;
+        }
+        .issues-wrap {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 12px;
+        }
+        .issue-pill {
+            border: 1px solid rgba(255,255,255,0.18);
+            border-radius: 999px;
+            padding: 5px 10px;
+            font-size: 0.76rem;
+            color: #d1d5db;
+            background: rgba(0,0,0,0.2);
+        }
+        .flash-ok {
+            border: 1px solid rgba(52, 211, 153, 0.5);
+            background: rgba(52, 211, 153, 0.14);
+            color: #86efac;
+            border-radius: 10px;
+            padding: 10px 12px;
+            margin-bottom: 14px;
+        }
+        .flash-err {
+            border: 1px solid rgba(248, 113, 113, 0.45);
+            background: rgba(248, 113, 113, 0.12);
+            color: #fca5a5;
+            border-radius: 10px;
+            padding: 10px 12px;
+            margin-bottom: 14px;
+        }
+        .input-line {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            align-items: center;
+            margin-top: 12px;
+        }
+        .tool-input,
+        .tool-select,
+        .tool-textarea {
+            background: rgba(0, 0, 0, 0.28);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: #fff;
+            border-radius: 8px;
+            padding: 8px 10px;
+        }
+        .tool-textarea {
+            width: 100%;
+            min-height: 80px;
+            font-family: monospace;
+            font-size: 0.82rem;
+        }
+        .meta-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 16px;
+            font-size: 0.85rem;
+        }
+        .meta-table th,
+        .meta-table td {
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+            padding: 8px 6px;
+            vertical-align: top;
+            text-align: left;
+        }
+        .status-badge {
+            display: inline-block;
+            border-radius: 999px;
+            padding: 3px 8px;
+            font-size: 0.72rem;
+            border: 1px solid rgba(255,255,255,0.2);
+            background: rgba(0,0,0,0.25);
+            color: #e5e7eb;
+        }
+        .status-updated { border-color: rgba(16, 185, 129, 0.55); color: #86efac; }
+        .status-error { border-color: rgba(239, 68, 68, 0.55); color: #fca5a5; }
+        .status-pending { border-color: rgba(156, 163, 175, 0.55); color: #d1d5db; }
+        .status-skipped { border-color: rgba(245, 158, 11, 0.55); color: #fcd34d; }
+        .needs-fix {
+            color: #fca5a5;
+            font-weight: 600;
+        }
+        .ok-fix {
+            color: #86efac;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <%- include('../partials/navbar') %>
+
+    <div class="container" style="padding-top: 30px;">
+        <section class="section">
+            <div class="section-header">
+                <h2><span class="section-icon">📺</span> YouTube Metadata Audit</h2>
+                <a href="/tools" class="btn btn-secondary">Volver a Tools</a>
+            </div>
+
+            <p style="color:#9ca3af; margin-bottom: 12px;">
+                Inspecciona todo el canal, cuenta cuántos videos necesitan corrección y aplica updates de título, descripción, categoría y tags.
+                Este tool guarda auditorías y resultados en DB para escalar operaciones del dashboard.
+            </p>
+
+            <% if (errorMessage) { %>
+                <div class="flash-err"><strong>Error:</strong> <%= errorMessage %></div>
+            <% } %>
+
+            <% if (flash) { %>
+                <% if (flash.startsWith('inspect_ok') || flash.startsWith('update_ok')) { %>
+                    <div class="flash-ok"><strong>OK:</strong> <%= flash %></div>
+                <% } else { %>
+                    <div class="flash-err"><strong>Detalle:</strong> <%= flash %></div>
+                <% } %>
+            <% } %>
+
+            <form method="POST" action="/tools/youtube-metadata-audit/inspect" style="margin-bottom: 10px;">
+                <button type="submit" class="btn">Inspeccionar Canal Ahora</button>
+            </form>
+
+            <form method="POST" action="/tools/youtube-metadata-audit/optimize-top" style="margin-top: 8px;">
+                <input type="hidden" name="run_id" value="<%= dashboard?.run?.id || '' %>">
+                <div class="input-line">
+                    <label class="tool-label" for="seo_limit" style="margin-bottom:0;">Top tráfico a optimizar:</label>
+                    <input id="seo_limit" class="tool-input" type="number" name="limit" value="50" min="1" max="200" style="width:110px;">
+
+                    <label style="display:flex; align-items:center; gap:6px; color:#d1d5db; font-size:0.85rem;">
+                        <input type="checkbox" name="only_needs_fix" checked>
+                        Solo videos con issues
+                    </label>
+
+                    <button type="submit" class="btn btn-secondary" <%= dashboard?.run?.id ? '' : 'disabled' %>>Optimizar SEO Top Tráfico (Perplexity → DB)</button>
+                </div>
+            </form>
+
+            <form method="POST" action="/tools/youtube-metadata-audit/optimize-top-and-update" style="margin-top: 8px;">
+                <input type="hidden" name="run_id" value="<%= dashboard?.run?.id || '' %>">
+                <div class="input-line">
+                    <label class="tool-label" for="seo_apply_limit" style="margin-bottom:0;">Top tráfico (SEO+Apply):</label>
+                    <input id="seo_apply_limit" class="tool-input" type="number" name="limit" value="50" min="1" max="200" style="width:110px;">
+
+                    <label style="display:flex; align-items:center; gap:6px; color:#d1d5db; font-size:0.85rem;">
+                        <input type="checkbox" name="only_needs_fix" checked>
+                        Solo videos con issues
+                    </label>
+
+                    <button type="submit" class="btn" <%= dashboard?.run?.id ? '' : 'disabled' %>>Optimizar + Aplicar Targets (1 paso)</button>
+                </div>
+            </form>
+
+            <form method="POST" action="/tools/youtube-metadata-audit/daily-report" style="margin-top: 8px;">
+                <div class="input-line">
+                    <label class="tool-label" for="report_from" style="margin-bottom:0;">Reporte diario desde:</label>
+                    <input id="report_from" class="tool-input" type="date" name="from">
+                    <label class="tool-label" for="report_to" style="margin-bottom:0;">hasta:</label>
+                    <input id="report_to" class="tool-input" type="date" name="to">
+                    <button type="submit" class="btn btn-secondary">Generar reporte diario (DB)</button>
+                </div>
+            </form>
+
+            <form method="POST" action="/tools/youtube-metadata-audit/daily-report-email" style="margin-top: 8px;">
+                <div class="input-line">
+                    <label class="tool-label" for="email_to" style="margin-bottom:0;">Enviar PDF a:</label>
+                    <input id="email_to" class="tool-input" type="text" name="email_to" placeholder="email@dominio.com" style="min-width:260px;">
+                    <label class="tool-label" for="email_cc" style="margin-bottom:0;">CC:</label>
+                    <input id="email_cc" class="tool-input" type="text" name="email_cc" placeholder="opcional" style="min-width:200px;">
+                    <button type="submit" class="btn">Enviar reporte diario por email (PDF)</button>
+                </div>
+                <div class="input-line">
+                    <label class="tool-label" for="email_bcc" style="margin-bottom:0;">BCC:</label>
+                    <input id="email_bcc" class="tool-input" type="text" name="email_bcc" placeholder="opcional" style="min-width:200px;">
+                    <label class="tool-label" for="email_subject" style="margin-bottom:0;">Asunto:</label>
+                    <input id="email_subject" class="tool-input" type="text" name="subject" placeholder="YouTube Ops Daily Report" style="min-width:260px;">
+                </div>
+                <div class="input-line" style="margin-top:6px; color:#9ca3af; font-size:0.78rem;">
+                    <label class="tool-label" for="email_from" style="margin-bottom:0;">Rango desde:</label>
+                    <input id="email_from" class="tool-input" type="date" name="from">
+                    <label class="tool-label" for="email_to_date" style="margin-bottom:0;">hasta:</label>
+                    <input id="email_to_date" class="tool-input" type="date" name="to">
+                </div>
+            </form>
+
+            <form method="POST" action="/tools/youtube-metadata-audit/update" style="margin-top: 8px;">
+                <input type="hidden" name="run_id" value="<%= dashboard?.run?.id || '' %>">
+                <div class="input-line">
+                    <label class="tool-label" for="mode" style="margin-bottom:0;">Modo de update:</label>
+                    <select id="mode" name="mode" class="tool-select">
+                        <option value="target_and_heuristic">Target + Heurístico (recomendado)</option>
+                        <option value="target_only">Solo videos con target explícito</option>
+                    </select>
+
+                    <label class="tool-label" for="limit" style="margin-bottom:0;">Límite:</label>
+                    <input id="limit" class="tool-input" type="number" name="limit" value="250" min="1" max="1000" style="width:110px;">
+
+                    <label style="display:flex; align-items:center; gap:6px; color:#d1d5db; font-size:0.85rem;">
+                        <input type="checkbox" name="only_needs_fix" checked>
+                        Solo videos con issues
+                    </label>
+
+                    <button type="submit" class="btn btn-secondary" <%= dashboard?.run?.id ? '' : 'disabled' %>>Aplicar Update Metadata</button>
+                </div>
+
+                <div style="margin-top: 10px;">
+                    <label class="tool-label" for="video_ids">Video IDs opcionales (separados por espacio o coma):</label>
+                    <textarea id="video_ids" name="video_ids" class="tool-textarea" placeholder="WMMU0m31Jfw, Uz6954H7PEc"></textarea>
+                </div>
+            </form>
+
+            <% if (dashboard?.hasData && dashboard.run) { %>
+                <div class="tool-grid">
+                    <div class="tool-card">
+                        <div class="tool-label">Run ID</div>
+                        <div class="tool-value"><%= dashboard.run.id %></div>
+                    </div>
+                    <div class="tool-card">
+                        <div class="tool-label">Canal</div>
+                        <div class="tool-value"><%= dashboard.run.channelTitle || dashboard.run.channelId %></div>
+                    </div>
+                    <div class="tool-card">
+                        <div class="tool-label">Videos Inspeccionados</div>
+                        <div class="tool-value"><%= dashboard.run.inspectedCount || 0 %></div>
+                    </div>
+                    <div class="tool-card">
+                        <div class="tool-label">Videos a Corregir</div>
+                        <div class="tool-value"><%= dashboard.run.needsFixCount || 0 %></div>
+                    </div>
+                    <div class="tool-card">
+                        <div class="tool-label">Creado por</div>
+                        <div class="tool-value"><%= dashboard.run.createdBy || '-' %></div>
+                    </div>
+                    <div class="tool-card">
+                        <div class="tool-label">Creado en</div>
+                        <div class="tool-value"><%= dashboard.run.createdAt ? new Date(dashboard.run.createdAt).toLocaleString() : '-' %></div>
+                    </div>
+                </div>
+
+                <div class="issues-wrap">
+                    <% const issueCounts = dashboard.run.issueCounts || {}; %>
+                    <% const issueEntries = Object.entries(issueCounts); %>
+                    <% if (issueEntries.length === 0) { %>
+                        <span class="issue-pill">Sin issues detectados</span>
+                    <% } else { %>
+                        <% issueEntries.sort((a,b) => b[1]-a[1]); %>
+                        <% issueEntries.forEach(([issue, count]) => { %>
+                            <span class="issue-pill"><%= issue %>: <strong><%= count %></strong></span>
+                        <% }) %>
+                    <% } %>
+                </div>
+
+                <div style="overflow:auto; margin-top: 10px;">
+                    <table class="meta-table">
+                        <thead>
+                            <tr>
+                                <th>Video</th>
+                                <th>Título actual</th>
+                                <th>Issues</th>
+                                <th>Estado</th>
+                                <th>Detalle</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% (dashboard.items || []).forEach((item) => { %>
+                                <% const statusClass = `status-${item.updateStatus || 'pending'}`; %>
+                                <tr>
+                                    <td>
+                                        <div><code><%= item.videoId %></code></div>
+                                        <div style="margin-top:4px;"><a href="https://studio.youtube.com/video/<%= item.videoId %>/edit" target="_blank" rel="noopener">Studio</a></div>
+                                        <div><a href="https://www.youtube.com/watch?v=<%= item.videoId %>" target="_blank" rel="noopener">Watch</a></div>
+                                    </td>
+                                    <td>
+                                        <div><%= item.titleCurrent || '-' %></div>
+                                        <div style="margin-top:4px; color:#9ca3af; font-size:0.78rem;">
+                                            Desc: <%= item.descriptionLenCurrent || 0 %> chars | Cat: <%= item.categoryCurrent || '-' %> | Tags: <%= (item.tagsCurrent || []).length %>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <% if (item.needsFix) { %>
+                                            <div class="needs-fix">Sí</div>
+                                        <% } else { %>
+                                            <div class="ok-fix">No</div>
+                                        <% } %>
+                                        <div style="margin-top:4px; color:#d1d5db; font-size:0.78rem;">
+                                            <%= (item.issues || []).join(', ') || '-' %>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span class="status-badge <%= statusClass %>"><%= item.updateStatus || 'pending' %></span>
+                                    </td>
+                                    <td style="max-width: 260px; color:#d1d5db; font-size:0.78rem;">
+                                        <%= item.updateMessage || '-' %>
+                                    </td>
+                                </tr>
+                            <% }) %>
+                        </tbody>
+                    </table>
+                </div>
+            <% } else { %>
+                <div class="tool-card" style="margin-top: 14px;">
+                    <div class="tool-label">Sin inspección todavía</div>
+                    <div style="color:#d1d5db;">Haz clic en <strong>Inspeccionar Canal Ahora</strong> para cargar el estado completo del canal y calcular cuántos videos necesitan corrección.</div>
+                </div>
+            <% } %>
+
+            <div style="margin-top: 18px; color:#9ca3af; font-size:0.82rem;">
+                Requiere env vars del servidor: <code>YT_CLIENT_SECRETS_PATH</code> y <code>YT_TOKEN_FILE_PATH</code>.
+            </div>
+        </section>
+    </div>
+
+    <%- include('../partials/footer') %>
+</body>
+</html>

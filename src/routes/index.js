@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { getOne, getAll } = require('../config/database');
+const { sendYoutubeOpsDailyReportEmail } = require('../utils/youtubeMetadataAudit');
 
 // GET home page / dashboard
 router.get('/', async (req, res) => {
@@ -55,31 +56,32 @@ router.get('/', async (req, res) => {
             LIMIT 10
         `);
 
+        const totalTracks = stats?.total_tracks || 0;
+        const splitsheetsSent = stats?.splitsheets_sent || 0;
+        const splitsheetsConfirmed = stats?.splitsheets_confirmed || 0;
+        const totalContent = stats?.total_content || 0;
+
         res.render('index', {
             title: 'Dashboard - El Inmortal 2',
             stats: {
-                tracks: {
-                    total: stats?.total_tracks || 0,
-                    target: 21
-                },
-                splitsheets: {
-                    sent: stats?.splitsheets_sent || 0,
-                    confirmed: stats?.splitsheets_confirmed || 0,
-                    pending: pendingSplitsheets
-                },
-                content: {
-                    total: stats?.total_content || 0,
-                    target: 63
-                },
-                producers: producerCount,
-                urgentTasks: urgentTasks
+                totalTracks,
+                totalTracksTarget: 21,
+                splitsheetsSent,
+                splitsheetsConfirmed,
+                splitsheetsPending: pendingSplitsheets,
+                totalContent,
+                totalContentTarget: 63,
+                producerCount,
+                urgentTasks
             },
             singles: singles || [],
             recentActivity: recentActivity || [],
             recentTracks: recentTracks || [],
             launchDate: new Date('2026-02-17T00:00:00'),
             artistName: 'Galante el Emperador',
-            albumName: 'El Inmortal 2'
+            albumName: 'El Inmortal 2',
+            flash: String(req.query.flash || ''),
+            defaultReportEmailTo: process.env.YT_DAILY_REPORT_TO || req.session?.user?.email || ''
         });
     } catch (error) {
         console.error('Dashboard Error:', error);
@@ -88,6 +90,35 @@ router.get('/', async (req, res) => {
             message: 'Error loading dashboard',
             error: process.env.NODE_ENV === 'development' ? error : {}
         });
+    }
+});
+
+router.post('/send-daily-report-email', async (req, res) => {
+    const fromDate = String(req.body.from || '').trim();
+    const toDate = String(req.body.to || '').trim();
+    const emailTo = String(req.body.email_to || '').trim();
+    const emailCc = String(req.body.email_cc || '').trim();
+    const emailBcc = String(req.body.email_bcc || '').trim();
+    const subject = String(req.body.subject || '').trim();
+
+    try {
+        const requestedBy = req.session?.user?.username || req.session?.user?.email || 'dashboard_user';
+        const fallbackTo = req.session?.user?.email || process.env.YT_DAILY_REPORT_TO || '';
+
+        const result = await sendYoutubeOpsDailyReportEmail({
+            requestedBy,
+            fromDate,
+            toDate,
+            to: emailTo || fallbackTo,
+            cc: emailCc,
+            bcc: emailBcc,
+            subject
+        });
+
+        return res.redirect(`/?flash=${encodeURIComponent(`daily_report_email_ok:${result.reportDate}|to:${result.recipients.to.join(';')}`)}`);
+    } catch (error) {
+        console.error('Dashboard daily report email error:', error);
+        return res.redirect(`/?flash=${encodeURIComponent(`daily_report_email_error:${error.message}`)}`);
     }
 });
 

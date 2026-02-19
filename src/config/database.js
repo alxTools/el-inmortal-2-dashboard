@@ -1,30 +1,57 @@
 const mysql = require('mysql2/promise');
 require('dotenv').config();
 
+function parseBool(value, fallback = false) {
+    if (value === undefined || value === null || value === '') return fallback;
+    const text = String(value).trim().toLowerCase();
+    return ['1', 'true', 'yes', 'on'].includes(text);
+}
+
+const dbHost = process.env.DB_HOST || 'localhost';
+const sslEnabled = parseBool(process.env.DB_SSL, dbHost !== 'localhost' && dbHost !== '127.0.0.1');
+
 // MySQL Configuration
 const DB_CONFIG = {
-    host: process.env.DB_HOST || 'db.artistaviral.com',
-    user: process.env.DB_USER || 'ailex',
-    password: process.env.DB_PASSWORD || 'soyesmalandro.2',
-    database: process.env.DB_NAME || 'artistaviral',
+    host: dbHost,
+    port: Number(process.env.DB_PORT || 3306),
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_NAME,
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0,
     enableKeepAlive: true,
     keepAliveInitialDelay: 10000,
     // SSL configuration for remote connections (required by many MySQL hosts)
-    ssl: {
-        rejectUnauthorized: false  // Allow self-signed certificates
-    }
+    ssl: sslEnabled
+        ? {
+            rejectUnauthorized: parseBool(process.env.DB_SSL_REJECT_UNAUTHORIZED, false)
+        }
+        : undefined
 };
 
 let pool = null;
 let connectionTested = false;
 
+async function closePool() {
+    if (!pool) return;
+    await pool.end();
+    pool = null;
+    connectionTested = false;
+}
+
 // Get or create connection pool
 async function getPool() {
     if (!pool) {
         try {
+            const missing = [];
+            if (!DB_CONFIG.user) missing.push('DB_USER');
+            if (!DB_CONFIG.password) missing.push('DB_PASSWORD');
+            if (!DB_CONFIG.database) missing.push('DB_NAME');
+            if (missing.length) {
+                throw new Error(`Missing required DB env vars: ${missing.join(', ')}`);
+            }
+
             pool = mysql.createPool(DB_CONFIG);
             
             // Test connection
@@ -109,8 +136,9 @@ async function initializeTables() {
                 name: 'tracks',
                 sql: `CREATE TABLE tracks (
                     id INT AUTO_INCREMENT PRIMARY KEY,
-                    track_number INT NOT NULL UNIQUE,
+                    track_number INT NOT NULL,
                     title VARCHAR(255) NOT NULL,
+                    album_id INT,
                     producer_id INT,
                     recording_date DATE,
                     duration VARCHAR(20),
@@ -128,19 +156,22 @@ async function initializeTables() {
                     audio_file_type VARCHAR(50),
                     cover_image_path VARCHAR(500),
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    UNIQUE KEY unique_track_number (album_id, track_number)
                 )`
             },
             {
                 name: 'album_info',
                 sql: `CREATE TABLE album_info (
                     id INT AUTO_INCREMENT PRIMARY KEY,
-                    name VARCHAR(255) DEFAULT 'El Inmortal 2',
-                    artist VARCHAR(255) DEFAULT 'Galante el Emperador',
+                    name VARCHAR(255) NOT NULL,
+                    artist VARCHAR(255) NOT NULL,
                     cover_image_path VARCHAR(500),
                     release_date DATE,
                     status VARCHAR(50) DEFAULT 'upcoming',
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    description TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
                 )`
             },
             {
@@ -482,6 +513,7 @@ async function seedInitialData() {
 
 module.exports = {
     getPool,
+    closePool,
     query,
     getOne,
     getAll,

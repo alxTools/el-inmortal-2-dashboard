@@ -9,7 +9,10 @@
     "sync:images": "node scripts/sync-local-images.js",
     "api:key:create": "node scripts/create-api-key.js",
     "youtube:audit": "node scripts/youtube-channel-audit.js",
-    "youtube:quota-monitor-tick": "node scripts/youtube-quota-monitor-tick.js"
+    "youtube:quota-monitor-tick": "node scripts/youtube-quota-monitor-tick.js",
+    "db:backup": "node scripts/backup-artistaviral-db.js",
+    "db:setup:intel": "node scripts/setup-intel-tables.js",
+    "db:setup:track-rights": "node scripts/setup-track-rights-tables.js"
   },
   "engines": {
     "node": ">=16.0.0"

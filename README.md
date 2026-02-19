@@ -38,6 +38,10 @@ DB_HOST=...
 DB_USER=...
 DB_PASSWORD=...
 DB_NAME=...
+DB_BACKUP_DIR=...
+DB_BACKUP_RETENTION_DAYS=14
+DB_BACKUP_REQUESTED_BY=scheduler
+MYSQLDUMP_PATH=C:/Program Files/MySQL/MySQL Workbench 8.0 CE/mysqldump.exe
 
 YT_CLIENT_SECRETS_PATH=...
 YT_TOKEN_FILE_PATH=...
@@ -178,6 +182,9 @@ npm run youtube:audit -- daily-report-email --to team@galanteelemperador.com --b
 npm run youtube:audit -- quota-check --by cli
 npm run youtube:audit -- quota-history --limit 72
 npm run youtube:quota-monitor-tick -- --by cli --task-name ElInmortal2_YTQuotaMonitor
+npm run db:backup
+npm run db:setup:intel
+npm run db:setup:track-rights
 ```
 
 Para transporte `graph`, la App Registration debe tener permiso de aplicación `Mail.Send` con admin consent.
@@ -196,6 +203,14 @@ Para monitoreo intensivo (cada 5 minutos, hasta detectar reset y auto-detenerse)
 install_youtube_quota_until_reset_schedule.bat
 check_youtube_quota_until_reset_schedule.bat
 uninstall_youtube_quota_until_reset_schedule.bat
+```
+
+Para backup horario de `db.artistaviral.com` en Windows:
+
+```bat
+install_db_backup_hourly_schedule.bat
+check_db_backup_hourly_schedule.bat
+uninstall_db_backup_hourly_schedule.bat
 ```
 
 ## Nota para expansion MCP multi-artista

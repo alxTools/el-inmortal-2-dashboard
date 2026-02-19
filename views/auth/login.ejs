@@ -6,77 +6,139 @@
     <title><%= title %></title>
     <link rel="stylesheet" href="/css/dashboard.css">
     <style>
-        .login-container {
+        body {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
             min-height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
         }
-        .login-box {
+        .login-container {
             background: rgba(255, 255, 255, 0.05);
-            border: 2px solid rgba(255, 215, 0, 0.3);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 215, 0, 0.3);
             border-radius: 20px;
             padding: 50px;
             width: 100%;
             max-width: 450px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+        }
+        .login-logo {
             text-align: center;
-        }
-        .login-box h1 {
-            font-size: 2.5em;
-            background: linear-gradient(45deg, #ffd700, #ffed4e);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            margin-bottom: 10px;
-        }
-        .login-box .subtitle {
-            color: #888;
             margin-bottom: 40px;
+        }
+        .login-logo img {
+            max-width: 280px;
+            width: 100%;
+            height: auto;
+            margin-bottom: 15px;
+            filter: drop-shadow(0 4px 6px rgba(0,0,0,0.3));
+        }
+        .login-logo p {
+            color: #888;
+            font-size: 1.1em;
+            margin-top: 10px;
+        }
+        .form-group {
+            margin-bottom: 25px;
+        }
+        .form-group label {
+            display: block;
+            color: #888;
+            margin-bottom: 10px;
+            font-size: 0.95em;
+        }
+        .form-group input {
+            width: 100%;
+            padding: 15px 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+            color: #fff;
+            font-size: 1.1em;
+            transition: all 0.3s;
+        }
+        .form-group input:focus {
+            outline: none;
+            border-color: #ffd700;
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.2);
+        }
+        .btn-login {
+            width: 100%;
+            padding: 18px;
+            background: linear-gradient(45deg, #ffd700, #ffed4e);
+            border: none;
+            border-radius: 10px;
+            color: #1a1a2e;
+            font-size: 1.1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-top: 10px;
+        }
+        .btn-login:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 30px rgba(255, 215, 0, 0.3);
         }
         .error-message {
             background: rgba(220, 53, 69, 0.2);
             border: 1px solid rgba(220, 53, 69, 0.5);
-            color: #ff6b6b;
+            border-radius: 8px;
             padding: 15px;
-            border-radius: 10px;
-            margin-bottom: 20px;
+            margin-bottom: 25px;
+            color: #ff6b6b;
+            text-align: center;
+        }
+        .login-footer {
+            text-align: center;
+            margin-top: 30px;
+            color: #666;
+            font-size: 0.9em;
+        }
+        @media (max-width: 480px) {
+            .login-container {
+                margin: 20px;
+                padding: 30px;
+            }
+            .login-logo h1 {
+                font-size: 2em;
+            }
         }
     </style>
 </head>
 <body>
     <div class="login-container">
-        <div class="login-box">
-            <h1>👑 El Inmortal 2</h1>
-            <p class="subtitle">Galante el Emperador - Launch Dashboard</p>
+        <div class="login-logo">
+            <img src="/images/galante_signature.png" alt="Galante el Emperador" style="max-width: 250px; margin-bottom: 20px;" onerror="this.src='/images/logo.png';">
+            <p>Sistema de Gestión Musical</p>
+        </div>
 
-            <% if (error) { %>
-                <div class="error-message">
-                    <%= error %>
-                </div>
-            <% } %>
-
-            <form action="/auth/login" method="POST">
-                <div class="form-group" style="text-align: left;">
-                    <label>Usuario</label>
-                    <input type="text" name="username" required autofocus>
-                </div>
-
-                <div class="form-group" style="text-align: left;">
-                    <label>Contraseña</label>
-                    <input type="password" name="password" required>
-                </div>
-
-                <button type="submit" class="btn" style="width: 100%; margin-top: 20px; padding: 15px;">
-                    Iniciar Sesión
-                </button>
-            </form>
-
-            <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid rgba(255, 255, 255, 0.1);">
-                <p style="color: #666; font-size: 0.85em;">
-                    Usuario por defecto: <strong style="color: #ffd700;">admin</strong><br>
-                    Contraseña: <strong style="color: #ffd700;">admin123</strong>
-                </p>
+        <% if (error) { %>
+            <div class="error-message">
+                <%= error %>
             </div>
+        <% } %>
+
+        <form action="/auth/login" method="POST">
+            <div class="form-group">
+                <label for="email">👤 Usuario o Email</label>
+                <input type="text" id="email" name="email" required placeholder="alx o alx@galante.com" autofocus>
+            </div>
+
+            <div class="form-group">
+                <label for="password">🔑 Contraseña</label>
+                <input type="password" id="password" name="password" required placeholder="••••••••">
+            </div>
+
+            <button type="submit" class="btn-login">
+                🔐 Iniciar Sesión
+            </button>
+        </form>
+
+        <div class="login-footer">
+            <p style="color: #888; margin-bottom: 15px;">¿No tienes cuenta? <a href="/auth/register" style="color: #ffd700; text-decoration: none; font-weight: bold;">Crear cuenta</a></p>
+            <p>© 2026 Galante Dashboard</p>
+            <p style="font-size: 0.85em; margin-top: 10px;">SaaS Multi-Tenant</p>
         </div>
     </div>
 </body>

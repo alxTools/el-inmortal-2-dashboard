@@ -2,6 +2,7 @@ const express = require('express');
 const path = require('path');
 const fs = require('fs');
 const session = require('express-session');
+const MySQLStore = require('express-mysql-session')(session);
 const helmet = require('helmet');
 const cors = require('cors');
 const methodOverride = require('method-override');
@@ -13,6 +14,17 @@ const { initializeTables, seedInitialData } = require('./config/database');
 
 const app = express();
 const PORT = process.env.PORT || 10000;
+
+function parseBool(value, fallback = false) {
+    if (value === undefined || value === null || value === '') return fallback;
+    const text = String(value).trim().toLowerCase();
+    return ['1', 'true', 'yes', 'on'].includes(text);
+}
+
+function parseIntSafe(value, fallback) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
 
 // Security middleware
 app.use(helmet({
@@ -82,16 +94,59 @@ app.use(express.static(path.join(__dirname, '../public')));
 // Trust proxy (needed for Nginx + Secure Cookies)
 app.set('trust proxy', 1);
 
-// Session configuration - using memory store for now (can be changed to MySQL later)
+// Session configuration (persistent MySQL store)
+const sessionMaxAgeMs = parseIntSafe(
+    process.env.SESSION_MAX_AGE_MS,
+    parseIntSafe(process.env.SESSION_MAX_AGE_DAYS, 365) * 24 * 60 * 60 * 1000
+);
+
+const sessionStoreConfig = {
+    host: process.env.DB_HOST || 'localhost',
+    port: parseIntSafe(process.env.DB_PORT, 3306),
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_NAME,
+    clearExpired: true,
+    checkExpirationInterval: parseIntSafe(process.env.SESSION_CLEANUP_INTERVAL_MS, 15 * 60 * 1000),
+    expiration: sessionMaxAgeMs,
+    createDatabaseTable: true,
+    endConnectionOnClose: false
+};
+
+const sessionSslEnabled = parseBool(
+    process.env.DB_SSL,
+    !['localhost', '127.0.0.1'].includes(String(process.env.DB_HOST || 'localhost').toLowerCase())
+);
+
+if (sessionSslEnabled) {
+    sessionStoreConfig.ssl = {
+        rejectUnauthorized: parseBool(process.env.DB_SSL_REJECT_UNAUTHORIZED, false)
+    };
+}
+
+let sessionStore;
+try {
+    sessionStore = new MySQLStore(sessionStoreConfig);
+    sessionStore.on('error', (error) => {
+        console.error('Session store error:', error.message);
+    });
+} catch (error) {
+    console.error('Failed to initialize MySQL session store, falling back to memory store:', error.message);
+}
+
 app.use(session({
+    name: process.env.SESSION_COOKIE_NAME || 'el2.sid',
+    store: sessionStore,
     secret: process.env.SESSION_SECRET || 'el-inmortal-2-secret-key-2026',
     resave: false,
     saveUninitialized: false,
+    rolling: parseBool(process.env.SESSION_ROLLING, true),
+    proxy: process.env.NODE_ENV === 'production',
     cookie: {
-        secure: process.env.NODE_ENV === 'production', // Requires HTTPS
+        secure: parseBool(process.env.SESSION_COOKIE_SECURE, process.env.NODE_ENV === 'production'),
         httpOnly: true,
-        sameSite: 'lax',
-        maxAge: 1000 * 60 * 60 * 24 // 24 hours
+        sameSite: process.env.SESSION_COOKIE_SAMESITE || 'lax',
+        maxAge: sessionMaxAgeMs
     }
 }));
 

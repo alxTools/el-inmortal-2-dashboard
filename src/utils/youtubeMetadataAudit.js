@@ -282,6 +282,22 @@ function getRequiredEnv(name) {
     return String(value).trim();
 }
 
+function parseGoogleApiError(error) {
+    const reason =
+        error?.errors?.[0]?.reason ||
+        error?.response?.data?.error?.errors?.[0]?.reason ||
+        null;
+    const message =
+        error?.response?.data?.error?.message ||
+        error?.message ||
+        'unknown_error';
+
+    return {
+        reason: reason ? String(reason) : null,
+        message: String(message || 'unknown_error').slice(0, 1000)
+    };
+}
+
 function resolveYoutubeConfig() {
     const clientSecretsPath = getRequiredEnv('YT_CLIENT_SECRETS_PATH');
     const tokenPath = getRequiredEnv('YT_TOKEN_FILE_PATH');
@@ -296,7 +312,7 @@ function resolveYoutubeConfig() {
     return { clientSecretsPath, tokenPath };
 }
 
-async function getYoutubeClient() {
+async function getYoutubeClientWithMeta() {
     const { clientSecretsPath, tokenPath } = resolveYoutubeConfig();
 
     const secretRaw = fs.readFileSync(clientSecretsPath, 'utf8');
@@ -315,10 +331,20 @@ async function getYoutubeClient() {
         redirectUri
     );
 
+    const clientIdPrefix = String(secretObj.client_id || '').split('-')[0] || '';
+
     const tokenRaw = fs.readFileSync(tokenPath, 'utf8');
     oauth2Client.setCredentials(JSON.parse(tokenRaw));
 
-    return google.youtube({ version: 'v3', auth: oauth2Client });
+    return {
+        youtube: google.youtube({ version: 'v3', auth: oauth2Client }),
+        clientIdPrefix
+    };
+}
+
+async function getYoutubeClient() {
+    const { youtube } = await getYoutubeClientWithMeta();
+    return youtube;
 }
 
 async function ensureYoutubeMetadataTables() {
@@ -488,6 +514,24 @@ async function ensureYoutubeMetadataTables() {
             PRIMARY KEY (id),
             KEY idx_report_date (report_date),
             KEY idx_status (status)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    `);
+
+    await query(`
+        CREATE TABLE IF NOT EXISTS youtube_api_quota_checks (
+            id BIGINT NOT NULL AUTO_INCREMENT,
+            status VARCHAR(32) NOT NULL,
+            reason VARCHAR(120) NULL,
+            message_text TEXT NULL,
+            endpoint_label VARCHAR(64) NOT NULL DEFAULT 'channels.mine',
+            requested_by_user VARCHAR(128) NULL,
+            channel_id VARCHAR(128) NULL,
+            channel_title VARCHAR(255) NULL,
+            client_id_prefix VARCHAR(64) NULL,
+            checked_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            KEY idx_checked_at (checked_at),
+            KEY idx_status_checked (status, checked_at)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     `);
 
@@ -1793,6 +1837,125 @@ async function sendYoutubeOpsDailyReportEmail({
     };
 }
 
+async function checkYoutubeApiQuotaAndStore({
+    requestedBy = 'system',
+    endpointLabel = 'channels.mine'
+} = {}) {
+    await ensureYoutubeMetadataTables();
+
+    let status = 'error';
+    let reason = null;
+    let messageText = 'not_checked';
+    let channelId = null;
+    let channelTitle = null;
+    let clientIdPrefix = null;
+
+    try {
+        const { youtube, clientIdPrefix: cidPrefix } = await getYoutubeClientWithMeta();
+        clientIdPrefix = cidPrefix || null;
+
+        const channelsResp = await youtube.channels.list({
+            part: ['snippet'],
+            mine: true,
+            maxResults: 1
+        });
+
+        const channel = channelsResp?.data?.items?.[0] || null;
+        channelId = channel?.id || null;
+        channelTitle = channel?.snippet?.title || null;
+        status = 'available';
+        messageText = 'ok';
+    } catch (error) {
+        const parsed = parseGoogleApiError(error);
+        reason = parsed.reason;
+        messageText = parsed.message;
+        status = reason === 'quotaExceeded' ? 'quota_exceeded' : 'error';
+    }
+
+    await run(
+        `INSERT INTO youtube_api_quota_checks
+         (status, reason, message_text, endpoint_label, requested_by_user, channel_id, channel_title, client_id_prefix)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+            status,
+            reason,
+            messageText,
+            String(endpointLabel || 'channels.mine'),
+            String(requestedBy || 'system'),
+            channelId,
+            channelTitle,
+            clientIdPrefix
+        ]
+    );
+
+    return {
+        status,
+        available: status === 'available',
+        reason,
+        message: messageText,
+        endpointLabel,
+        requestedBy,
+        channelId,
+        channelTitle,
+        clientIdPrefix,
+        checkedAt: new Date().toISOString()
+    };
+}
+
+async function getYoutubeApiQuotaHistory({ limit = 200 } = {}) {
+    await ensureYoutubeMetadataTables();
+
+    const safeLimit = Math.max(1, Math.min(2000, Number(limit || 200)));
+    const rows = await getAll(
+        `SELECT id, status, reason, message_text, endpoint_label, requested_by_user,
+                channel_id, channel_title, client_id_prefix, checked_at
+         FROM youtube_api_quota_checks
+         ORDER BY checked_at DESC
+         LIMIT ${safeLimit}`
+    );
+
+    const latest = rows[0] || null;
+    const latestAvailable = rows.find((row) => row.status === 'available') || null;
+    const latestQuotaExceeded = rows.find((row) => row.status === 'quota_exceeded') || null;
+
+    const chronological = [...rows].reverse();
+    let resetDetectedAt = null;
+    for (let i = 1; i < chronological.length; i += 1) {
+        const prev = chronological[i - 1];
+        const curr = chronological[i];
+        if (prev.status === 'quota_exceeded' && curr.status === 'available') {
+            resetDetectedAt = curr.checked_at;
+        }
+    }
+
+    return {
+        limit: safeLimit,
+        latest: latest
+            ? {
+                status: latest.status,
+                reason: latest.reason,
+                message: latest.message_text,
+                checkedAt: latest.checked_at
+            }
+            : null,
+        latestAvailableAt: latestAvailable?.checked_at || null,
+        latestQuotaExceededAt: latestQuotaExceeded?.checked_at || null,
+        resetDetectedAt,
+        checks: rows.map((row) => ({
+            id: row.id,
+            status: row.status,
+            reason: row.reason,
+            message: row.message_text,
+            endpointLabel: row.endpoint_label,
+            requestedBy: row.requested_by_user,
+            channelId: row.channel_id,
+            channelTitle: row.channel_title,
+            clientIdPrefix: row.client_id_prefix,
+            checkedAt: row.checked_at
+        }))
+    };
+}
+
 async function getRemoteVideoSnippetStatus(youtube, videoId) {
     const resp = await youtube.videos.list({
         part: ['snippet', 'status'],
@@ -2135,5 +2298,7 @@ module.exports = {
     optimizeTopTrafficAndApplyUpdates,
     buildYoutubeOpsDailyReport,
     generateAndStoreYoutubeOpsDailyReport,
-    sendYoutubeOpsDailyReportEmail
+    sendYoutubeOpsDailyReportEmail,
+    checkYoutubeApiQuotaAndStore,
+    getYoutubeApiQuotaHistory
 };

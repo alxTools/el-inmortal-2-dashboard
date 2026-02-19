@@ -9,7 +9,9 @@ const {
     optimizeTopTrafficVideosAndStoreTargets,
     optimizeTopTrafficAndApplyUpdates,
     generateAndStoreYoutubeOpsDailyReport,
-    sendYoutubeOpsDailyReportEmail
+    sendYoutubeOpsDailyReportEmail,
+    checkYoutubeApiQuotaAndStore,
+    getYoutubeApiQuotaHistory
 } = require('../src/utils/youtubeMetadataAudit');
 const { closePool } = require('../src/config/database');
 
@@ -142,6 +144,22 @@ async function main() {
         });
 
         console.log('Daily report email sent with PDF');
+        console.log(JSON.stringify(result, null, 2));
+        return;
+    }
+
+    if (command === 'quota-check') {
+        const requestedBy = getArgValue(args, 'by', 'cli');
+        const result = await checkYoutubeApiQuotaAndStore({ requestedBy });
+        console.log('YouTube API quota check stored');
+        console.log(JSON.stringify(result, null, 2));
+        return;
+    }
+
+    if (command === 'quota-history') {
+        const limit = Number(getArgValue(args, 'limit', 72)) || 72;
+        const result = await getYoutubeApiQuotaHistory({ limit });
+        console.log('YouTube API quota history');
         console.log(JSON.stringify(result, null, 2));
         return;
     }

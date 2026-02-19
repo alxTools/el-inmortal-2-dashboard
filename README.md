@@ -175,9 +175,19 @@ npm run youtube:audit -- optimize-top --run-id 5 --limit 50 --by cli
 npm run youtube:audit -- optimize-top-and-update --run-id 5 --limit 50 --by cli
 npm run youtube:audit -- daily-report --by cli
 npm run youtube:audit -- daily-report-email --to team@galanteelemperador.com --by cli
+npm run youtube:audit -- quota-check --by cli
+npm run youtube:audit -- quota-history --limit 72
 ```
 
 Para transporte `graph`, la App Registration debe tener permiso de aplicación `Mail.Send` con admin consent.
+
+Para monitoreo horario de cuota YouTube en Windows:
+
+```bat
+install_youtube_quota_hourly_schedule.bat
+check_youtube_quota_hourly_schedule.bat
+uninstall_youtube_quota_hourly_schedule.bat
+```
 
 ## Nota para expansion MCP multi-artista
 

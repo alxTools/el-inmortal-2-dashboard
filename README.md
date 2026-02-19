@@ -177,6 +177,7 @@ npm run youtube:audit -- daily-report --by cli
 npm run youtube:audit -- daily-report-email --to team@galanteelemperador.com --by cli
 npm run youtube:audit -- quota-check --by cli
 npm run youtube:audit -- quota-history --limit 72
+npm run youtube:quota-monitor-tick -- --by cli --task-name ElInmortal2_YTQuotaMonitor
 ```
 
 Para transporte `graph`, la App Registration debe tener permiso de aplicación `Mail.Send` con admin consent.
@@ -187,6 +188,14 @@ Para monitoreo horario de cuota YouTube en Windows:
 install_youtube_quota_hourly_schedule.bat
 check_youtube_quota_hourly_schedule.bat
 uninstall_youtube_quota_hourly_schedule.bat
+```
+
+Para monitoreo intensivo (cada 5 minutos, hasta detectar reset y auto-detenerse):
+
+```bat
+install_youtube_quota_until_reset_schedule.bat
+check_youtube_quota_until_reset_schedule.bat
+uninstall_youtube_quota_until_reset_schedule.bat
 ```
 
 ## Nota para expansion MCP multi-artista

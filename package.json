@@ -8,7 +8,8 @@
     "dev": "nodemon src/app.js",
     "sync:images": "node scripts/sync-local-images.js",
     "api:key:create": "node scripts/create-api-key.js",
-    "youtube:audit": "node scripts/youtube-channel-audit.js"
+    "youtube:audit": "node scripts/youtube-channel-audit.js",
+    "youtube:quota-monitor-tick": "node scripts/youtube-quota-monitor-tick.js"
   },
   "engines": {
     "node": ">=16.0.0"

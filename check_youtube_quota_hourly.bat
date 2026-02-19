@@ -3,6 +3,9 @@ setlocal
 
 set "APP_DIR=C:\Users\AlexSerrano\Dropbox\skills_agent_rules\el-inmortal-2-webapp"
 set "LOG_DIR=%APP_DIR%\logs"
+set "NPM_CMD=C:\Program Files\nodejs\npm.cmd"
+
+if not exist "%NPM_CMD%" set "NPM_CMD=npm"
 
 if not exist "%LOG_DIR%" mkdir "%LOG_DIR%"
 
@@ -12,7 +15,7 @@ set "LOG_FILE=%LOG_DIR%\yt-quota-hourly-%TODAY%.log"
 echo [%date% %time%] Starting YouTube quota check >> "%LOG_FILE%"
 
 cd /d "%APP_DIR%"
-call npm run youtube:audit -- quota-check --by scheduler >> "%LOG_FILE%" 2>&1
+call "%NPM_CMD%" run youtube:audit -- quota-check --by scheduler >> "%LOG_FILE%" 2>&1
 set "EXIT_CODE=%ERRORLEVEL%"
 
 echo [%date% %time%] Finished YouTube quota check, exit=%EXIT_CODE% >> "%LOG_FILE%"

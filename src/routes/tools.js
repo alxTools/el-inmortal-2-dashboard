@@ -1,4 +1,6 @@
 const express = require('express');
+const path = require('path');
+const fs = require('fs');
 const router = express.Router();
 const {
     ensureYoutubeMetadataTables,
@@ -39,6 +41,49 @@ router.get('/thumbnail-generator', (req, res) => {
     res.render('tools/thumbnail-generator', {
         title: 'Thumbnail Generator - El Inmortal 2 Dashboard'
     });
+});
+
+router.get('/exports', async (req, res) => {
+    const exportDir = path.join(__dirname, '../../exports');
+    let exportsList = [];
+
+    try {
+        if (fs.existsSync(exportDir)) {
+            const entries = fs.readdirSync(exportDir, { withFileTypes: true });
+            exportsList = entries
+                .filter((entry) => entry.isFile())
+                .map((entry) => {
+                    const fullPath = path.join(exportDir, entry.name);
+                    const stat = fs.statSync(fullPath);
+                    return {
+                        name: entry.name,
+                        size: stat.size,
+                        updatedAt: stat.mtime
+                    };
+                })
+                .sort((a, b) => b.updatedAt - a.updatedAt);
+        }
+    } catch (error) {
+        console.error('Exports list error:', error);
+    }
+
+    res.render('tools/exports', {
+        title: 'Exports - El Inmortal 2 Dashboard',
+        exportsList
+    });
+});
+
+router.get('/exports/download/:filename', (req, res) => {
+    const exportDir = path.join(__dirname, '../../exports');
+    const rawName = String(req.params.filename || '').trim();
+    const safeName = path.basename(rawName);
+    const filePath = path.join(exportDir, safeName);
+
+    if (!safeName || !fs.existsSync(filePath)) {
+        return res.status(404).send('Archivo no encontrado');
+    }
+
+    return res.download(filePath, safeName);
 });
 
 router.get('/youtube-metadata-audit', async (req, res) => {

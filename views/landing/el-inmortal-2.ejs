@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %></title>
+    <meta name="description" content="Landing oficial de El Inmortal 2 de Galante el Emperador.">
+    <meta property="og:title" content="<%= landingData.albumName %> - <%= landingData.artistName %>">
+    <meta property="og:description" content="<%= landingData.description %>">
+    <meta property="og:image" content="<%= landingData.coverImage %>">
+    <meta property="og:type" content="music.album">
+    <link rel="stylesheet" href="/css/album-landing.tailwind.css">
+</head>
+<body>
+    <% if (!assetsReady) { %>
+        <div style="background:#1f2937;color:#f9fafb;padding:12px 18px;font-family:Arial,sans-serif;">
+            ⚠️ Landing assets no encontrados. Ejecuta `npm run landing:build` para regenerarlos.
+        </div>
+    <% } %>
+
+    <noscript>
+        <div style="background:#111827;color:#f9fafb;padding:12px 18px;font-family:Arial,sans-serif;">
+            Este landing necesita JavaScript para la version interactiva.
+        </div>
+    </noscript>
+
+    <div id="album-landing-root">
+        <section style="padding:24px;font-family:Arial,sans-serif;max-width:960px;margin:0 auto;">
+            <h1 style="font-size:32px;margin:0 0 6px;"> <%= landingData.albumName %> </h1>
+            <p style="margin:0 0 12px;color:#6b7280;"> <%= landingData.artistName %> </p>
+            <p style="margin:0 0 16px;"> <%= landingData.description %> </p>
+            <p style="margin:0 0 20px;color:#9ca3af;">Release: <%= landingData.releaseDate %></p>
+
+            <h2 style="margin:18px 0 10px;">Area exclusiva</h2>
+            <p style="margin:0 0 12px;color:#6b7280;">Registra tu email para desbloquear el tracklist completo y el player.</p>
+
+            <form method="post" action="/landing/subscribe" style="display:flex;gap:8px;flex-wrap:wrap;">
+                <input type="text" name="full_name" placeholder="Nombre y apellido" required style="padding:10px 14px;border-radius:999px;border:1px solid #d1d5db;min-width:240px;" />
+                <input type="text" name="country" placeholder="Pais" required style="padding:10px 14px;border-radius:999px;border:1px solid #d1d5db;min-width:200px;" />
+                <input type="email" name="email" placeholder="Tu email" required style="padding:10px 14px;border-radius:999px;border:1px solid #d1d5db;min-width:240px;" />
+                <input type="hidden" name="source" value="landing_el_inmortal_2" />
+                <button type="submit" style="padding:10px 16px;border-radius:999px;border:0;background:#f59e0b;color:#111827;font-weight:600;">Desbloquear</button>
+            </form>
+        </section>
+    </div>
+
+    <script>
+        window.__ALBUM_LANDING_DATA__ = <%- landingDataJson %>;
+    </script>
+    <script src="/js/album-landing.bundle.js" defer></script>
+</body>
+</html>

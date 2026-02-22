@@ -38,7 +38,8 @@
                         <% items.forEach(item => { %>
                         <li id="item-<%= item.id %>" class="checklist-item <%= item.completed ? 'completed' : '' %>" style="padding: 15px; background: rgba(255, 255, 255, 0.05); margin-bottom: 10px; border-radius: 10px; display: flex; align-items: center; gap: 15px; transition: all 0.3s;">
                             <input type="checkbox" id="checkbox-<%= item.id %>" <%= item.completed ? 'checked' : '' %> 
-                                   onchange="toggleItem(<%= item.id %>)"
+                                   class="checklist-checkbox"
+                                   data-item-id="<%= item.id %>"
                                    style="width: 22px; height: 22px; accent-color: #ffd700; cursor: pointer;">
                             <span id="text-<%= item.id %>" style="flex: 1; <%= item.completed ? 'text-decoration: line-through; opacity: 0.6;' : '' %>">
                                 <%= item.item_text %>
@@ -78,9 +79,13 @@
                 return;
             }
             
-            // Get current state
+            // Get previous state from DOM (before browser auto-toggles)
+            const wasCompleted = itemLi.classList.contains('completed');
+            console.log('Previous state (wasCompleted):', wasCompleted);
+            
+            // Get current checkbox state (after browser auto-toggles)
             const isChecked = checkbox.checked;
-            console.log('Current checkbox state:', isChecked);
+            console.log('Current checkbox state (isChecked):', isChecked);
             
             try {
                 const url = `/api/checklist/${id}/toggle`;
@@ -117,14 +122,19 @@
                     checkbox.checked = serverCompleted;
                     
                     // Update counts based on actual change
-                    if (serverCompleted && !isChecked) {
+                    if (serverCompleted && !wasCompleted) {
                         completedItems++;
-                    } else if (!serverCompleted && isChecked) {
+                        console.log('Incremented completedItems to:', completedItems);
+                    } else if (!serverCompleted && wasCompleted) {
                         completedItems--;
+                        console.log('Decremented completedItems to:', completedItems);
+                    } else {
+                        console.log('No count change needed');
                     }
                     
                     // Update UI
                     updateProgressBar();
+                    console.log('Progress bar updated');
                     
                     // Update item styling
                     if (serverCompleted) {
@@ -175,6 +185,14 @@
                 progressFill.style.background = 'linear-gradient(90deg, #28a745, #20c997)';
             }
         }
+        
+        // Attach event listeners to all checkboxes (CSP-compliant, no inline handlers)
+        document.querySelectorAll('.checklist-checkbox').forEach(function(checkbox) {
+            checkbox.addEventListener('change', function() {
+                const itemId = this.getAttribute('data-item-id');
+                toggleItem(itemId);
+            });
+        });
         
         console.log('✅ Checklist cargado:', totalItems, 'tareas,', completedItems, 'completadas');
     </script>

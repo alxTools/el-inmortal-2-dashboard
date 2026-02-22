@@ -80,15 +80,6 @@
                 const id = this.getAttribute('data-id');
                 const name = this.getAttribute('data-name');
                 
-                const confirmMessage = `¿Estás seguro de que quieres eliminar al compositor "${name}"?\n\n` +
-                                     `⚠️ Advertencia: Si este compositor tiene temas asignados, ` +
-                                     `se perderá esa información.\n\n` +
-                                     `Esta acción no se puede deshacer.`;
-                
-                if (!confirm(confirmMessage)) {
-                    return;
-                }
-
                 try {
                     const response = await fetch('/composers/' + id, {
                         method: 'DELETE',

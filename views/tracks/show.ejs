@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %></title>
+    <link rel="stylesheet" href="/css/dashboard.css">
+    <style>
+        .track-header {
+            display: flex;
+            gap: 30px;
+            margin-bottom: 40px;
+            align-items: flex-start;
+        }
+        .track-cover {
+            width: 250px;
+            height: 250px;
+            object-fit: cover;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .track-info {
+            flex: 1;
+        }
+        .track-number-badge {
+            display: inline-block;
+            background: rgba(255, 215, 0, 0.2);
+            color: #ffd700;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .track-info h1 {
+            color: #ffd700;
+            margin-bottom: 15px;
+        }
+        .track-meta {
+            color: #888;
+            margin-bottom: 20px;
+        }
+        .track-meta p {
+            margin-bottom: 8px;
+        }
+        .track-type-badge-large {
+            display: inline-block;
+            padding: 10px 20px;
+            border-radius: 25px;
+            font-size: 0.9em;
+            font-weight: bold;
+            margin-bottom: 20px;
+        }
+        .track-actions {
+            display: flex;
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .info-section {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .info-section h3 {
+            color: #ffd700;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(255, 215, 0, 0.3);
+        }
+        .lyrics-box {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 10px;
+            padding: 20px;
+            max-height: 400px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            font-family: 'Courier New', monospace;
+            line-height: 1.8;
+            color: #ddd;
+        }
+        .audio-player-section {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .no-audio {
+            color: #888;
+            font-style: italic;
+            padding: 20px;
+            text-align: center;
+        }
+        @media (max-width: 768px) {
+            .track-header {
+                flex-direction: column;
+                align-items: center;
+                text-align: center;
+            }
+            .track-cover {
+                width: 200px;
+                height: 200px;
+            }
+            .track-actions {
+                flex-direction: column;
+                width: 100%;
+            }
+            .track-actions .btn {
+                width: 100%;
+                text-align: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <%- include('../partials/navbar') %>
+
+    <div class="container" style="padding-top: 40px;">
+        <div class="track-header">
+            <% if (track.cover_image_path) { %>
+                <img src="<%= track.cover_image_path %>" alt="<%= track.title %>" class="track-cover">
+            <% } else { %>
+                <div class="track-cover" style="display: flex; align-items: center; justify-content: center; font-size: 4em;">
+                    🎵
+                </div>
+            <% } %>
+            
+            <div class="track-info">
+                <span class="track-number-badge">Track #<%= track.track_number %></span>
+                
+                <% if (track.is_single) { %>
+                    <span class="track-type-badge-large type-single">🎯 SENCILLO</span>
+                <% } else if (track.is_primary) { %>
+                    <span class="track-type-badge-large type-primary">⭐ PRINCIPAL</span>
+                <% } else { %>
+                    <span class="track-type-badge-large type-album">💿 TRACK DE ÁLBUM</span>
+                <% } %>
+                
+                <h1><%= track.title || 'Sin título' %></h1>
+                
+                <div class="track-meta">
+                    <p><strong>🎧 Productor:</strong> <%= track.producer_name || 'Sin asignar' %></p>
+                    <% if (track.features) { %>
+                        <p><strong>👥 Featuring:</strong> <%= track.features %></p>
+                    <% } %>
+                    <% if (track.duration) { %>
+                        <p><strong>⏱️ Duración:</strong> <%= track.duration %></p>
+                    <% } %>
+                    <% if (track.recording_date) { %>
+                        <p><strong>📅 Fecha de grabación:</strong> <%= new Date(track.recording_date).toLocaleDateString('es-ES') %></p>
+                    <% } %>
+                    <p><strong>📊 Estado:</strong> <%= track.status === 'completed' ? '✅ Completado' : track.status === 'in_progress' ? '🔄 En progreso' : '⏳ Pendiente' %></p>
+                </div>
+                
+                <div class="track-actions">
+                    <a href="/tracks/<%= track.id %>/edit" class="btn">✏️ Editar Tema</a>
+                    <a href="/tracks" class="btn btn-secondary">← Volver a Temas</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Audio Player Section -->
+        <div class="audio-player-section">
+            <h3 style="color: #ffd700; margin-bottom: 15px;">🎵 Audio</h3>
+            <% if (track.audio_file_path) { %>
+                <audio controls style="width: 100%;" preload="metadata">
+                    <source src="<%= track.audio_file_path %>" type="audio/wav">
+                    <source src="<%= track.audio_file_path %>" type="audio/mpeg">
+                    Tu navegador no soporta el elemento de audio.
+                </audio>
+                <p style="color: #888; margin-top: 10px; font-size: 0.9em;">
+                    Archivo: <%= track.audio_file_type ? track.audio_file_type.toUpperCase() : 'AUDIO' %>
+                </p>
+            <% } else { %>
+                <div class="no-audio">
+                    🎵 No hay archivo de audio disponible para este tema
+                </div>
+            <% } %>
+        </div>
+
+        <!-- Splitsheet Status -->
+        <div class="info-section">
+            <h3>📄 Splitsheet</h3>
+            <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+                <div style="flex: 1; min-width: 200px;">
+                    <p style="color: #888; margin-bottom: 10px;">Estado:</p>
+                    <% if (track.splitsheet_confirmed) { %>
+                        <span class="status-badge status-done" style="font-size: 1.1em;">✓ Confirmado</span>
+                    <% } else if (track.splitsheet_sent) { %>
+                        <span class="status-badge status-pending" style="font-size: 1.1em;">⏳ Enviado</span>
+                    <% } else { %>
+                        <span class="status-badge status-urgent" style="font-size: 1.1em;">⚠️ Pendiente</span>
+                    <% } %>
+                </div>
+                <div style="flex: 1; min-width: 200px;">
+                    <% if (!track.splitsheet_confirmed) { %>
+                        <a href="/splitsheets/generate/<%= track.producer_id %>" class="btn-small">Generar Splitsheet</a>
+                    <% } %>
+                </div>
+            </div>
+        </div>
+
+        <!-- Lyrics Section -->
+        <% if (track.lyrics) { %>
+        <div class="info-section">
+            <h3>📝 Letra</h3>
+            <div class="lyrics-box"><%= track.lyrics %></div>
+        </div>
+        <% } %>
+
+        <!-- Additional Info -->
+        <div class="info-section">
+            <h3>ℹ️ Información Adicional</h3>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px;">
+                <div>
+                    <p style="color: #888; margin-bottom: 5px;">ID del Tema:</p>
+                    <p>#<%= track.id %></p>
+                </div>
+                <div>
+                    <p style="color: #888; margin-bottom: 5px;">Creado:</p>
+                    <p><%= new Date(track.created_at).toLocaleDateString('es-ES') %></p>
+                </div>
+                <% if (track.updated_at && track.updated_at !== track.created_at) { %>
+                <div>
+                    <p style="color: #888; margin-bottom: 5px;">Última actualización:</p>
+                    <p><%= new Date(track.updated_at).toLocaleDateString('es-ES') %></p>
+                </div>
+                <% } %>
+            </div>
+        </div>
+    </div>
+
+    <%- include('../partials/footer') %>
+</body>
+</html>

@@ -100,6 +100,35 @@ router.post('/', [
     }
 });
 
+// GET show track details
+router.get('/:id', async (req, res) => {
+    try {
+        const trackId = req.params.id;
+        
+        const track = await getOne('SELECT t.*, p.name as producer_name FROM tracks t LEFT JOIN producers p ON t.producer_id = p.id WHERE t.id = ?', [trackId]);
+        
+        if (!track) {
+            return res.status(404).render('error', {
+                title: '404',
+                message: 'Tema no encontrado',
+                error: {}
+            });
+        }
+        
+        res.render('tracks/show', {
+            title: track.title,
+            track: track
+        });
+    } catch (error) {
+        console.error('Error:', error);
+        res.status(500).render('error', {
+            title: 'Error',
+            message: 'Error cargando tema',
+            error: process.env.NODE_ENV === 'development' ? error : {}
+        });
+    }
+});
+
 // GET edit track form
 router.get('/:id/edit', async (req, res) => {
     try {
@@ -147,7 +176,7 @@ router.put('/:id', async (req, res) => {
             [
                 title, 
                 producer_id || null, 
-                recording_date, 
+                recording_date || null, 
                 duration, 
                 lyrics, 
                 status, 

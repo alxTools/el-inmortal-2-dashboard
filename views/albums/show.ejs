@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %></title>
+    <link rel="stylesheet" href="/css/dashboard.css">
+    <style>
+        .album-header {
+            display: flex;
+            gap: 30px;
+            margin-bottom: 40px;
+            align-items: flex-start;
+        }
+        .album-cover-large {
+            width: 300px;
+            height: 300px;
+            object-fit: cover;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+        .album-info {
+            flex: 1;
+        }
+        .album-info h1 {
+            color: #ffd700;
+            margin-bottom: 15px;
+        }
+        .album-meta {
+            color: #888;
+            margin-bottom: 20px;
+        }
+        .album-status-badge {
+            display: inline-block;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            margin-bottom: 20px;
+        }
+        .track-number {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+            background: rgba(255, 215, 0, 0.2);
+            color: #ffd700;
+            border-radius: 50%;
+            font-weight: bold;
+            margin-right: 15px;
+        }
+        .track-item {
+            display: flex;
+            align-items: center;
+            padding: 15px 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            margin-bottom: 10px;
+            transition: all 0.3s;
+        }
+        .track-item:hover {
+            background: rgba(255, 255, 255, 0.08);
+            transform: translateX(5px);
+        }
+        .track-title {
+            flex: 1;
+            color: #fff;
+        }
+        .track-actions {
+            display: flex;
+            gap: 10px;
+        }
+        .stats-bar {
+            display: flex;
+            gap: 20px;
+            margin-top: 20px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 10px;
+        }
+        .stat-item {
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 2em;
+            color: #ffd700;
+            font-weight: bold;
+        }
+        .stat-label {
+            color: #888;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <%- include('../partials/navbar') %>
+
+    <div class="container" style="padding-top: 40px;">
+        <div class="album-header">
+            <% if (album.cover_image_path) { %>
+                <img src="<%= album.cover_image_path %>" alt="<%= album.name %>" class="album-cover-large">
+            <% } else { %>
+                <div class="album-cover-large" style="display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); font-size: 4em;">
+                    💿
+                </div>
+            <% } %>
+            
+            <div class="album-info">
+                <span class="album-status-badge status-<%= album.status || 'upcoming' %>">
+                    <%= album.status === 'released' ? '🎵 Lanzado' : album.status === 'draft' ? '📝 Borrador' : '⏳ Próximamente' %>
+                </span>
+                
+                <h1><%= album.name %></h1>
+                <div class="album-meta">
+                    <p><strong>Artista:</strong> <%= album.artist %></p>
+                    <% if (album.release_date) { %>
+                        <p><strong>Fecha de lanzamiento:</strong> <%= new Date(album.release_date).toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' }) %></p>
+                    <% } %>
+                    <% if (album.description) { %>
+                        <p style="margin-top: 15px;"><%= album.description %></p>
+                    <% } %>
+                </div>
+                
+                <div class="stats-bar">
+                    <div class="stat-item">
+                        <div class="stat-value"><%= tracks.length %></div>
+                        <div class="stat-label">Temas</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value"><%= tracks.filter(t => t.audio_file_path).length %></div>
+                        <div class="stat-label">Con Audio</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value"><%= tracks.filter(t => t.lyrics && t.lyrics.trim().length > 50).length %></div>
+                        <div class="stat-label">Con Letras</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value"><%= tracks.filter(t => t.splitsheet_confirmed).length %></div>
+                        <div class="stat-label">Splits</div>
+                    </div>
+                </div>
+                
+                <div style="margin-top: 25px;">
+                    <a href="/albums/<%= album.id %>/edit" class="btn">✏️ Editar Álbum</a>
+                    <a href="/tracks/new?album_id=<%= album.id %>" class="btn" style="margin-left: 10px;">+ Agregar Tema</a>
+                    <a href="/albums" class="btn btn-secondary" style="margin-left: 10px;">← Volver a Álbumes</a>
+                </div>
+                
+                <% 
+                const tracksWithoutLyrics = tracks.filter(t => t.audio_file_path && (!t.lyrics || t.lyrics.trim().length < 50));
+                %>
+                <% if (tracksWithoutLyrics.length > 0) { %>
+                <div style="margin-top: 20px; padding: 15px; background: rgba(255, 215, 0, 0.1); border-radius: 10px; border: 1px solid rgba(255, 215, 0, 0.3);">
+                    <p style="margin-bottom: 10px; color: #ffd700;">
+                        📝 <%= tracksWithoutLyrics.length %> temas sin letras completas
+                    </p>
+                    <button id="generateAllLyricsBtn" class="btn" style="background: linear-gradient(45deg, #ffd700, #ffed4e); color: #1a1a2e; font-weight: bold;">
+                        ✨ Generar Todas las Letras
+                    </button>
+                    <span id="generationStatus" style="margin-left: 15px; color: #888; display: none;"></span>
+                </div>
+                <% } %>
+            </div>
+        </div>
+
+        <h2 style="color: #ffd700; margin-bottom: 25px;">🎵 Lista de Temas</h2>
+        
+        <% if (tracks.length === 0) { %>
+            <div style="text-align: center; padding: 60px 20px; background: rgba(255, 255, 255, 0.05); border-radius: 15px;">
+                <p style="font-size: 3em; margin-bottom: 20px;">🎵</p>
+                <p>Este álbum no tiene temas aún.</p>
+                <a href="/tracks/new?album_id=<%= album.id %>" class="btn" style="margin-top: 20px;">Agregar Primer Tema</a>
+            </div>
+        <% } else { %>
+            <div class="tracks-list">
+                <% tracks.forEach(track => { %>
+                <div class="track-item">
+                    <span class="track-number"><%= track.track_number %></span>
+                    <span class="track-title"><%= track.title %></span>
+                    <div class="track-actions">
+                        <% if (track.audio_file_path) { %>
+                            <span style="color: #28a745; font-size: 0.9em;">🎵 Audio</span>
+                        <% } %>
+                        <% if (track.lyrics && track.lyrics.trim().length > 50) { %>
+                            <span style="color: #17a2b8; font-size: 0.9em;">📝 Letra</span>
+                        <% } %>
+                        <% if (track.splitsheet_confirmed) { %>
+                            <span style="color: #ffd700; font-size: 0.9em;">✓ Split</span>
+                        <% } %>
+                        <a href="/tracks/<%= track.id %>/edit" class="btn-small">Editar</a>
+                        <a href="/tracks/<%= track.id %>" class="btn-small">Ver</a>
+                    </div>
+                </div>
+                <% }) %>
+            </div>
+        <% } %>
+    </div>
+
+    <%- include('../partials/footer') %>
+    
+    <script>
+        document.getElementById('generateAllLyricsBtn')?.addEventListener('click', async function() {
+            const btn = this;
+            const status = document.getElementById('generationStatus');
+            
+            if (!confirm('¿Generar letras automáticamente para todos los temas sin letras?\n\nEsto puede tomar varios minutos dependiendo de la cantidad de temas.')) {
+                return;
+            }
+            
+            btn.disabled = true;
+            btn.textContent = '⏳ Generando...';
+            status.style.display = 'inline';
+            status.textContent = 'Procesando...';
+            
+            try {
+                const response = await fetch('/api/albums/<%= album.id %>/generate-lyrics', {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok && result.success) {
+                    status.textContent = `✓ ${result.successful} generadas, ${result.errors} errores`;
+                    status.style.color = result.errors === 0 ? '#28a745' : '#ffc107';
+                    
+                    if (result.successful > 0) {
+                        setTimeout(() => {
+                            location.reload();
+                        }, 2000);
+                    }
+                } else {
+                    throw new Error(result.error || 'Error en la generación');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                status.textContent = '❌ Error: ' + error.message;
+                status.style.color = '#dc3545';
+                btn.disabled = false;
+                btn.textContent = '✨ Reintentar';
+            }
+        });
+    </script>
+</body>
+</html>

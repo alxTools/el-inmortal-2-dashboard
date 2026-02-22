@@ -6,6 +6,25 @@ const { query, closePool } = require('../src/config/database');
 
 async function main() {
     await query(`
+        CREATE TABLE IF NOT EXISTS intel_agent_credentials (
+            id BIGINT NOT NULL AUTO_INCREMENT,
+            provider_key VARCHAR(64) NOT NULL,
+            username VARCHAR(255) NOT NULL,
+            secret_ciphertext LONGTEXT NOT NULL,
+            secret_iv VARCHAR(64) NOT NULL,
+            secret_tag VARCHAR(64) NOT NULL,
+            secret_version INT NOT NULL DEFAULT 1,
+            notes TEXT NULL,
+            status VARCHAR(32) NOT NULL DEFAULT 'active',
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY uq_provider_user (provider_key, username),
+            KEY idx_provider_status (provider_key, status)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    `);
+
+    await query(`
         CREATE TABLE IF NOT EXISTS track_split_intake_queue (
             id BIGINT NOT NULL AUTO_INCREMENT,
             album_id INT NULL,
@@ -34,6 +53,24 @@ async function main() {
     `);
 
     await query(`
+        CREATE TABLE IF NOT EXISTS intel_agent_skills (
+            id BIGINT NOT NULL AUTO_INCREMENT,
+            skill_key VARCHAR(80) NOT NULL,
+            skill_name VARCHAR(255) NOT NULL,
+            mission_type VARCHAR(80) NULL,
+            status VARCHAR(32) NOT NULL DEFAULT 'active',
+            playbook_markdown MEDIUMTEXT NULL,
+            config_json JSON NULL,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY uq_skill_key (skill_key),
+            KEY idx_skill_status (status),
+            KEY idx_skill_mission_type (mission_type)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    `);
+
+    await query(`
         CREATE TABLE IF NOT EXISTS intel_agent_missions (
             id BIGINT NOT NULL AUTO_INCREMENT,
             mission_type VARCHAR(80) NOT NULL,
@@ -51,6 +88,23 @@ async function main() {
             UNIQUE KEY uq_mission_type (mission_type),
             KEY idx_status_priority (status, priority),
             KEY idx_next_run (next_run_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    `);
+
+    await query(`
+        CREATE TABLE IF NOT EXISTS intel_mission_skill_map (
+            id BIGINT NOT NULL AUTO_INCREMENT,
+            mission_id BIGINT NOT NULL,
+            skill_id BIGINT NOT NULL,
+            is_primary TINYINT(1) NOT NULL DEFAULT 0,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY uq_mission_skill (mission_id, skill_id),
+            KEY idx_skill (skill_id),
+            CONSTRAINT fk_mission_skill_map_mission FOREIGN KEY (mission_id)
+                REFERENCES intel_agent_missions(id) ON DELETE CASCADE,
+            CONSTRAINT fk_mission_skill_map_skill FOREIGN KEY (skill_id)
+                REFERENCES intel_agent_skills(id) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     `);
 

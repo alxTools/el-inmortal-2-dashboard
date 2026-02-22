@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %></title>
+    <link rel="stylesheet" href="/css/dashboard.css">
+    <style>
+        .companies-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        .companies-table th, .companies-table td {
+            padding: 15px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .companies-table th {
+            color: #ffd700;
+            font-weight: bold;
+            text-transform: uppercase;
+            font-size: 0.9em;
+        }
+        .companies-table tr:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+        .plan-badge {
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 0.8em;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        .plan-basic { background: rgba(108, 117, 125, 0.2); color: #ccc; }
+        .plan-pro { background: rgba(23, 162, 184, 0.2); color: #17a2b8; }
+        .plan-enterprise { background: rgba(255, 215, 0, 0.2); color: #ffd700; }
+    </style>
+</head>
+<body>
+    <%- include('../partials/navbar') %>
+
+    <div class="container" style="padding-top: 40px;">
+        <div class="section-header" style="margin-bottom: 30px;">
+            <h1>🏢 Gestión de Empresas</h1>
+            <button onclick="showCreateModal()" class="btn">+ Nueva Empresa</button>
+        </div>
+
+        <div class="section">
+            <table class="companies-table">
+                <thead>
+                    <tr>
+                        <th>Nombre</th>
+                        <th>Contacto</th>
+                        <th>Plan</th>
+                        <th>Estado</th>
+                        <th>Fecha Registro</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <% companies.forEach(company => { %>
+                    <tr>
+                        <td style="font-weight: bold; color: #fff;"><%= company.name %></td>
+                        <td>
+                            <div style="font-size: 0.9em;"><%= company.email %></div>
+                            <div style="color: #888; font-size: 0.8em;"><%= company.phone || '-' %></div>
+                        </td>
+                        <td>
+                            <span class="plan-badge plan-<%= company.subscription_type %>"><%= company.subscription_type %></span>
+                        </td>
+                        <td>
+                            <span style="color: <%= company.status === 'active' ? '#28a745' : '#dc3545' %>">
+                                ● <%= company.status === 'active' ? 'Activo' : 'Inactivo' %>
+                            </span>
+                        </td>
+                        <td style="color: #888; font-size: 0.9em;">
+                            <%= new Date(company.created_at).toLocaleDateString('es-ES') %>
+                        </td>
+                        <td>
+                            <a href="/settings/companies/<%= company.id %>/edit" style="text-decoration: none; margin-right: 10px;">✏️</a>
+                            <a href="#" onclick="deleteCompany(<%= company.id %>, '<%= company.name %>')" style="text-decoration: none; color: #dc3545;">🗑️</a>
+                        </td>
+                    </tr>
+                    <% }) %>
+                </tbody>
+            </table>
+
+            <script>
+                async function deleteCompany(id, name) {
+                    if (confirm('¿Estás seguro de eliminar la empresa "' + name + '"? Esta acción no se puede deshacer.')) {
+                        try {
+                            const response = await fetch('/settings/companies/' + id, {
+                                method: 'DELETE',
+                                headers: { 'Accept': 'application/json' }
+                            });
+                            
+                            const result = await response.json();
+                            
+                            if (result.success) {
+                                alert('Empresa eliminada');
+                                window.location.reload();
+                            } else {
+                                alert('Error: ' + result.error);
+                            }
+                        } catch (error) {
+                            alert('Error al eliminar');
+                        }
+                    }
+                }
+            </script>
+        </div>
+    </div>
+
+    <%- include('../partials/footer') %>
+
+    <script>
+        function showCreateModal() {
+            const name = prompt('Nombre de la empresa:');
+            if (name) {
+                const email = prompt('Email de contacto:');
+                // Implement creation logic via fetch
+                alert('Creación de empresas en desarrollo');
+            }
+        }
+    </script>
+</body>
+</html>

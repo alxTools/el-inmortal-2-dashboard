@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %></title>
+    <link rel="stylesheet" href="/css/dashboard.css">
+</head>
+<body>
+    <%- include('../partials/navbar') %>
+
+    <div class="container" style="padding-top: 30px;">
+        <section class="section">
+            <div class="section-header">
+                <h2><span class="section-icon">📦</span> Exports</h2>
+            </div>
+
+            <p style="color: #9ca3af; margin-bottom: 20px;">
+                Descargas limpias listas para registro (ASCAP, SoundExchange, otros).
+            </p>
+
+            <% if (!exportsList || exportsList.length === 0) { %>
+                <div class="alert" style="background: #1f2937; border: 1px solid #374151; color: #e5e7eb;">
+                    No hay exports generados todavia.
+                </div>
+            <% } else { %>
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Archivo</th>
+                                <th>Tamano</th>
+                                <th>Actualizado</th>
+                                <th>Accion</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% exportsList.forEach((item) => { %>
+                                <tr>
+                                    <td><%= item.name %></td>
+                                    <td><%= (item.size / 1024).toFixed(1) %> KB</td>
+                                    <td><%= item.updatedAt.toLocaleString('es-PR') %></td>
+                                    <td>
+                                        <a href="/tools/exports/download/<%= encodeURIComponent(item.name) %>" class="btn btn-primary" style="padding: 6px 12px; font-size: 0.85em;">
+                                            Descargar
+                                        </a>
+                                    </td>
+                                </tr>
+                            <% }) %>
+                        </tbody>
+                    </table>
+                </div>
+            <% } %>
+        </section>
+    </div>
+
+    <%- include('../partials/footer') %>
+</body>
+</html>

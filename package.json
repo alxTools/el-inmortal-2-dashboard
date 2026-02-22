@@ -6,13 +6,29 @@
   "scripts": {
     "start": "node src/app.js",
     "dev": "nodemon src/app.js",
+    "landing:build:css": "tailwindcss -i ./frontend/landing/landing.css -o ./public/css/album-landing.tailwind.css --minify --config ./tailwind.landing.config.js",
+    "landing:build:js": "esbuild ./frontend/landing/landing.jsx --bundle --minify --platform=browser --format=iife --global-name=AlbumLandingApp --outfile=./public/js/album-landing.bundle.js",
+    "landing:build": "npm run landing:build:css && npm run landing:build:js",
     "sync:images": "node scripts/sync-local-images.js",
     "api:key:create": "node scripts/create-api-key.js",
     "youtube:audit": "node scripts/youtube-channel-audit.js",
     "youtube:quota-monitor-tick": "node scripts/youtube-quota-monitor-tick.js",
     "db:backup": "node scripts/backup-artistaviral-db.js",
     "db:setup:intel": "node scripts/setup-intel-tables.js",
-    "db:setup:track-rights": "node scripts/setup-track-rights-tables.js"
+    "db:setup:track-rights": "node scripts/setup-track-rights-tables.js",
+    "intel:seed-missions": "node scripts/seed-intel-missions.js",
+    "intel:seed-skills": "node scripts/seed-intel-skills.js",
+    "intel:set-credential": "node scripts/set-intel-credential.js",
+    "intel:ascap-scan": "node scripts/intel-ascap-scan-once.js",
+    "intel:ascap-debug": "node scripts/intel-ascap-debug-search.js",
+    "intel:ascap-batch": "node scripts/intel-ascap-batch-scan.js",
+    "intel:ascap-download": "node scripts/intel-ascap-download-catalog.js",
+    "intel:ascap-import": "node scripts/intel-ascap-import-catalog.js",
+    "intel:ascap-analyze": "node scripts/intel-ascap-analyze-catalog.js",
+    "export:ascap-catalog": "node scripts/export-ascap-catalog.js",
+    "intel:social-scan": "node scripts/intel-social-scan-once.js",
+    "intel:platform-footprint": "node scripts/intel-platform-footprint-once.js",
+    "status:update": "node scripts/log-status-update.js"
   },
   "engines": {
     "node": ">=16.0.0"
@@ -38,7 +54,14 @@
     "nodemailer": "^8.0.1",
     "openai": "^6.22.0",
     "pdfkit": "^0.17.2",
+    "playwright-core": "^1.58.2",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
     "sqlite3": "^5.1.6",
     "winston": "^3.11.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.27.3",
+    "tailwindcss": "^3.4.17"
   }
 }

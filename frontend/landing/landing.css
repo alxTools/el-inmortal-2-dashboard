@@ -1,0 +1,101 @@
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+    --landing-night: #060b15;
+    --landing-ink: #0f172a;
+    --landing-panel: rgba(15, 23, 42, 0.55);
+    --landing-edge: rgba(248, 250, 252, 0.14);
+    --landing-fire: #f97316;
+    --landing-gold: #facc15;
+    --landing-ice: #0ea5e9;
+}
+
+html,
+body {
+    margin: 0;
+    min-height: 100%;
+}
+
+body {
+    font-family: 'Space Grotesk', sans-serif;
+    background:
+        radial-gradient(circle at 12% 8%, rgba(14, 165, 233, 0.26), transparent 46%),
+        radial-gradient(circle at 85% 0%, rgba(249, 115, 22, 0.18), transparent 40%),
+        linear-gradient(180deg, #020617 0%, var(--landing-night) 45%, #02040a 100%);
+    color: #e2e8f0;
+}
+
+.font-display {
+    font-family: 'Bebas Neue', sans-serif;
+    letter-spacing: 0.05em;
+}
+
+.glass-panel {
+    background: var(--landing-panel);
+    border: 1px solid var(--landing-edge);
+    backdrop-filter: blur(8px);
+}
+
+.hero-aurora {
+    position: absolute;
+    inset: -25% auto auto -10%;
+    width: 360px;
+    height: 360px;
+    border-radius: 9999px;
+    background: radial-gradient(circle, rgba(249, 115, 22, 0.42) 0%, rgba(249, 115, 22, 0) 68%);
+    filter: blur(2px);
+    pointer-events: none;
+}
+
+.hero-aurora::after {
+    content: '';
+    position: absolute;
+    width: 300px;
+    height: 300px;
+    right: -220px;
+    top: 160px;
+    border-radius: 9999px;
+    background: radial-gradient(circle, rgba(14, 165, 233, 0.34) 0%, rgba(14, 165, 233, 0) 70%);
+}
+
+.reveal {
+    animation: rise-in 0.8s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.reveal-delay-1 {
+    animation-delay: 0.08s;
+}
+
+.reveal-delay-2 {
+    animation-delay: 0.16s;
+}
+
+.reveal-delay-3 {
+    animation-delay: 0.24s;
+}
+
+.track-card {
+    transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.track-card:hover {
+    transform: translateY(-3px);
+    border-color: rgba(250, 204, 21, 0.45);
+    box-shadow: 0 14px 36px rgba(15, 23, 42, 0.45);
+}
+
+@keyframes rise-in {
+    from {
+        opacity: 0;
+        transform: translateY(14px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}

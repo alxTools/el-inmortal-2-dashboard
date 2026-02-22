@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %></title>
+    <link rel="stylesheet" href="/css/dashboard.css">
+    <style>
+        .upload-zone {
+            border: 3px dashed rgba(255, 215, 0, 0.5);
+            border-radius: 15px;
+            padding: 60px 40px;
+            text-align: center;
+            background: rgba(255, 215, 0, 0.05);
+            transition: all 0.3s;
+            cursor: pointer;
+            margin-bottom: 30px;
+        }
+        .upload-zone:hover {
+            border-color: #ffd700;
+            background: rgba(255, 215, 0, 0.1);
+        }
+        .upload-zone.dragover {
+            border-color: #ffd700;
+            background: rgba(255, 215, 0, 0.2);
+            transform: scale(1.02);
+        }
+        .upload-zone-icon {
+            font-size: 4em;
+            margin-bottom: 20px;
+        }
+        .upload-zone-text {
+            color: #888;
+            font-size: 1.1em;
+        }
+        .upload-zone-input {
+            display: none;
+        }
+        .file-list {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+        .file-item {
+            display: flex;
+            align-items: center;
+            padding: 15px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            gap: 15px;
+        }
+        .file-item:last-child {
+            border-bottom: none;
+        }
+        .file-icon {
+            font-size: 2em;
+        }
+        .file-info {
+            flex: 1;
+        }
+        .file-name {
+            color: #fff;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .file-size {
+            color: #888;
+            font-size: 0.85em;
+        }
+        .file-status {
+            padding: 5px 12px;
+            border-radius: 15px;
+            font-size: 0.85em;
+        }
+        .status-pending {
+            background: rgba(255, 193, 7, 0.2);
+            color: #ffc107;
+        }
+        .status-uploading {
+            background: rgba(255, 215, 0, 0.2);
+            color: #ffd700;
+        }
+        .status-done {
+            background: rgba(40, 167, 69, 0.2);
+            color: #28a745;
+        }
+        .status-error {
+            background: rgba(220, 53, 69, 0.2);
+            color: #dc3545;
+        }
+        .mapping-section {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 30px;
+        }
+        .mapping-item {
+            display: flex;
+            align-items: center;
+            padding: 15px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            gap: 15px;
+        }
+        .mapping-item:last-child {
+            border-bottom: none;
+        }
+        .mapping-file {
+            flex: 1;
+            color: #ffd700;
+        }
+        .mapping-arrow {
+            color: #888;
+            font-size: 1.5em;
+        }
+        .mapping-select {
+            flex: 1;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 5px;
+            color: #fff;
+        }
+        .mapping-select:focus {
+            outline: none;
+            border-color: #ffd700;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 20px 0;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #ffd700, #ffed4e);
+            transition: width 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #1a1a2e;
+            font-weight: bold;
+        }
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        @media (max-width: 768px) {
+            .mapping-item {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            .mapping-arrow {
+                transform: rotate(90deg);
+            }
+        }
+    </style>
+</head>
+<body>
+    <%- include('../partials/navbar') %>
+
+    <div class="container" style="padding-top: 40px;">
+        <div class="section-header" style="margin-bottom: 30px;">
+            <h1>📁 Subir Audio en Lote</h1>
+            <a href="/tracks" class="btn btn-secondary">← Volver a Temas</a>
+        </div>
+
+        <!-- Step 1: Upload Files -->
+        <div class="section" id="uploadSection">
+            <h2 style="color: #ffd700; margin-bottom: 20px;">Paso 1: Seleccionar Archivos</h2>
+            
+            <div class="upload-zone" id="uploadZone">
+                <div class="upload-zone-icon">📁</div>
+                <div class="upload-zone-text">
+                    Arrastra archivos de audio aquí<br>
+                    <small>o haz clic para seleccionar</small>
+                </div>
+                <input type="file" id="fileInput" class="upload-zone-input" multiple accept="audio/*">
+            </div>
+
+            <p style="color: #888; text-align: center;">
+                Formatos soportados: WAV, MP3, M4A, FLAC<br>
+                Máximo 25 archivos a la vez - 100MB por archivo
+            </p>
+        </div>
+
+        <!-- File List (Hidden initially) -->
+        <div class="file-list" id="fileList" style="display: none;">
+            <h3 style="color: #ffd700; margin-bottom: 20px;">Archivos Seleccionados</h3>
+            <div id="fileItems"></div>
+            
+            <div class="progress-bar" id="progressBar" style="display: none;">
+                <div class="progress-fill" id="progressFill" style="width: 0%;">0%</div>
+            </div>
+            
+            <button id="uploadBtn" class="btn" style="margin-top: 20px; width: 100%;">
+                🚀 Subir Archivos
+            </button>
+        </div>
+
+        <!-- Step 2: Map Files to Tracks (Hidden initially) -->
+        <div class="mapping-section" id="mappingSection" style="display: none;">
+            <h2 style="color: #ffd700; margin-bottom: 20px;">Paso 2: Asignar a Tracks</h2>
+            <p style="color: #888; margin-bottom: 20px;">
+                Selecciona a qué track corresponde cada archivo:
+            </p>
+            
+            <div id="mappingItems"></div>
+            
+            <button id="mapBtn" class="btn" style="margin-top: 20px; width: 100%;">
+                ✅ Guardar Asignaciones
+            </button>
+        </div>
+
+        <!-- Results (Hidden initially) -->
+        <div class="section" id="resultsSection" style="display: none;">
+            <h2 style="color: #ffd700; margin-bottom: 20px;">✅ Resultados</h2>
+            <div id="resultsContent"></div>
+            <a href="/tracks" class="btn" style="margin-top: 20px; width: 100%;">
+                Ver Todos los Tracks
+            </a>
+        </div>
+    </div>
+
+    <%- include('../partials/footer') %>
+
+    <script>
+        let selectedFiles = [];
+        let uploadedFiles = [];
+        let tracks = <%- JSON.stringify(tracks) %>;
+
+        // Upload zone click
+        document.getElementById('uploadZone').addEventListener('click', function() {
+            document.getElementById('fileInput').click();
+        });
+
+        // File input change
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            handleFiles(e.target.files);
+        });
+
+        // Drag and drop
+        const uploadZone = document.getElementById('uploadZone');
+        
+        uploadZone.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            this.classList.add('dragover');
+        });
+        
+        uploadZone.addEventListener('dragleave', function(e) {
+            e.preventDefault();
+            this.classList.remove('dragover');
+        });
+        
+        uploadZone.addEventListener('drop', function(e) {
+            e.preventDefault();
+            this.classList.remove('dragover');
+            handleFiles(e.dataTransfer.files);
+        });
+
+        function handleFiles(files) {
+            selectedFiles = Array.from(files).filter(file => file.type.startsWith('audio/'));
+            
+            if (selectedFiles.length === 0) {
+                alert('Por favor selecciona archivos de audio válidos');
+                return;
+            }
+            
+            if (selectedFiles.length > 25) {
+                alert('Máximo 25 archivos permitidos');
+                selectedFiles = selectedFiles.slice(0, 25);
+            }
+            
+            displayFileList();
+        }
+
+        function displayFileList() {
+            const fileItems = document.getElementById('fileItems');
+            fileItems.innerHTML = '';
+            
+            selectedFiles.forEach((file, index) => {
+                const fileSize = (file.size / 1024 / 1024).toFixed(2);
+                const div = document.createElement('div');
+                div.className = 'file-item';
+                div.innerHTML = `
+                    <div class="file-icon">🎵</div>
+                    <div class="file-info">
+                        <div class="file-name">${file.name}</div>
+                        <div class="file-size">${fileSize} MB</div>
+                    </div>
+                    <span class="file-status status-pending" id="status-${index}">Pendiente</span>
+                `;
+                fileItems.appendChild(div);
+            });
+            
+            document.getElementById('fileList').style.display = 'block';
+        }
+
+        // Upload button
+        document.getElementById('uploadBtn').addEventListener('click', async function() {
+            if (selectedFiles.length === 0) return;
+            
+            this.disabled = true;
+            const totalFiles = selectedFiles.length;
+            let completedFiles = 0;
+            
+            // Create progress container
+            const progressDiv = document.createElement('div');
+            progressDiv.id = 'uploadProgress';
+            progressDiv.style.cssText = 'margin-top: 20px; padding: 20px; background: rgba(255,255,255,0.05); border-radius: 10px;';
+            progressDiv.innerHTML = `
+                <div style="margin-bottom: 15px;">
+                    <strong style="color: #ffd700;">📊 Progreso:</strong>
+                    <span id="progressText">0 de ${totalFiles} archivos</span>
+                </div>
+                <div class="progress-bar" style="width: 100%; height: 30px; background: rgba(255,255,255,0.1); border-radius: 15px; overflow: hidden;">
+                    <div id="progressBarFill" style="width: 0%; height: 100%; background: linear-gradient(90deg, #ffd700, #ffed4e); transition: width 0.3s; display: flex; align-items: center; justify-content: center; color: #1a1a2e; font-weight: bold;">0%</div>
+                </div>
+            `;
+            document.getElementById('fileList').appendChild(progressDiv);
+            
+            uploadedFiles = [];
+            
+            // Upload files one by one with progress tracking
+            for (let i = 0; i < selectedFiles.length; i++) {
+                const file = selectedFiles[i];
+                const statusEl = document.getElementById(`status-${i}`);
+                
+                // Update current file status
+                statusEl.className = 'file-status status-uploading';
+                statusEl.textContent = '⏳ Subiendo...';
+                
+                const formData = new FormData();
+                formData.append('audio_files', file);
+                
+                try {
+                    const response = await fetch('/bulk-upload', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (result.success && result.files && result.files.length > 0) {
+                        uploadedFiles.push(result.files[0]);
+                        statusEl.className = 'file-status status-done';
+                        statusEl.textContent = '✓ Subido';
+                        completedFiles++;
+                        
+                        // Update progress
+                        const progressPercent = Math.round((completedFiles / totalFiles) * 100);
+                        document.getElementById('progressBarFill').style.width = progressPercent + '%';
+                        document.getElementById('progressBarFill').textContent = progressPercent + '%';
+                        document.getElementById('progressText').textContent = `${completedFiles} de ${totalFiles} archivos completados`;
+                    } else {
+                        throw new Error(result.error || 'Error en archivo');
+                    }
+                } catch (error) {
+                    console.error('Error uploading file:', file.name, error);
+                    statusEl.className = 'file-status status-error';
+                    statusEl.textContent = '❌ Error';
+                    completedFiles++;
+                }
+            }
+            
+            // Final status
+            const successCount = uploadedFiles.length;
+            const errorCount = totalFiles - successCount;
+            
+            if (errorCount === 0) {
+                this.textContent = '✅ Subida Completada (' + successCount + ' archivos)';
+                showMappingSection();
+            } else {
+                this.textContent = `⚠️ Completado (${successCount} OK, ${errorCount} errores)`;
+                this.disabled = false;
+                if (successCount > 0) {
+                    showMappingSection();
+                }
+            }
+        });
+
+        function showMappingSection() {
+            const mappingItems = document.getElementById('mappingItems');
+            mappingItems.innerHTML = '';
+            
+            uploadedFiles.forEach((file, index) => {
+                const div = document.createElement('div');
+                div.className = 'mapping-item';
+                
+                // Try to match by filename pattern (number at beginning)
+                const match = file.originalName.match(/^(\d+)/);
+                const suggestedTrack = match ? tracks.find(t => t.track_number === parseInt(match[1])) : null;
+                
+                let options = '<option value="">-- Seleccionar Track --</option>';
+                tracks.forEach(track => {
+                    const selected = suggestedTrack && suggestedTrack.id === track.id ? 'selected' : '';
+                    const hasAudio = track.audio_file_path ? ' (Tiene audio)' : '';
+                    options += `<option value="${track.id}" ${selected}>#${track.track_number} - ${track.title}${hasAudio}</option>`;
+                });
+                
+                div.innerHTML = `
+                    <div class="mapping-file">${file.originalName}</div>
+                    <div class="mapping-arrow">→</div>
+                    <select class="mapping-select" data-file-index="${index}" data-file-path="${file.filePath}">
+                        ${options}
+                    </select>
+                `;
+                
+                mappingItems.appendChild(div);
+            });
+            
+            document.getElementById('mappingSection').style.display = 'block';
+            document.getElementById('mappingSection').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // Map button
+        document.getElementById('mapBtn').addEventListener('click', async function() {
+            const selects = document.querySelectorAll('.mapping-select');
+            const mappings = [];
+            
+            selects.forEach(select => {
+                const trackId = select.value;
+                const filePath = select.getAttribute('data-file-path');
+                
+                if (trackId) {
+                    mappings.push({
+                        trackId: parseInt(trackId),
+                        filePath: filePath,
+                        fileType: 'master'
+                    });
+                }
+            });
+            
+            if (mappings.length === 0) {
+                alert('Por favor asigna al menos un archivo a un track');
+                return;
+            }
+            
+            this.disabled = true;
+            this.textContent = '⏳ Guardando...';
+            
+            try {
+                const response = await fetch('/bulk-upload/bulk-map', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ mappings: mappings })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showResults(result);
+                } else {
+                    throw new Error(result.error || 'Error al guardar');
+                }
+            } catch (error) {
+                console.error('Mapping error:', error);
+                alert('❌ Error: ' + error.message);
+                this.disabled = false;
+                this.textContent = '✅ Guardar Asignaciones';
+            }
+        });
+
+        function showResults(result) {
+            const resultsContent = document.getElementById('resultsContent');
+            
+            let html = `
+                <div style="background: rgba(40, 167, 69, 0.1); border: 1px solid #28a745; border-radius: 10px; padding: 20px; margin-bottom: 20px;">
+                    <h3 style="color: #28a745; margin-bottom: 15px;">✅ Archivos Asignados Exitosamente</h3>
+                    <p style="color: #888;">${result.mapped} de ${result.results.length} archivos mapeados</p>
+                </div>
+            `;
+            
+            if (result.errors > 0) {
+                html += `
+                    <div style="background: rgba(220, 53, 69, 0.1); border: 1px solid #dc3545; border-radius: 10px; padding: 20px; margin-bottom: 20px;">
+                        <h3 style="color: #dc3545; margin-bottom: 15px;">⚠️ Errores (${result.errors})</h3>
+                `;
+                
+                result.results.filter(r => r.status === 'error').forEach(r => {
+                    html += `<p style="color: #888; margin: 5px 0;">❌ ${r.filePath}: ${r.error}</p>`;
+                });
+                
+                html += '</div>';
+            }
+            
+            resultsContent.innerHTML = html;
+            
+            document.getElementById('resultsSection').style.display = 'block';
+            document.getElementById('resultsSection').scrollIntoView({ behavior: 'smooth' });
+        }
+    </script>
+</body>
+</html>

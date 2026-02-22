@@ -34,6 +34,7 @@ app.use(helmet({
             styleSrc: ["'self'", "'unsafe-inline'", "https:"],
             scriptSrc: ["'self'", "'unsafe-inline'"],
             imgSrc: ["'self'", "data:", "https:"],
+            fontSrc: ["'self'", "data:", "https:"],
         },
     },
 }));
@@ -179,6 +180,7 @@ const uploadsRouter = require('./routes/uploads');
 const bulkUploadRouter = require('./routes/bulk-upload');
 const settingsRouter = require('./routes/settings');
 const toolsRouter = require('./routes/tools');
+const landingRouter = require('./routes/landing');
 const apiV1Router = require('./routes/api-v1');
 const { apiKeyAuth } = require('./middleware/apiKeyAuth');
 
@@ -192,6 +194,7 @@ function requireAuth(req, res, next) {
 
 // Public routes (no auth required)
 app.use('/auth', authRouter);
+app.use('/landing', landingRouter);
 app.use('/api/v1', apiV1Router);
 app.use('/api/v1/uploads', apiKeyAuth, uploadsRouter);
 app.use('/api/v1/bulk-upload', apiKeyAuth, bulkUploadRouter);

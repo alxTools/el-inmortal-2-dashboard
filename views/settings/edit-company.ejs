@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %></title>
+    <link rel="stylesheet" href="/css/dashboard.css">
+    <style>
+        .edit-container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+        .form-group {
+            margin-bottom: 25px;
+        }
+        .form-group label {
+            display: block;
+            color: #888;
+            margin-bottom: 8px;
+            font-size: 0.95em;
+        }
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 12px 15px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            color: #fff;
+            font-size: 1em;
+        }
+        .form-group input:focus, .form-group select:focus {
+            outline: none;
+            border-color: #ffd700;
+        }
+        .btn-save {
+            background: linear-gradient(45deg, #ffd700, #ffed4e);
+            color: #1a1a2e;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        .btn-cancel {
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <%- include('../partials/navbar') %>
+
+    <div class="edit-container">
+        <h1 style="color: #ffd700; margin-bottom: 30px;">✏️ Editar Empresa</h1>
+
+        <form id="editCompanyForm">
+            <div class="form-group">
+                <label>Nombre de la Empresa</label>
+                <input type="text" name="name" value="<%= company.name %>" required>
+            </div>
+
+            <div class="form-group">
+                <label>Email de Contacto</label>
+                <input type="email" name="email" value="<%= company.email || '' %>">
+            </div>
+
+            <div class="form-group">
+                <label>Teléfono</label>
+                <input type="text" name="phone" value="<%= company.phone || '' %>">
+            </div>
+
+            <div class="form-group">
+                <label>Plan de Suscripción</label>
+                <select name="subscription_type" required>
+                    <option value="basic" <%= company.subscription_type === 'basic' ? 'selected' : '' %>>Básico</option>
+                    <option value="pro" <%= company.subscription_type === 'pro' ? 'selected' : '' %>>Pro</option>
+                    <option value="enterprise" <%= company.subscription_type === 'enterprise' ? 'selected' : '' %>>Enterprise</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>Estado</label>
+                <select name="status" required>
+                    <option value="active" <%= company.status === 'active' ? 'selected' : '' %>>Activo</option>
+                    <option value="inactive" <%= company.status === 'inactive' ? 'selected' : '' %>>Inactivo</option>
+                    <option value="suspended" <%= company.status === 'suspended' ? 'selected' : '' %>>Suspendido</option>
+                </select>
+            </div>
+
+            <button type="submit" class="btn-save">💾 Guardar Cambios</button>
+            <a href="/settings/companies" class="btn-cancel">Cancelar</a>
+        </form>
+    </div>
+
+    <%- include('../partials/footer') %>
+
+    <script>
+        document.getElementById('editCompanyForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            const data = Object.fromEntries(formData);
+            
+            try {
+                const response = await fetch('/settings/companies/<%= company.id %>', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    alert('Empresa actualizada');
+                    window.location.href = '/settings/companies';
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                alert('Error al guardar');
+            }
+        });
+    </script>
+</body>
+</html>

@@ -21,6 +21,8 @@ database/*.db-wal
 logs/
 *.log
 backups/
+downloads/
+exports/
 
 # OS files
 .DS_Store

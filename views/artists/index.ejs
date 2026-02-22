@@ -86,15 +86,6 @@
                 const id = this.getAttribute('data-id');
                 const name = this.getAttribute('data-name');
                 
-                const confirmMessage = `¿Estás seguro de que quieres eliminar al artista "${name}"?\n\n` +
-                                     `⚠️ Advertencia: Si este artista tiene temas asignados, ` +
-                                     `se eliminará esa relación.\n\n` +
-                                     `Esta acción no se puede deshacer.`;
-                
-                if (!confirm(confirmMessage)) {
-                    return;
-                }
-
                 try {
                     const response = await fetch('/artists/' + id, {
                         method: 'DELETE',

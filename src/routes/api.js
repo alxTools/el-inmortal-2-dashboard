@@ -9,6 +9,7 @@ const { promisify } = require('util');
 const execAsync = promisify(exec);
 const { downloadFromDropbox, cleanupTempFile: cleanupDropboxTemp, isDropboxPath, convertToDropboxPath } = require('../utils/dropboxHelper');
 const { downloadFromDrive, cleanupTempFile: cleanupDriveTemp, isGoogleDrivePath } = require('../utils/googleDriveHelper');
+const { getLatestUpdates } = require('../utils/statusUpdates');
 
 // Initialize OpenAI client
 const openai = new OpenAI({
@@ -172,6 +173,23 @@ router.get('/countdown', (req, res) => {
         daysUntilLaunch: Math.ceil((launchDate - now) / (1000 * 60 * 60 * 24)),
         timers: timers
     });
+});
+
+// GET status updates for voice announcements
+router.get('/status-updates', async (req, res) => {
+    try {
+        const afterId = Number(req.query.afterId || 0) || 0;
+        const limit = Number(req.query.limit || 5) || 5;
+        const updates = await getLatestUpdates({ afterId, limit });
+
+        res.json({
+            updates: updates || [],
+            latestId: updates && updates.length ? updates[0].id : afterId
+        });
+    } catch (error) {
+        console.error('API Status Updates Error:', error);
+        res.status(500).json({ error: 'Error fetching status updates' });
+    }
 });
 
 // POST update track status

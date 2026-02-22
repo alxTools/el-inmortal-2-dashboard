@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %></title>
+    <link rel="stylesheet" href="/css/dashboard.css">
+    <style>
+        .users-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        .users-table th, .users-table td {
+            padding: 15px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .users-table th {
+            color: #ffd700;
+            font-weight: bold;
+            text-transform: uppercase;
+            font-size: 0.9em;
+        }
+        .users-table tr:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+        .role-badge {
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 0.8em;
+            font-weight: bold;
+        }
+        .role-super_admin { background: rgba(255, 215, 0, 0.2); color: #ffd700; }
+        .role-admin { background: rgba(255, 87, 87, 0.2); color: #ff5757; }
+        .role-artist { background: rgba(40, 167, 69, 0.2); color: #28a745; }
+        .role-producer { background: rgba(23, 162, 184, 0.2); color: #17a2b8; }
+        
+        .status-badge {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 5px;
+        }
+        .status-active { background: #28a745; box-shadow: 0 0 5px #28a745; }
+        .status-inactive { background: #6c757d; }
+        
+        .action-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 1.2em;
+            opacity: 0.7;
+            transition: opacity 0.3s;
+        }
+        .action-btn:hover {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+    <%- include('../partials/navbar') %>
+
+    <div class="container" style="padding-top: 40px;">
+        <div class="section-header" style="margin-bottom: 30px;">
+            <h1>👥 Gestión de Usuarios</h1>
+            <a href="/auth/admin/register" class="btn">+ Nuevo Usuario</a>
+        </div>
+
+        <div class="section">
+            <div class="users-stats" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px;">
+                <div style="background: rgba(255, 255, 255, 0.05); padding: 20px; border-radius: 10px; text-align: center;">
+                    <div style="font-size: 2em; font-weight: bold; color: #ffd700;"><%= users.length %></div>
+                    <div style="color: #888; font-size: 0.9em;">Total Usuarios</div>
+                </div>
+                <div style="background: rgba(255, 255, 255, 0.05); padding: 20px; border-radius: 10px; text-align: center;">
+                    <div style="font-size: 2em; font-weight: bold; color: #28a745;"><%= users.filter(u => u.status === 'active').length %></div>
+                    <div style="color: #888; font-size: 0.9em;">Activos</div>
+                </div>
+                <div style="background: rgba(255, 255, 255, 0.05); padding: 20px; border-radius: 10px; text-align: center;">
+                    <div style="font-size: 2em; font-weight: bold; color: #17a2b8;"><%= users.filter(u => u.role === 'artist').length %></div>
+                    <div style="color: #888; font-size: 0.9em;">Artistas</div>
+                </div>
+            </div>
+
+            <div style="overflow-x: auto;">
+                <table class="users-table">
+                    <thead>
+                        <tr>
+                            <th>Usuario</th>
+                            <th>Rol</th>
+                            <th>Empresa</th>
+                            <th>Estado</th>
+                            <th>Registro</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% users.forEach(user => { %>
+                        <tr>
+                            <td>
+                                <div style="font-weight: bold;"><%= user.name %></div>
+                                <div style="color: #888; font-size: 0.85em;"><%= user.email %></div>
+                                <div style="color: #666; font-size: 0.8em;">@<%= user.username %></div>
+                            </td>
+                            <td>
+                                <span class="role-badge role-<%= user.role %>"><%= user.role %></span>
+                            </td>
+                            <td><%= user.company_name || '-' %></td>
+                            <td>
+                                <span class="status-badge status-<%= user.status %>"></span>
+                                <%= user.status === 'active' ? 'Activo' : 'Inactivo' %>
+                            </td>
+                            <td style="color: #888; font-size: 0.9em;">
+                                <%= new Date(user.created_at).toLocaleDateString('es-ES') %>
+                            </td>
+                            <td>
+                                <a href="/settings/users/<%= user.id %>/edit" class="action-btn" title="Editar">✏️</a>
+                                <% if (user.id !== 1 && user.role !== 'super_admin') { %>
+                                    <button class="action-btn" style="color: #dc3545;" title="Eliminar" onclick="deleteUser(<%= user.id %>)">🗑️</button>
+                                <% } %>
+                            </td>
+                        </tr>
+                        <% }) %>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <%- include('../partials/footer') %>
+
+    <script>
+        async function deleteUser(id) {
+            if (confirm('¿Estás seguro de eliminar este usuario? Esta acción no se puede deshacer.')) {
+                try {
+                    const response = await fetch('/settings/users/' + id, {
+                        method: 'DELETE',
+                        headers: { 'Accept': 'application/json' }
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        alert('Usuario eliminado');
+                        window.location.reload();
+                    } else {
+                        alert('Error: ' + result.error);
+                    }
+                } catch (error) {
+                    alert('Error al eliminar');
+                }
+            }
+        }
+    </script>
+</body>
+</html>

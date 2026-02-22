@@ -85,6 +85,159 @@
             font-size: 0.85em;
             color: #888;
         }
+        
+        /* Mobile Responsive Styles for Tracks Table */
+        @media (max-width: 768px) {
+            .section-header {
+                flex-direction: column;
+                gap: 15px;
+                text-align: center;
+            }
+            
+            .section-header h1 {
+                font-size: 1.5em;
+            }
+            
+            .filter-tabs {
+                justify-content: center;
+            }
+            
+            .filter-tab {
+                padding: 8px 15px;
+                font-size: 0.85em;
+            }
+            
+            .stats-overview {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 10px;
+            }
+            
+            .stat-mini {
+                padding: 10px;
+            }
+            
+            .stat-mini .number {
+                font-size: 1.5em;
+            }
+            
+            .stat-mini .label {
+                font-size: 0.75em;
+            }
+            
+            /* Convert table to cards on mobile */
+            .tracks-table {
+                display: block;
+                width: 100%;
+            }
+            
+            .tracks-table thead {
+                display: none;
+            }
+            
+            .tracks-table tbody {
+                display: block;
+                width: 100%;
+            }
+            
+            .tracks-table tbody tr {
+                display: block;
+                margin-bottom: 15px;
+                background: rgba(255, 255, 255, 0.05);
+                border-radius: 10px;
+                padding: 15px;
+                border: 1px solid rgba(255, 255, 255, 0.1);
+            }
+            
+            .tracks-table tbody td {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 8px 0;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+                font-size: 0.9em;
+            }
+            
+            .tracks-table tbody td:last-child {
+                border-bottom: none;
+            }
+            
+            .tracks-table tbody td:first-child {
+                font-size: 1.2em;
+                color: #ffd700;
+                font-weight: bold;
+                justify-content: flex-start;
+                gap: 10px;
+            }
+            
+            .tracks-table tbody td:first-child::before {
+                content: "#";
+                color: #888;
+            }
+            
+            .tracks-table tbody td:nth-child(2) {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 5px;
+            }
+            
+            .tracks-table tbody td:nth-child(2) strong {
+                font-size: 1.1em;
+            }
+            
+            .tracks-table tbody td:nth-child(3)::before {
+                content: "Duración:";
+                color: #888;
+                font-size: 0.85em;
+            }
+            
+            .tracks-table tbody td:nth-child(4)::before {
+                content: "Productor:";
+                color: #888;
+                font-size: 0.85em;
+            }
+            
+            .tracks-table tbody td:nth-child(5)::before {
+                content: "Tipo:";
+                color: #888;
+                font-size: 0.85em;
+            }
+            
+            .tracks-table tbody td:nth-child(6)::before {
+                content: "Splitsheet:";
+                color: #888;
+                font-size: 0.85em;
+            }
+            
+            .tracks-table tbody td:nth-child(7) {
+                justify-content: flex-start;
+                gap: 10px;
+                margin-top: 10px;
+            }
+            
+            .track-features {
+                font-size: 0.8em;
+            }
+            
+            .track-type-badge {
+                font-size: 0.65em;
+                padding: 3px 8px;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .stats-overview {
+                grid-template-columns: 1fr;
+            }
+            
+            .filter-tabs {
+                flex-direction: column;
+                gap: 5px;
+            }
+            
+            .filter-tab {
+                text-align: center;
+            }
+        }
     </style>
 </head>
 <body>
@@ -141,6 +294,7 @@
                     <tr>
                         <th style="width: 50px;">#</th>
                         <th>Título</th>
+                        <th style="width: 80px;">Duración</th>
                         <th>Productor</th>
                         <th style="width: 120px;">Tipo</th>
                         <th>Splitsheet</th>
@@ -167,6 +321,14 @@
                                     <span style="color: #888; margin-left: 8px;">📝 LETRA</span>
                                 <% } %>
                             </div>
+                        </td>
+                        <td style="text-align: center; color: #888; font-size: 0.9em;">
+                            <% if (track.duration) { %>
+                                <% const mins = Math.floor(track.duration / 60); const secs = track.duration % 60; %>
+                                <%= mins %>:<%= secs.toString().padStart(2, '0') %>
+                            <% } else { %>
+                                -
+                            <% } %>
                         </td>
                         <td><%= track.producer_name || 'Sin asignar' %></td>
                         <td>

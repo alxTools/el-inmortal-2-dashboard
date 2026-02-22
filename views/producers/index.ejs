@@ -80,16 +80,6 @@
                 
                 console.log('Delete button clicked for producer:', name, 'ID:', id);
                 
-                const confirmMessage = `¿Estás seguro de que quieres eliminar al productor "${name}"?\n\n` +
-                                     `⚠️ Advertencia: Si este productor tiene temas asignados, ` +
-                                     `esos temas quedarán sin productor asignado.\n\n` +
-                                     `Esta acción no se puede deshacer.`;
-                
-                if (!confirm(confirmMessage)) {
-                    console.log('Deletion cancelled by user');
-                    return;
-                }
-
                 try {
                     console.log('Sending DELETE request to /producers/' + id);
                     const response = await fetch('/producers/' + id, {

@@ -42,6 +42,7 @@ DB_BACKUP_DIR=...
 DB_BACKUP_RETENTION_DAYS=14
 DB_BACKUP_REQUESTED_BY=scheduler
 MYSQLDUMP_PATH=C:/Program Files/MySQL/MySQL Workbench 8.0 CE/mysqldump.exe
+INTEL_CRED_ENC_KEY=...
 
 YT_CLIENT_SECRETS_PATH=...
 YT_TOKEN_FILE_PATH=...
@@ -185,6 +186,19 @@ npm run youtube:quota-monitor-tick -- --by cli --task-name ElInmortal2_YTQuotaMo
 npm run db:backup
 npm run db:setup:intel
 npm run db:setup:track-rights
+npm run intel:seed-missions
+npm run intel:seed-skills
+npm run intel:set-credential -- --provider ascap --username your_user --password your_pass
+npm run intel:ascap-scan -- --url "https://www.ascap.com/repertory#/ace/search/title/toda%20para%20mi"
+npm run intel:ascap-batch -- --by cli --limit 21
+npm run intel:ascap-download -- --by cli
+npm run intel:ascap-import -- --by cli
+npm run intel:ascap-analyze -- --by cli --file "D:\\download\\WorksCatalog.csv"
+npm run export:ascap-catalog -- --by cli --source ascap_catalog_csv --run-id 12
+npm run intel:social-scan -- --by cli --limit 21
+npm run intel:platform-footprint -- --by cli --limit 21
+npm run status:update -- --message "Landing actualizado" --source opencode --severity info
+npm run landing:build
 ```
 
 Para transporte `graph`, la App Registration debe tener permiso de aplicación `Mail.Send` con admin consent.

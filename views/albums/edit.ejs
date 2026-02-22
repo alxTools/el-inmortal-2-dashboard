@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %></title>
+    <link rel="stylesheet" href="/css/dashboard.css">
+</head>
+<body>
+    <%- include('../partials/navbar') %>
+
+    <div class="container" style="padding-top: 40px; max-width: 700px;">
+        <h1 style="color: #ffd700; margin-bottom: 30px;">💿 Editar Álbum</h1>
+
+        <div class="section">
+            <form id="albumForm">
+                <div class="form-group">
+                    <label>Nombre del Álbum *</label>
+                    <input type="text" name="name" id="albumName" value="<%= album.name %>" required>
+                </div>
+
+                <div class="form-group">
+                    <label>Artista *</label>
+                    <input type="text" name="artist" id="albumArtist" value="<%= album.artist %>" required>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Fecha de Lanzamiento</label>
+                        <input type="date" name="release_date" id="albumReleaseDate" 
+                               value="<%= album.release_date ? new Date(album.release_date).toISOString().split('T')[0] : '' %>">
+                    </div>
+                    <div class="form-group">
+                        <label>Estado</label>
+                        <select name="status" id="albumStatus">
+                            <option value="upcoming" <%= album.status === 'upcoming' ? 'selected' : '' %>>Próximamente</option>
+                            <option value="draft" <%= album.status === 'draft' ? 'selected' : '' %>>Borrador</option>
+                            <option value="released" <%= album.status === 'released' ? 'selected' : '' %>>Lanzado</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Descripción</label>
+                    <textarea name="description" id="albumDescription" rows="3"><%= album.description || '' %></textarea>
+                </div>
+
+                <div style="display: flex; gap: 15px; margin-top: 30px;">
+                    <button type="submit" class="btn">💾 Guardar Cambios</button>
+                    <a href="/albums" class="btn btn-secondary">Cancelar</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <%- include('../partials/footer') %>
+
+    <script>
+        document.getElementById('albumForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = {
+                name: document.getElementById('albumName').value,
+                artist: document.getElementById('albumArtist').value,
+                release_date: document.getElementById('albumReleaseDate').value,
+                status: document.getElementById('albumStatus').value,
+                description: document.getElementById('albumDescription').value
+            };
+            
+            try {
+                const response = await fetch('/albums/<%= album.id %>', {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify(formData)
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok && result.success) {
+                    window.location.href = '/albums';
+                } else {
+                    alert('Error: ' + (result.error || 'Error al actualizar álbum'));
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error actualizando álbum');
+            }
+        });
+    </script>
+</body>
+</html>

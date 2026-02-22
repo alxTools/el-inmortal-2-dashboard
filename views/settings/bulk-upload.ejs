@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %></title>
+    <link rel="stylesheet" href="/css/dashboard.css">
+    <style>
+        .settings-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+            border-bottom: 2px solid rgba(255, 215, 0, 0.3);
+            padding-bottom: 15px;
+        }
+        .settings-tab {
+            padding: 10px 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            color: #888;
+            text-decoration: none;
+            transition: all 0.3s;
+        }
+        .settings-tab:hover, .settings-tab.active {
+            background: rgba(255, 215, 0, 0.2);
+            border-color: #ffd700;
+            color: #ffd700;
+        }
+        .settings-section {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            padding: 25px;
+            margin-bottom: 20px;
+        }
+        .settings-section h3 {
+            color: #ffd700;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(255, 215, 0, 0.3);
+        }
+        .info-card {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 15px;
+            border-left: 3px solid #ffd700;
+        }
+        .info-card h4 {
+            color: #ffd700;
+            margin-bottom: 10px;
+        }
+        .info-card p {
+            color: #888;
+            margin: 5px 0;
+        }
+        .current-value {
+            display: inline-block;
+            background: rgba(255, 215, 0, 0.2);
+            color: #ffd700;
+            padding: 5px 12px;
+            border-radius: 5px;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+        .feature-list {
+            list-style: none;
+            padding: 0;
+        }
+        .feature-list li {
+            padding: 10px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            color: #ddd;
+        }
+        .feature-list li:before {
+            content: "✓";
+            color: #28a745;
+            margin-right: 10px;
+        }
+        .feature-list li:last-child {
+            border-bottom: none;
+        }
+        .access-links {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-top: 30px;
+        }
+        .access-link {
+            background: linear-gradient(135deg, rgba(255, 215, 0, 0.1) 0%, rgba(255, 215, 0, 0.05) 100%);
+            border: 1px solid rgba(255, 215, 0, 0.3);
+            border-radius: 10px;
+            padding: 25px;
+            text-decoration: none;
+            color: #fff;
+            transition: all 0.3s;
+            text-align: center;
+        }
+        .access-link:hover {
+            background: rgba(255, 215, 0, 0.2);
+            transform: translateY(-3px);
+        }
+        .access-link-icon {
+            font-size: 3em;
+            margin-bottom: 15px;
+        }
+        .access-link-title {
+            color: #ffd700;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .access-link-desc {
+            color: #888;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <%- include('../partials/navbar') %>
+
+    <div class="container" style="padding-top: 40px;">
+        <h1 style="color: #ffd700; margin-bottom: 30px;">⚙️ Configuración de Subida en Lote</h1>
+
+        <div class="settings-tabs">
+            <a href="/settings" class="settings-tab">General</a>
+            <a href="/settings/bulk-upload" class="settings-tab active">Subida en Lote</a>
+            <a href="/settings/users" class="settings-tab">Usuarios</a>
+            <a href="/settings/companies" class="settings-tab">Empresas</a>
+        </div>
+
+        <div class="settings-section">
+            <h3>📊 Límites Actuales</h3>
+            
+            <div class="info-card">
+                <h4>Tamaño Máximo por Archivo</h4>
+                <p>
+                    Valor configurado: 
+                    <span class="current-value"><%= settings.max_file_size || 100 %> MB</span>
+                </p>
+                <p style="color: #888; font-size: 0.9em; margin-top: 10px;">
+                    Los archivos que excedan este límite serán rechazados automáticamente.
+                </p>
+            </div>
+
+            <div class="info-card">
+                <h4>Cantidad Máxima por Subida</h4>
+                <p>
+                    Valor configurado: 
+                    <span class="current-value"><%= settings.max_files_per_upload || 25 %> archivos</span>
+                </p>
+                <p style="color: #888; font-size: 0.9em; margin-top: 10px;">
+                    Número máximo de archivos que se pueden subir simultáneamente.
+                </p>
+            </div>
+
+            <div class="info-card">
+                <h4>Formatos Soportados</h4>
+                <p>
+                    Extensiones permitidas: 
+                    <span class="current-value"><%= settings.allowed_formats || 'wav,mp3,m4a,flac,aac' %></span>
+                </p>
+            </div>
+        </div>
+
+        <div class="settings-section">
+            <h3>✨ Características Disponibles</h3>
+            <ul class="feature-list">
+                <li>Subida de hasta <%= settings.max_files_per_upload || 25 %> archivos simultáneos</li>
+                <li>Detección automática por número de track en el nombre del archivo</li>
+                <li>Asignación manual de archivos a tracks específicos</li>
+                <li>Soporte para archivos de hasta <%= settings.max_file_size || 100 %> MB</li>
+                <li>Conversión automática de formatos grandes (si exceden límites de API)</li>
+                <li>Generación automática de letras vía transcripción (opcional)</li>
+                <li>Previsualización de audio antes de confirmar</li>
+            </ul>
+        </div>
+
+        <div class="settings-section">
+            <h3>🚀 Accesos Directos</h3>
+            <div class="access-links">
+                <a href="/bulk-upload" class="access-link">
+                    <div class="access-link-icon">📁</div>
+                    <div class="access-link-title">Subida en Lote General</div>
+                    <div class="access-link-desc">Subir múltiples temas a cualquier álbum</div>
+                </a>
+                <a href="/albums" class="access-link">
+                    <div class="access-link-icon">💿</div>
+                    <div class="access-link-title">Desde Álbum</div>
+                    <div class="access-link-desc">Subir audio directamente a un álbum específico</div>
+                </a>
+                <a href="/tracks" class="access-link">
+                    <div class="access-link-icon">🎵</div>
+                    <div class="access-link-title">Lista de Tracks</div>
+                    <div class="access-link-desc">Gestionar temas existentes y subir audio individual</div>
+                </a>
+            </div>
+        </div>
+
+        <div class="settings-section">
+            <h3>💡 Tips de Uso</h3>
+            <div style="background: rgba(255, 215, 0, 0.05); border-left: 3px solid #ffd700; padding: 20px; border-radius: 0 8px 8px 0;">
+                <p style="color: #ddd; margin: 0 0 15px 0;">
+                    <strong>Nomenclatura recomendada:</strong> Para que el sistema detecte automáticamente el track, 
+                    nombra tus archivos así:
+                </p>
+                <code style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 5px; display: block; color: #ffd700; margin: 10px 0;">
+                    01 Nombre del Tema.wav<br>
+                    02 Otro Tema.mp3<br>
+                    03 Track Tres.flac
+                </code>
+                <p style="color: #888; margin: 15px 0 0 0; font-size: 0.9em;">
+                    El sistema buscará el número al inicio del nombre y sugerirá asignarlo al track correspondiente.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <%- include('../partials/footer') %>
+</body>
+</html>

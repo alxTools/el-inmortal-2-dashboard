@@ -15,9 +15,9 @@
         <div class="countdown-main">
             <div class="countdown-title">Lanzamiento en</div>
             <div class="countdown-time" id="main-countdown">
-                <span id="main-days">--</span>d 
-                <span id="main-hours">--</span>h 
-                <span id="main-minutes">--</span>m
+                <span id="main-days" data-label="días">--</span>
+                <span id="main-hours" data-label="horas">--</span>
+                <span id="main-minutes" data-label="mins">--</span>
             </div>
         </div>
     </header>
@@ -189,29 +189,29 @@
     <div class="container">
         <!-- Stats Overview -->
         <div class="stats-grid">
-            <div class="stat-card">
-                <h3>Total de Temas</h3>
+            <div class="stat-card reveal shine-effect">
+                <h3>🎵 Total de Temas</h3>
                 <div class="number"><%= stats.totalTracks %>/<%= stats.totalTracksTarget %></div>
                 <div class="label">Canciones en el álbum</div>
                 <div class="progress-bar">
                     <div class="progress-fill" style="width: <%= (stats.totalTracks / stats.totalTracksTarget * 100) %>"></div>
                 </div>
             </div>
-            <div class="stat-card">
-                <h3>Productores</h3>
+            <div class="stat-card reveal shine-effect">
+                <h3>🎧 Productores</h3>
                 <div class="number"><%= stats.producerCount %></div>
                 <div class="label">Colaboradores</div>
             </div>
-            <div class="stat-card">
-                <h3>Splitsheets</h3>
+            <div class="stat-card reveal shine-effect">
+                <h3>📄 Splitsheets</h3>
                 <div class="number"><%= stats.splitsheetsConfirmed %>/<%= stats.totalTracks %></div>
                 <div class="label">Confirmados</div>
                 <div class="progress-bar">
                     <div class="progress-fill" style="width: <%= stats.totalTracks > 0 ? (stats.splitsheetsConfirmed / stats.totalTracks * 100) : 0 %>"></div>
                 </div>
             </div>
-            <div class="stat-card">
-                <h3>Contenido</h3>
+            <div class="stat-card reveal shine-effect">
+                <h3>📱 Contenido</h3>
                 <div class="number"><%= stats.totalContent %>/<%= stats.totalContentTarget %></div>
                 <div class="label">Posts planeados</div>
                 <div class="progress-bar">

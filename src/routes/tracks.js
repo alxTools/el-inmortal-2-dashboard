@@ -1,7 +1,42 @@
 const express = require('express');
 const router = express.Router();
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 const { body, validationResult } = require('express-validator');
 const { getAll, getOne, run } = require('../config/database');
+const { analyzeAndDescribeAudio } = require('../utils/audioHelper');
+
+// Configurar multer para subida de audio
+const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        const uploadDir = path.join(__dirname, '../../public/uploads/audio');
+        if (!fs.existsSync(uploadDir)) {
+            fs.mkdirSync(uploadDir, { recursive: true });
+        }
+        cb(null, uploadDir);
+    },
+    filename: function (req, file, cb) {
+        const timestamp = Date.now();
+        const sanitized = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
+        cb(null, `${timestamp}_${sanitized}`);
+    }
+});
+
+const upload = multer({
+    storage: storage,
+    limits: {
+        fileSize: 100 * 1024 * 1024 // 100MB max
+    },
+    fileFilter: (req, file, cb) => {
+        if (file.mimetype.startsWith('audio/') || 
+            file.originalname.match(/\.(wav|mp3|m4a|flac|aac)$/i)) {
+            cb(null, true);
+        } else {
+            cb(new Error('Solo se permiten archivos de audio'), false);
+        }
+    }
+});
 
 // GET all tracks
 router.get('/', async (req, res) => {
@@ -66,7 +101,7 @@ router.get('/new', async (req, res) => {
 });
 
 // POST create new track
-router.post('/', [
+router.post('/', upload.single('audio_file'), [
     body('track_number').isInt({ min: 1, max: 21 }),
     body('title').trim().notEmpty(),
     body('producer_id').optional().isInt()
@@ -81,12 +116,40 @@ router.post('/', [
     }
 
     try {
-        const { track_number, title, producer_id, recording_date, duration, lyrics } = req.body;
+        const { track_number, title, producer_id, recording_date, lyrics } = req.body;
+        
+        // Si se subió audio, procesarlo
+        let audioFilePath = null;
+        let duration = null;
+        let audioDescription = null;
+        
+        if (req.file) {
+            audioFilePath = `/uploads/audio/${req.file.filename}`;
+            const localFilePath = req.file.path;
+            
+            // Obtener productor para la descripción
+            let producerName = 'El Inmortal 2 Team';
+            if (producer_id) {
+                const producer = await getOne('SELECT name FROM producers WHERE id = ?', [producer_id]);
+                if (producer) producerName = producer.name;
+            }
+            
+            // Analizar audio y generar descripción
+            try {
+                console.log(`[Tracks] Analyzing audio for: ${title}`);
+                const analysis = await analyzeAndDescribeAudio(localFilePath, title, producerName);
+                duration = analysis.duration;
+                audioDescription = analysis.description;
+                console.log(`[Tracks] ✅ Audio analyzed - Duration: ${duration}`);
+            } catch (analysisError) {
+                console.warn(`[Tracks] Could not analyze audio: ${analysisError.message}`);
+            }
+        }
 
         await run(
-            `INSERT INTO tracks (track_number, title, producer_id, recording_date, duration, lyrics)
-             VALUES (?, ?, ?, ?, ?, ?)`,
-            [track_number, title, producer_id || null, recording_date, duration, lyrics]
+            `INSERT INTO tracks (track_number, title, producer_id, recording_date, duration, lyrics, audio_file_path, audio_file_type, audio_description)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [track_number, title, producer_id || null, recording_date, duration, lyrics, audioFilePath, audioFilePath ? 'master' : null, audioDescription]
         );
 
         res.redirect('/tracks');

@@ -5,6 +5,7 @@ const path = require('path');
 const fs = require('fs');
 const { getAll, getOne, run } = require('../config/database');
 const { uploadToDrive, isGoogleDrivePath } = require('../utils/googleDriveHelper');
+const { analyzeAndDescribeAudio } = require('../utils/audioHelper');
 
 // Helper function to log activity
 async function logActivity(action, entityType, entityId, details) {
@@ -113,11 +114,37 @@ router.post('/track/:id/audio', upload.single('audio_file'), async (req, res) =>
         
         console.log(`[UPLOADS] Audio saved locally: ${fileStoragePath}`);
         
+        // Obtener info del track para generar descripción
+        const track = await getOne('SELECT t.title, p.name as producer_name FROM tracks t LEFT JOIN producers p ON t.producer_id = p.id WHERE t.id = ?', [trackId]);
+        const trackTitle = track?.title || 'Unknown Track';
+        const producer = track?.producer_name || 'El Inmortal 2 Team';
+        
+        // Analizar audio y generar descripción (proceso asíncrono, no bloqueamos la respuesta)
+        let duration = null;
+        let audioDescription = null;
+        
+        try {
+            console.log(`[UPLOADS] Analyzing audio for: ${trackTitle}`);
+            const analysis = await analyzeAndDescribeAudio(localFilePath, trackTitle, producer);
+            duration = analysis.duration;
+            audioDescription = analysis.description;
+            console.log(`[UPLOADS] ✅ Audio analyzed - Duration: ${duration}`);
+        } catch (analysisError) {
+            console.warn(`[UPLOADS] Could not analyze audio: ${analysisError.message}`);
+            // Si falla el análisis, solo extraemos duración
+            try {
+                const { getAudioDuration } = require('../utils/audioHelper');
+                duration = await getAudioDuration(localFilePath);
+            } catch (e) {
+                console.warn(`[UPLOADS] Could not extract duration either`);
+            }
+        }
+        
         await run(
             `UPDATE tracks 
-             SET audio_file_path = ?, audio_file_type = ?
+             SET audio_file_path = ?, audio_file_type = ?, duration = ?, audio_description = ?
              WHERE id = ?`,
-            [fileStoragePath, file_type || 'master', trackId]
+            [fileStoragePath, file_type || 'master', duration, audioDescription, trackId]
         );
         
         // Log activity
@@ -129,6 +156,8 @@ router.post('/track/:id/audio', upload.single('audio_file'), async (req, res) =>
             message: `Archivo de audio subido exitosamente (${storageType})`,
             filePath: fileStoragePath,
             fileType: file_type || 'master',
+            duration: duration,
+            hasDescription: !!audioDescription,
             storage: storageType
         });
     } catch (error) {
@@ -356,12 +385,22 @@ router.post('/track/:id/audio/replace', upload.single('audio_file'), async (req,
             }
         }
         
+        // Extraer duración del nuevo audio
+        let duration = null;
+        try {
+            const newFileFullPath = path.join(process.cwd(), 'public', newFilePath);
+            duration = await getAudioDuration(newFileFullPath);
+            console.log(`[UPLOADS] Audio duration extracted: ${duration}`);
+        } catch (durationError) {
+            console.warn(`[UPLOADS] Could not extract duration: ${durationError.message}`);
+        }
+        
         // Update database with new file
         await run(
             `UPDATE tracks 
-             SET audio_file_path = ?, audio_file_type = ?
+             SET audio_file_path = ?, audio_file_type = ?, duration = ?
              WHERE id = ?`,
-            [newFilePath, file_type || 'master', trackId]
+            [newFilePath, file_type || 'master', duration, trackId]
         );
         
         // Log activity

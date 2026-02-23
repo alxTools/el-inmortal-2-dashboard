@@ -6,6 +6,7 @@ const MySQLStore = require('express-mysql-session')(session);
 const helmet = require('helmet');
 const cors = require('cors');
 const methodOverride = require('method-override');
+const cookieParser = require('cookie-parser');
 const crypto = require('crypto');
 const { exec } = require('child_process');
 require('dotenv').config();
@@ -71,6 +72,7 @@ app.post('/webhook/deploy', express.raw({ type: 'application/json' }), (req, res
 // Body parsing middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser());
 
 // Method override for PUT/DELETE from forms
 app.use(methodOverride('_method'));
@@ -192,16 +194,62 @@ function requireAuth(req, res, next) {
     next();
 }
 
+// Middleware para verificar si es admin o fan verificado (vía cookie de landing)
+function requireVerifiedFanOrAuth(req, res, next) {
+    // Si es admin (tiene sesión), permitir acceso
+    if (req.session.user) {
+        return next();
+    }
+    
+    // Si no es admin, verificar si tiene cookie de landing verificada
+    const landingUnlock = req.cookies?.landing_el_inmortal_unlock;
+    if (landingUnlock === '1') {
+        return next();
+    }
+    
+    // Si no tiene ni sesión ni cookie, redirigir a landing para que se registre
+    return res.redirect('/ei2');
+}
+
 // Public routes (no auth required)
 app.use('/auth', authRouter);
 app.use('/landing', landingRouter);
+
+// Ruta corta /ei2 - URL principal para el álbum
+app.use('/ei2', landingRouter);
+
 app.use('/api/v1', apiV1Router);
 app.use('/api/v1/uploads', apiKeyAuth, uploadsRouter);
 app.use('/api/v1/bulk-upload', apiKeyAuth, bulkUploadRouter);
 
+// Health check endpoint (public)
+app.get('/api/health', (req, res) => {
+    res.json({
+        status: 'ok',
+        service: 'el-inmortal-2-dashboard',
+        version: '1.0.0',
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime()
+    });
+});
+
 // Protected routes (auth required)
 app.use('/', requireAuth, indexRouter);
 app.use('/tracks', requireAuth, tracksRouter);
+// Tools routes with conditional auth - allow proxy, download, extract-frame, gpu-info without auth
+const publicToolsPaths = ['/proxy', '/download', '/extract-frame', '/gpu-info'];
+app.use('/tools', (req, res, next) => {
+    console.log('Tools middleware - req.path:', req.path, 'req.originalUrl:', req.originalUrl);
+    // Check if this is a public tools path
+    const isPublicPath = publicToolsPaths.some(path => req.path.startsWith(path));
+    console.log('Is public path:', isPublicPath);
+    if (isPublicPath) {
+        return next();
+    }
+    // Otherwise require auth
+    return requireAuth(req, res, next);
+}, toolsRouter);
+
 app.use('/albums', requireAuth, albumsRouter);
 app.use('/producers', requireAuth, producersRouter);
 app.use('/composers', requireAuth, composersRouter);
@@ -209,7 +257,6 @@ app.use('/artists', requireAuth, artistsRouter);
 app.use('/splitsheets', requireAuth, splitsheetsRouter);
 app.use('/calendar', requireAuth, calendarRouter);
 app.use('/checklist', requireAuth, checklistRouter);
-app.use('/tools', requireAuth, toolsRouter);
 app.use('/api', requireAuth, apiRouter);
 app.use('/uploads', requireAuth, uploadsRouter);
 app.use('/bulk-upload', requireAuth, bulkUploadRouter);

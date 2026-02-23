@@ -3,23 +3,47 @@
         <img src="/images/galante_signature.png" alt="Galante el Emperador" class="navbar-logo" onerror="this.style.display='none';this.nextElementSibling.style.display='inline';">
         <span class="navbar-logo-fallback" style="display:none;">Galante</span>
     </a>
-    <ul class="navbar-nav">
+    
+    <!-- Mobile Menu Toggle -->
+    <button class="mobile-menu-toggle" id="mobileMenuToggle" aria-label="Toggle menu">
+        <span></span>
+        <span></span>
+        <span></span>
+    </button>
+    
+    <ul class="navbar-nav" id="navbarNav">
         <% if (typeof user !== 'undefined' && user) { %>
-            <li><a href="/">Dashboard</a></li>
-            <li><a href="/albums">💿 Álbumes</a></li>
-            <li><a href="/tracks">🎵 Temas</a></li>
-            <li><a href="/producers">🎧 Productores</a></li>
-            <li><a href="/composers">📝 Compositores</a></li>
-            <li><a href="/artists">👥 Artistas</a></li>
-            <li><a href="/splitsheets">📄 Splitsheets</a></li>
-            <li><a href="/calendar">📅 Calendario</a></li>
-            <li><a href="/checklist">✅ Checklist</a></li>
-            <li><a href="/tools">🧰 Tools</a></li>
-            <li><a href="/landing/el-inmortal-2" target="_blank" rel="noreferrer">🚀 Landing</a></li>
-            <li><a href="/settings">⚙️ Config</a></li>
-            <li><a href="/auth/logout" style="color: #ff6b6b;">🚪 Salir</a></li>
+            <li><a href="/" data-tooltip="Dashboard principal">Dashboard</a></li>
+            <li><a href="/albums" data-tooltip="Gestionar álbumes">💿 Álbumes</a></li>
+            <li><a href="/tracks" data-tooltip="Lista de temas">🎵 Temas</a></li>
+            <li><a href="/producers" data-tooltip="Productores">🎧 Productores</a></li>
+            <li><a href="/composers" data-tooltip="Compositores">📝 Compositores</a></li>
+            <li><a href="/artists" data-tooltip="Artistas">👥 Artistas</a></li>
+            <li><a href="/splitsheets" data-tooltip="Splitsheets">📄 Splitsheets</a></li>
+            <li><a href="/calendar" data-tooltip="Calendario">📅 Calendario</a></li>
+            <li><a href="/checklist" data-tooltip="Checklist">✅ Checklist</a></li>
+            <li><a href="/tools" data-tooltip="Herramientas">🧰 Tools</a></li>
+            <li><a href="/landing/el-inmortal-2" target="_blank" rel="noreferrer" data-tooltip="Ver landing público">🚀 Landing</a></li>
+            <li><a href="/settings" data-tooltip="Configuración">⚙️ Config</a></li>
+            <li><a href="/auth/logout" data-tooltip="Cerrar sesión">🚪 Salir</a></li>
         <% } else { %>
             <li><a href="/auth/login">🔐 Login</a></li>
         <% } %>
     </ul>
 </nav>
+
+<script>
+    // Mobile menu toggle
+    document.getElementById('mobileMenuToggle')?.addEventListener('click', function() {
+        this.classList.toggle('active');
+        document.getElementById('navbarNav').classList.toggle('active');
+    });
+    
+    // Close mobile menu when clicking on a link
+    document.querySelectorAll('#navbarNav a').forEach(link => {
+        link.addEventListener('click', () => {
+            document.getElementById('mobileMenuToggle').classList.remove('active');
+            document.getElementById('navbarNav').classList.remove('active');
+        });
+    });
+</script>

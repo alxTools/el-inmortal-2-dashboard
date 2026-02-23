@@ -1,7 +1,12 @@
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
+const { exec } = require('child_process');
+const { promisify } = require('util');
 const router = express.Router();
+const ytdl = require('youtube-dl-exec');
+const execAsync = promisify(exec);
+
 const {
     ensureYoutubeMetadataTables,
     inspectYoutubeChannelAndStore,
@@ -306,6 +311,223 @@ router.get('/proxy/image', async (req, res) => {
     } catch (error) {
         console.error('Image proxy error:', error);
         return res.status(500).json({ error: 'Error proxying image' });
+    }
+});
+
+router.get('/download/youtube', async (req, res) => {
+    try {
+        const videoUrl = req.query.url;
+        if (!videoUrl) {
+            return res.status(400).json({ error: 'url is required' });
+        }
+
+        // Validate YouTube URL
+        const ytId = (() => {
+            try {
+                const u = new URL(videoUrl);
+                if (u.hostname.includes('youtu.be')) {
+                    return u.pathname.replace('/', '').trim() || null;
+                }
+                if (u.hostname.includes('youtube.com')) {
+                    return u.searchParams.get('v');
+                }
+                return null;
+            } catch (e) {
+                return null;
+            }
+        })();
+
+        if (!ytId) {
+            return res.status(400).json({ error: 'Invalid YouTube URL' });
+        }
+
+        const tempDir = path.join(__dirname, '../../temp');
+        if (!fs.existsSync(tempDir)) {
+            fs.mkdirSync(tempDir, { recursive: true });
+        }
+
+        const outputPath = path.join(tempDir, `yt_${ytId}.mp4`);
+
+        // Download video using yt-dlp via youtube-dl-exec
+        await ytdl(videoUrl, {
+            output: outputPath,
+            format: 'best[ext=mp4]/best',
+            noPlaylist: true,
+            maxFilesize: '100M',
+        });
+
+        if (!fs.existsSync(outputPath)) {
+            return res.status(500).json({ error: 'Failed to download video' });
+        }
+
+        // Stream the file and delete after sending
+        const stat = fs.statSync(outputPath);
+        res.setHeader('Content-Type', 'video/mp4');
+        res.setHeader('Content-Length', stat.size);
+        res.setHeader('Content-Disposition', `inline; filename="yt_${ytId}.mp4"`);
+        res.setHeader('Cache-Control', 'no-store');
+
+        const stream = fs.createReadStream(outputPath);
+        stream.pipe(res);
+
+        // Cleanup after streaming
+        stream.on('close', () => {
+            try {
+                fs.unlinkSync(outputPath);
+            } catch (e) {
+                console.error('Error deleting temp file:', e);
+            }
+        });
+
+        stream.on('error', (err) => {
+            console.error('Stream error:', err);
+            if (!res.headersSent) {
+                res.status(500).json({ error: 'Error streaming video' });
+            }
+            try {
+                fs.unlinkSync(outputPath);
+            } catch (e) {
+                // ignore
+            }
+        });
+
+    } catch (error) {
+        console.error('YouTube download error:', error);
+        return res.status(500).json({ error: 'Error downloading YouTube video: ' + error.message });
+    }
+});
+
+// Check if NVENC (NVIDIA GPU encoding) is available
+async function checkNvencAvailable() {
+    try {
+        const { stdout } = await execAsync('ffmpeg -encoders 2>/dev/null | grep nvenc || echo ""');
+        return stdout.includes('nvenc') || stdout.includes('h264_nvenc');
+    } catch (e) {
+        return false;
+    }
+}
+
+// Check if NVDEC (NVIDIA GPU decoding) is available
+async function checkNvdecAvailable() {
+    try {
+        const { stdout } = await execAsync('ffmpeg -decoders 2>/dev/null | grep cuvid || echo ""');
+        return stdout.includes('cuvid') || stdout.includes('h264_cuvid');
+    } catch (e) {
+        return false;
+    }
+}
+
+// Extract frame from video using ffmpeg (with GPU acceleration if available)
+router.post('/extract-frame', async (req, res) => {
+    try {
+        const { videoUrl, time, format = 'png' } = req.body;
+        
+        if (!videoUrl || time === undefined) {
+            return res.status(400).json({ error: 'videoUrl and time are required' });
+        }
+
+        const tempDir = path.join(__dirname, '../../temp');
+        if (!fs.existsSync(tempDir)) {
+            fs.mkdirSync(tempDir, { recursive: true });
+        }
+
+        const timestamp = Date.now();
+        const outputPath = path.join(tempDir, `frame_${timestamp}.${format}`);
+
+        // Check GPU capabilities
+        const hasNvdec = await checkNvdecAvailable();
+        const hasNvenc = await checkNvencAvailable();
+
+        // Build ffmpeg command with GPU acceleration if available
+        let ffmpegCmd = 'ffmpeg';
+        
+        // Use GPU decoding if available
+        if (hasNvdec) {
+            ffmpegCmd += ' -hwaccel cuda -hwaccel_output_format cuda';
+        }
+
+        ffmpegCmd += ` -ss ${time} -i "${videoUrl}" -vframes 1`;
+
+        // Use GPU encoding if available for output
+        if (hasNvenc && format === 'jpg') {
+            ffmpegCmd += ' -c:v h264_nvenc';
+        }
+
+        ffmpegCmd += ` -q:v 2 "${outputPath}"`;
+
+        console.log('Running ffmpeg command:', ffmpegCmd);
+        console.log('GPU acceleration:', { nvdec: hasNvdec, nvenc: hasNvenc });
+
+        await execAsync(ffmpegCmd, { timeout: 30000 });
+
+        if (!fs.existsSync(outputPath)) {
+            return res.status(500).json({ error: 'Failed to extract frame' });
+        }
+
+        // Send the frame
+        const stat = fs.statSync(outputPath);
+        const contentType = format === 'jpg' ? 'image/jpeg' : 'image/png';
+        
+        res.setHeader('Content-Type', contentType);
+        res.setHeader('Content-Length', stat.size);
+        res.setHeader('Cache-Control', 'no-store');
+
+        const stream = fs.createReadStream(outputPath);
+        stream.pipe(res);
+
+        // Cleanup
+        stream.on('close', () => {
+            try {
+                fs.unlinkSync(outputPath);
+            } catch (e) {
+                console.error('Error deleting temp frame file:', e);
+            }
+        });
+
+        stream.on('error', (err) => {
+            console.error('Stream error:', err);
+            if (!res.headersSent) {
+                res.status(500).json({ error: 'Error streaming frame' });
+            }
+            try {
+                fs.unlinkSync(outputPath);
+            } catch (e) {}
+        });
+
+    } catch (error) {
+        console.error('Frame extraction error:', error);
+        return res.status(500).json({ 
+            error: 'Error extracting frame: ' + error.message,
+            gpuAccel: false 
+        });
+    }
+});
+
+// Get GPU info endpoint
+router.get('/gpu-info', async (req, res) => {
+    try {
+        const hasNvdec = await checkNvdecAvailable();
+        const hasNvenc = await checkNvencAvailable();
+        
+        let gpuName = 'Unknown';
+        try {
+            const { stdout } = await execAsync('nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null || echo ""');
+            gpuName = stdout.trim() || 'NVIDIA GPU (nvidia-smi not available)';
+        } catch (e) {
+            gpuName = 'NVIDIA GPU (detection failed)';
+        }
+
+        res.json({
+            gpu: gpuName,
+            nvdec: hasNvdec,
+            nvenc: hasNvenc,
+            acceleration: hasNvdec || hasNvenc ? 'available' : 'not available'
+        });
+    } catch (error) {
+        res.status(500).json({ 
+            error: 'Failed to get GPU info',
+            acceleration: 'not available'
+        });
     }
 });
 

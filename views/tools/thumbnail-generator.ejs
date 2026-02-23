@@ -252,6 +252,11 @@
             sizesGrid.innerHTML = '';
             generateSizesBtn.disabled = true;
             downloadAllBtn.disabled = true;
+            // Limpiar URL del video remoto si es un blob
+            if (remoteVideoSourceUrl && remoteVideoSourceUrl.startsWith('blob:')) {
+                URL.revokeObjectURL(remoteVideoSourceUrl);
+            }
+            remoteVideoSourceUrl = null;
         }
 
         async function loadImageBlobViaProxy(sourceUrl) {
@@ -263,7 +268,7 @@
             return response.blob();
         }
 
-        async function useImageBlobAsBase(blob, filenameHint) {
+        async function useImageBlobAsBase(blob, filenameHint, isFromYouTube = false) {
             if (currentBlobUrl) URL.revokeObjectURL(currentBlobUrl);
             currentBlobUrl = URL.createObjectURL(blob);
             currentFilename = filenameHint;
@@ -275,6 +280,10 @@
                     previewBox.innerHTML = `<img src="${currentBlobUrl}" alt="Thumbnail preview">`;
                     downloadBtn.disabled = false;
                     generateSizesBtn.disabled = false;
+                    // Si es de YouTube, deshabilitar el boton de generar (ya esta listo)
+                    if (isFromYouTube) {
+                        generateBtn.disabled = true;
+                    }
                     resolve();
                 };
                 img.onerror = () => reject(new Error('No se pudo abrir la imagen base'));
@@ -334,6 +343,13 @@
 
         async function generateThumbnail() {
             const file = videoFileInput.files[0];
+            
+            // Si ya hay un thumbnail base cargado (ej: desde YouTube), no procesar video
+            if (baseImage && !file && !remoteVideoSourceUrl) {
+                setStatus('Thumbnail ya esta listo (cargado desde YouTube). Puedes generar los sizes de social media.', true);
+                return;
+            }
+            
             if (!file && !remoteVideoSourceUrl) {
                 setStatus('Selecciona un video o carga un link primero.', true);
                 return;
@@ -373,7 +389,16 @@
 
                 const format = outputFormatSelect.value;
                 const extension = format === 'image/jpeg' ? 'jpg' : 'png';
-                const fileBase = file.name.replace(/\.[^/.]+$/, '');
+                let fileBase;
+                if (file) {
+                    fileBase = file.name.replace(/\.[^/.]+$/, '');
+                } else if (remoteVideoSourceUrl) {
+                    const urlParts = remoteVideoSourceUrl.split('/');
+                    const lastPart = urlParts[urlParts.length - 1];
+                    fileBase = lastPart.split('?')[0].replace(/\.[^/.]+$/, '') || 'video';
+                } else {
+                    fileBase = 'video';
+                }
                 currentFilename = `${fileBase}_thumb_${validTime.toFixed(1)}s.${extension}`;
 
                 canvasElement.toBlob((blob) => {
@@ -422,6 +447,7 @@
             try {
                 const ytId = parseYouTubeId(inputUrl);
                 if (ytId) {
+                    // Primero intentar cargar el thumbnail rapido
                     const candidates = [
                         `https://i.ytimg.com/vi/${ytId}/maxresdefault.jpg`,
                         `https://i.ytimg.com/vi/${ytId}/hqdefault.jpg`
@@ -437,13 +463,39 @@
                         }
                     }
 
-                    if (!imageBlob) {
-                        throw new Error('No se pudo cargar thumbnail de YouTube');
+                    if (imageBlob) {
+                        await useImageBlobAsBase(imageBlob, `youtube_${ytId}.jpg`, true);
+                        setStatus('Thumbnail de YouTube cargado. Tambien puedes descargar el video completo para elegir otro frame.');
+                        setSizesStatus('Base lista desde YouTube. Puedes generar todos los sizes.');
                     }
 
-                    await useImageBlobAsBase(imageBlob, `youtube_${ytId}.jpg`);
-                    setStatus('Thumbnail de YouTube cargado.');
-                    setSizesStatus('Base lista desde YouTube. Puedes generar todos los sizes.');
+                    // Siempre ofrecer descargar el video completo con yt-dlp
+                    setStatus((imageBlob ? 'Thumbnail cargado. ' : '') + 'Descargando video completo con yt-dlp (puede tomar unos segundos)...');
+                    
+                    try {
+                        const downloadResponse = await fetch(`/tools/download/youtube?url=${encodeURIComponent(inputUrl)}`);
+                        if (!downloadResponse.ok) {
+                            throw new Error(`Error descargando video: ${downloadResponse.status}`);
+                        }
+                        
+                        const videoBlob = await downloadResponse.blob();
+                        // Crear URL separada para el video (no usar currentBlobUrl)
+                        if (remoteVideoSourceUrl && remoteVideoSourceUrl.startsWith('blob:')) {
+                            URL.revokeObjectURL(remoteVideoSourceUrl);
+                        }
+                        remoteVideoSourceUrl = URL.createObjectURL(videoBlob);
+                        currentFilename = `youtube_${ytId}.mp4`;
+                        
+                        setStatus('Video de YouTube descargado. Ahora puedes generar thumbnail desde cualquier momento del video.');
+                        generateBtn.disabled = false;
+                    } catch (downloadError) {
+                        console.error('Error descargando video:', downloadError);
+                        if (!imageBlob) {
+                            throw new Error('No se pudo cargar ni el thumbnail ni el video');
+                        }
+                        // Si ya tenemos el thumbnail, no es error grave
+                        setStatus('Thumbnail cargado (descarga de video completo fallo, pero puedes usar el thumbnail por defecto).');
+                    }
                     return;
                 }
 
@@ -452,6 +504,7 @@
                     videoFileInput.value = '';
                     setStatus('Video de Dropbox cargado. Ahora presiona "Generar Thumbnail".');
                     setSizesStatus('Luego de generar base, podras crear todos los sizes.');
+                    generateBtn.disabled = false;
                     return;
                 }
 
@@ -565,6 +618,7 @@
                 remoteVideoSourceUrl = null;
                 videoUrlInput.value = '';
                 setStatus('Video local seleccionado.');
+                generateBtn.disabled = false;
             }
         });
 

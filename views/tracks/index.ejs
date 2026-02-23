@@ -351,7 +351,7 @@
                         </td>
                         <td>
                             <% if (track.audio_file_path) { %>
-                                <button onclick="playTrack('<%= track.id %>', '<%= track.title %>', '<%= track.audio_file_path %>')" class="btn-small" style="margin-right: 5px; background: linear-gradient(45deg, #28a745, #20c997); border: none;">▶️ Play</button>
+                                <button onclick='playTrack("<%= track.id %>", "<%= track.title.replace(/"/g, '\\"') %>", "<%= track.audio_file_path %>")' class="btn-small" style="margin-right: 5px; background: linear-gradient(45deg, #28a745, #20c997); border: none;">▶️ Play</button>
                             <% } %>
                             <a href="/tracks/<%= track.id %>/edit" class="btn-small">Editar</a>
                         </td>
@@ -420,11 +420,15 @@
         }
 
         function playTrack(id, title, filePath) {
+            console.log('[PlayTrack] Starting playback:', { id, title, filePath });
             currentTrackId = id;
             audio.src = filePath;
             nowPlaying.textContent = `🎵 ${title}`;
             globalPlayer.style.display = 'block';
-            audio.play();
+            audio.play().catch(error => {
+                console.error('[PlayTrack] Error playing audio:', error);
+                alert('Error al reproducir: ' + error.message);
+            });
             updatePlayButton();
         }
 
@@ -474,6 +478,23 @@
         audio.addEventListener('ended', () => {
             updatePlayButton();
             progressBar.style.width = '0%';
+        });
+
+        // Error handling
+        audio.addEventListener('error', (e) => {
+            console.error('[Audio] Error loading/playing audio:', e);
+            console.error('[Audio] Error code:', audio.error ? audio.error.code : 'unknown');
+            console.error('[Audio] Error message:', audio.error ? audio.error.message : 'unknown');
+            console.error('[Audio] Current src:', audio.src);
+            alert('Error al cargar el audio. Revisa la consola para más detalles.');
+        });
+
+        audio.addEventListener('canplay', () => {
+            console.log('[Audio] Audio can play');
+        });
+
+        audio.addEventListener('loadstart', () => {
+            console.log('[Audio] Loading audio:', audio.src);
         });
 
         // Keyboard shortcuts

@@ -4,6 +4,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const { getAll, getOne, run } = require('../config/database');
+const { getAudioDuration } = require('../utils/audioHelper');
 
 // Configure multer for multiple file uploads
 const storage = multer.diskStorage({
@@ -96,16 +97,26 @@ router.post('/bulk-map', async (req, res) => {
                     throw new Error('Track no encontrado: ' + trackId);
                 }
                 
-                // Update track with audio file
+                // Extraer duración del audio
+                let duration = null;
+                try {
+                    const fullFilePath = path.join(process.cwd(), 'public', filePath);
+                    duration = await getAudioDuration(fullFilePath);
+                } catch (durationError) {
+                    console.warn(`[BulkUpload] Could not extract duration for ${track.title}: ${durationError.message}`);
+                }
+                
+                // Update track with audio file and duration
                 await run(
-                    'UPDATE tracks SET audio_file_path = ?, audio_file_type = ? WHERE id = ?',
-                    [filePath, fileType || 'master', trackId]
+                    'UPDATE tracks SET audio_file_path = ?, audio_file_type = ?, duration = ? WHERE id = ?',
+                    [filePath, fileType || 'master', duration, trackId]
                 );
                 
                 results.push({
                     trackId: trackId,
                     title: track.title,
                     filePath: filePath,
+                    duration: duration,
                     status: 'success'
                 });
                 

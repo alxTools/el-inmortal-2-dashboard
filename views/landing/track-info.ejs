@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %> - El Inmortal 2</title>
+    <link rel="stylesheet" href="/css/dashboard.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%);
+            min-height: 100vh;
+            color: #ffffff;
+        }
+        
+        .fan-header {
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(10px);
+            padding: 20px;
+            border-bottom: 1px solid rgba(255, 215, 0, 0.2);
+        }
+        
+        .fan-header-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .fan-logo {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #ffd700;
+            text-decoration: none;
+        }
+        
+        .fan-badge {
+            background: linear-gradient(135deg, #ffd700, #ffed4e);
+            color: #000;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+        
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+        
+        .track-header {
+            display: flex;
+            gap: 40px;
+            margin-bottom: 40px;
+            align-items: flex-start;
+        }
+        
+        @media (max-width: 768px) {
+            .track-header {
+                flex-direction: column;
+                align-items: center;
+                text-align: center;
+            }
+        }
+        
+        .track-cover {
+            width: 300px;
+            height: 300px;
+            object-fit: cover;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.5), 0 0 40px rgba(255, 215, 0, 0.1);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            flex-shrink: 0;
+        }
+        
+        @media (max-width: 768px) {
+            .track-cover {
+                width: 250px;
+                height: 250px;
+            }
+        }
+        
+        .track-info {
+            flex: 1;
+        }
+        
+        .track-number-badge {
+            display: inline-block;
+            background: linear-gradient(135deg, rgba(255, 215, 0, 0.2), rgba(255, 215, 0, 0.1));
+            color: #ffd700;
+            padding: 8px 20px;
+            border-radius: 25px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            border: 1px solid rgba(255, 215, 0, 0.3);
+        }
+        
+        .track-info h1 {
+            color: #ffd700;
+            margin-bottom: 20px;
+            font-size: 2.5rem;
+            text-shadow: 0 2px 10px rgba(255, 215, 0, 0.3);
+        }
+        
+        @media (max-width: 768px) {
+            .track-info h1 {
+                font-size: 1.8rem;
+            }
+        }
+        
+        .track-meta {
+            color: #b0b0b0;
+            margin-bottom: 25px;
+        }
+        
+        .track-meta p {
+            margin-bottom: 12px;
+            font-size: 1.1rem;
+        }
+        
+        .track-meta strong {
+            color: #ffd700;
+        }
+        
+        .info-section {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .info-section h3 {
+            color: #ffd700;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid rgba(255, 215, 0, 0.3);
+            font-size: 1.3rem;
+        }
+        
+        .audio-player-section {
+            background: linear-gradient(135deg, rgba(255, 215, 0, 0.1), rgba(255, 255, 255, 0.05));
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+            border: 1px solid rgba(255, 215, 0, 0.2);
+        }
+        
+        .audio-player-section h3 {
+            color: #ffd700;
+            margin-bottom: 20px;
+            font-size: 1.3rem;
+        }
+        
+        audio {
+            width: 100%;
+            height: 50px;
+            border-radius: 25px;
+        }
+        
+        audio::-webkit-media-controls-panel {
+            background: linear-gradient(135deg, #1a1a2e, #16213e);
+        }
+        
+        .no-audio {
+            color: #888;
+            font-style: italic;
+            padding: 30px;
+            text-align: center;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 10px;
+        }
+        
+        .lyrics-box {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            padding: 25px;
+            max-height: 500px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            font-family: 'Courier New', monospace;
+            line-height: 2;
+            color: #e0e0e0;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: #ffd700;
+            text-decoration: none;
+            font-weight: 600;
+            margin-bottom: 30px;
+            transition: all 0.3s ease;
+        }
+        
+        .back-link:hover {
+            transform: translateX(-5px);
+            text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+        }
+        
+        .fan-footer {
+            text-align: center;
+            padding: 40px 20px;
+            color: #666;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            margin-top: 40px;
+        }
+        
+        .fan-footer a {
+            color: #ffd700;
+            text-decoration: none;
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 15px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+        
+        .status-done {
+            background: rgba(34, 197, 94, 0.2);
+            color: #22c55e;
+        }
+        
+        .status-pending {
+            background: rgba(234, 179, 8, 0.2);
+            color: #eab308;
+        }
+        
+        .track-type-badge {
+            display: inline-block;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: bold;
+            margin-bottom: 15px;
+        }
+        
+        .type-single {
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.2), rgba(239, 68, 68, 0.1));
+            color: #ef4444;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+        
+        .type-primary {
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(59, 130, 246, 0.1));
+            color: #3b82f6;
+            border: 1px solid rgba(59, 130, 246, 0.3);
+        }
+        
+        .type-album {
+            background: linear-gradient(135deg, rgba(168, 85, 247, 0.2), rgba(168, 85, 247, 0.1));
+            color: #a855f7;
+            border: 1px solid rgba(168, 85, 247, 0.3);
+        }
+
+        /* Audio Description Box Styles */
+        .audio-description-box {
+            background: linear-gradient(135deg, rgba(255, 215, 0, 0.1), rgba(255, 140, 0, 0.05));
+            border: 2px solid rgba(255, 215, 0, 0.3);
+            border-radius: 20px;
+            padding: 30px;
+            margin: 30px 0;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .audio-description-box::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #ffd700, #ff8c00, #ffd700);
+            animation: shimmer 3s infinite;
+        }
+
+        @keyframes shimmer {
+            0%, 100% { opacity: 0.5; }
+            50% { opacity: 1; }
+        }
+
+        .audio-description-header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid rgba(255, 215, 0, 0.2);
+        }
+
+        .audio-description-icon {
+            font-size: 2rem;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+
+        .audio-description-title {
+            color: #ffd700;
+            font-size: 1.3rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+        }
+
+        .audio-description-content {
+            color: #e8e8e8;
+            font-size: 1.1rem;
+            line-height: 1.9;
+            white-space: pre-wrap;
+            font-family: 'Georgia', serif;
+        }
+
+        .audio-description-content p {
+            margin-bottom: 15px;
+        }
+
+        .audio-description-content strong {
+            color: #ffd700;
+        }
+
+        .audio-description-footer {
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 1px solid rgba(255, 215, 0, 0.2);
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            font-size: 0.9rem;
+            color: #888;
+        }
+
+        .audio-description-footer span {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .audio-tag {
+            display: inline-block;
+            background: rgba(255, 215, 0, 0.15);
+            color: #ffd700;
+            padding: 4px 10px;
+            border-radius: 15px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-right: 8px;
+            margin-bottom: 8px;
+        }
+
+        @media (max-width: 768px) {
+            .audio-description-box {
+                padding: 20px;
+                margin: 20px 0;
+            }
+            
+            .audio-description-content {
+                font-size: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="fan-header">
+        <div class="fan-header-content">
+            <a href="/landing/el-inmortal-2" class="fan-logo">🎵 El Inmortal 2</a>
+            <span class="fan-badge">✨ Acceso Exclusivo</span>
+        </div>
+    </header>
+
+    <div class="container">
+        <a href="/landing/el-inmortal-2" class="back-link">
+            ← Volver al Álbum
+        </a>
+        
+        <div class="track-header">
+            <% if (track.cover_image_path) { %>
+                <img src="<%= track.cover_image_path %>" alt="<%= track.title %>" class="track-cover">
+            <% } else { %>
+                <div class="track-cover" style="display: flex; align-items: center; justify-content: center; font-size: 5em;">
+                    🎵
+                </div>
+            <% } %>
+            
+            <div class="track-info">
+                <span class="track-number-badge">Track #<%= track.track_number %></span>
+                
+                <% if (track.is_single) { %>
+                    <span class="track-type-badge type-single">🎯 SENCILLO</span>
+                <% } else if (track.is_primary) { %>
+                    <span class="track-type-badge type-primary">⭐ PRINCIPAL</span>
+                <% } else { %>
+                    <span class="track-type-badge type-album">💿 TRACK DE ÁLBUM</span>
+                <% } %>
+                
+                <h1><%= track.title || 'Sin título' %></h1>
+                
+                <div class="track-meta">
+                    <p><strong>🎧 Productor:</strong> <%= track.producer_name || 'Sin asignar' %></p>
+                    <% if (track.features) { %>
+                        <p><strong>👥 Featuring:</strong> <%= track.features %></p>
+                    <% } %>
+                    <% if (track.duration) { %>
+                        <p><strong>⏱️ Duración:</strong> <%= track.duration %></p>
+                    <% } %>
+                    <% if (track.recording_date) { %>
+                        <p><strong>📅 Fecha de grabación:</strong> <%= new Date(track.recording_date).toLocaleDateString('es-ES') %></p>
+                    <% } %>
+                    <p><strong>📊 Estado:</strong> 
+                        <% if (track.status === 'completed') { %>
+                            <span class="status-badge status-done">✅ Completado</span>
+                        <% } else if (track.status === 'in_progress') { %>
+                            <span class="status-badge status-pending">🔄 En progreso</span>
+                        <% } else { %>
+                            <span class="status-badge status-pending">⏳ Pendiente</span>
+                        <% } %>
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Audio Player Section -->
+        <div class="audio-player-section">
+            <h3>🎵 Escuchar Audio</h3>
+            <% if (track.audio_file_path) { %>
+                <audio controls preload="metadata">
+                    <source src="<%= track.audio_file_path %>" type="audio/wav">
+                    <source src="<%= track.audio_file_path %>" type="audio/mpeg">
+                    Tu navegador no soporta el elemento de audio.
+                </audio>
+                <p style="color: #888; margin-top: 15px; font-size: 0.9em;">
+                    📁 Formato: <%= track.audio_file_type ? track.audio_file_type.toUpperCase() : 'AUDIO' %>
+                </p>
+            <% } else { %>
+                <div class="no-audio">
+                    🎵 Audio próximamente disponible
+                </div>
+            <% } %>
+        </div>
+
+        <!-- Audio Description Box -->
+        <% if (track.audio_description) { %>
+        <div class="audio-description-box">
+            <div class="audio-description-header">
+                <span class="audio-description-icon">🔥</span>
+                <span class="audio-description-title">La Vibra del Track</span>
+            </div>
+            <div class="audio-description-content">
+                <%- track.audio_description.replace(/\n\n/g, '</p><p>').replace(/\n/g, ' ') %>
+            </div>
+            <div class="audio-description-footer">
+                <% if (track.duration) { %>
+                    <span>⏱️ <%= track.duration %> min</span>
+                <% } %>
+                <% if (track.audio_file_type) { %>
+                    <span>🎵 <%= track.audio_file_type.toUpperCase() %></span>
+                <% } %>
+                <span style="margin-left: auto;">✨ Análisis AI</span>
+            </div>
+        </div>
+        <% } else if (track.audio_file_path) { %>
+        <div class="audio-description-box" style="background: rgba(255,255,255,0.03); border-color: rgba(255,255,255,0.1);">
+            <div class="audio-description-header">
+                <span class="audio-description-icon">🎵</span>
+                <span class="audio-description-title" style="color: #888;">Descripción del Ritmo</span>
+            </div>
+            <div class="audio-description-content" style="color: #888; font-style: italic; text-align: center;">
+                La descripción detallada del track se está generando... <br>
+                <small style="display: block; margin-top: 10px;">🤖 Nuestro sistema AI está analizando las frecuencias y la vibra del audio</small>
+            </div>
+        </div>
+        <% } %>
+
+        <!-- Lyrics Section -->
+        <% if (track.lyrics) { %>
+        <div class="info-section">
+            <h3>📝 Letra</h3>
+            <div class="lyrics-box"><%= track.lyrics %></div>
+        </div>
+        <% } %>
+
+        <!-- Additional Info -->
+        <div class="info-section">
+            <h3>ℹ️ Información del Track</h3>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px;">
+                <div>
+                    <p style="color: #888; margin-bottom: 8px;">Número de Track:</p>
+                    <p style="font-size: 1.2rem; color: #ffd700;">#<%= track.track_number %></p>
+                </div>
+                <% if (track.created_at) { %>
+                <div>
+                    <p style="color: #888; margin-bottom: 8px;">Agregado:</p>
+                    <p><%= new Date(track.created_at).toLocaleDateString('es-ES') %></p>
+                </div>
+                <% } %>
+            </div>
+        </div>
+    </div>
+
+    <footer class="fan-footer">
+        <p>🎤 Galante el Emperador - El Inmortal 2</p>
+        <p style="margin-top: 10px; font-size: 0.9rem;">
+            <a href="/landing/el-inmortal-2">← Volver al álbum completo</a>
+        </p>
+    </footer>
+</body>
+</html>

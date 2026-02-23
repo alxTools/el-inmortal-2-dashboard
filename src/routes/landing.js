@@ -2,6 +2,8 @@ const express = require('express');
 const path = require('path');
 const fs = require('fs');
 const { getAll, getOne, query, run } = require('../config/database');
+const { sendWelcomeEmail, sendWebhookToN8N } = require('../utils/emailHelper');
+const { ensureLandingLeadsTable, syncToWordPress, getUnifiedStats } = require('../utils/landingDb');
 
 const router = express.Router();
 
@@ -48,38 +50,6 @@ function normalizeTitle(value) {
         .toLowerCase();
 }
 
-async function ensureLandingLeadsTable() {
-    await query(
-        `CREATE TABLE IF NOT EXISTS landing_email_leads (
-            id BIGINT NOT NULL AUTO_INCREMENT,
-            email VARCHAR(255) NOT NULL,
-            full_name VARCHAR(255) NULL,
-            country VARCHAR(120) NULL,
-            source_label VARCHAR(128) NOT NULL DEFAULT 'landing_el_inmortal_2',
-            ip_address VARCHAR(64) NULL,
-            user_agent VARCHAR(255) NULL,
-            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            PRIMARY KEY (id),
-            KEY idx_email (email),
-            KEY idx_country (country),
-            KEY idx_source (source_label)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`
-    );
-
-    const columns = await getAll(
-        `SELECT column_name FROM information_schema.columns
-         WHERE table_schema = DATABASE() AND table_name = 'landing_email_leads'`
-    );
-    const columnSet = new Set(columns.map((row) => row.column_name));
-
-    if (!columnSet.has('full_name')) {
-        await query('ALTER TABLE landing_email_leads ADD COLUMN full_name VARCHAR(255) NULL');
-    }
-    if (!columnSet.has('country')) {
-        await query('ALTER TABLE landing_email_leads ADD COLUMN country VARCHAR(120) NULL');
-    }
-}
-
 function toPublicImagePath(rawPath) {
     const source = String(rawPath || '').trim();
     if (!source) return FALLBACK_COVER;
@@ -120,11 +90,8 @@ function toPublicMediaPath(rawPath) {
     return '';
 }
 
-router.get('/', (_req, res) => {
-    return res.redirect('/landing/el-inmortal-2');
-});
-
-router.get('/el-inmortal-2', async (_req, res) => {
+// Función reutilizable para renderizar la landing
+async function renderLandingPage(res) {
     let album = null;
     let tracks = [];
 
@@ -138,6 +105,7 @@ router.get('/el-inmortal-2', async (_req, res) => {
 
         tracks = await getAll(
             `SELECT
+                t.id,
                 t.track_number,
                 t.title,
                 t.features,
@@ -165,6 +133,7 @@ router.get('/el-inmortal-2', async (_req, res) => {
         const key = normalizeTitle(fallback.title);
         const dbTrack = trackMap.get(key);
         return {
+            id: dbTrack?.id || null,
             trackNumber: Number(fallback.trackNumber || idx + 1),
             title: fallback.title,
             producer: fallback.producer,
@@ -217,6 +186,11 @@ router.get('/el-inmortal-2', async (_req, res) => {
         landingDataJson: JSON.stringify(landingData).replace(/</g, '\\u003c'),
         assetsReady
     });
+}
+
+// Ruta principal - renderiza la landing page
+router.get('/', async (_req, res) => {
+    return renderLandingPage(res);
 });
 
 router.post('/subscribe', async (req, res) => {
@@ -228,72 +202,244 @@ router.post('/subscribe', async (req, res) => {
         req.is('application/json') ||
         String(req.headers.accept || '').includes('application/json');
 
+    console.log('[Landing Subscribe] Received request:', { email, fullName, country, sourceLabel });
+
     if (!fullName || !country) {
+        console.log('[Landing Subscribe] Missing fields:', { fullName, country });
         if (!wantsJson) {
-            return res.redirect('/landing/el-inmortal-2?unlock=0');
+            return res.redirect('/ei2?unlock=0');
         }
         return res.status(400).json({ success: false, error: 'missing_fields' });
     }
 
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        console.log('[Landing Subscribe] Invalid email:', email);
         if (!wantsJson) {
-            return res.redirect('/landing/el-inmortal-2?unlock=0');
+            return res.redirect('/ei2?unlock=0');
         }
         return res.status(400).json({ success: false, error: 'email_invalid' });
     }
 
     try {
-        await ensureLandingLeadsTable();
+        console.log('[Landing Subscribe] ========== INICIANDO REGISTRO ==========');
+        console.log('[Landing Subscribe] Datos recibidos:', { email, fullName, country, sourceLabel });
+        console.log('[Landing Subscribe] IP:', req.ip);
+        
+        // Intentar guardar en DB, pero si falla, continuamos igual
+        let result = { lastID: null };
+        try {
+            console.log('[Landing Subscribe] Paso 1: Verificando tabla...');
+            await ensureLandingLeadsTable();
+            console.log('[Landing Subscribe] ✅ Tabla verificada');
+            
+            console.log('[Landing Subscribe] Paso 2: Insertando datos...');
+            result = await run(
+                `INSERT INTO landing_email_leads (email, full_name, country, source_label, ip_address, user_agent)
+                 VALUES (?, ?, ?, ?, ?, ?)`,
+                [
+                    email,
+                    fullName,
+                    country,
+                    sourceLabel,
+                    req.ip,
+                    String(req.headers['user-agent'] || '').slice(0, 255)
+                ]
+            );
+            console.log('[Landing Subscribe] ✅ Datos insertados, ID:', result.lastID);
+        } catch (dbError) {
+            console.error('[Landing Subscribe] ⚠️ Error en DB (continuando igual):', dbError.message);
+            // No fallamos, continuamos para enviar email y webhook
+        }
+        console.log('[Landing Subscribe] Table ready, inserting data...');
 
-        await run(
-            `INSERT INTO landing_email_leads (email, full_name, country, source_label, ip_address, user_agent)
-             VALUES (?, ?, ?, ?, ?, ?)`
-            ,
-            [
+        // Sincronizar con tablas WordPress existentes (no bloqueante)
+        console.log('[Landing Subscribe] Paso 3: Sincronizando con WordPress...');
+        let syncResults = [];
+        try {
+            syncResults = await syncToWordPress({ email, full_name: fullName, country, source_label: sourceLabel });
+            console.log('[Landing Subscribe] ✅ Sincronización WordPress:', syncResults);
+        } catch (syncError) {
+            console.log('[Landing Subscribe] ⚠️ Error sincronizando WordPress (continuando):', syncError.message);
+        }
+
+        // Enviar email de bienvenida y webhook en paralelo (no bloqueantes)
+        console.log('[Landing Subscribe] Paso 4: Enviando email y webhook...');
+        
+        const [emailResult, webhookResult] = await Promise.allSettled([
+            sendWelcomeEmail({ to: email, name: fullName, country: country }),
+            sendWebhookToN8N({
                 email,
                 fullName,
                 country,
                 sourceLabel,
-                req.ip,
-                String(req.headers['user-agent'] || '').slice(0, 255)
-            ]
-        );
+                ipAddress: req.ip,
+                userAgent: String(req.headers['user-agent'] || '').slice(0, 255),
+                registeredAt: new Date().toISOString(),
+                wordpressSync: syncResults
+            })
+        ]);
+
+        console.log('[Landing Subscribe] Email result:', emailResult.status === 'fulfilled' ? emailResult.value : emailResult.reason);
+        console.log('[Landing Subscribe] Webhook result:', webhookResult.status === 'fulfilled' ? webhookResult.value : webhookResult.reason);
+
+        // Establecer cookie de acceso para fans verificados (válida por 30 días)
+        res.cookie('landing_el_inmortal_unlock', '1', {
+            maxAge: 30 * 24 * 60 * 60 * 1000, // 30 días
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax'
+        });
 
         if (!wantsJson) {
-            return res.redirect('/landing/el-inmortal-2?unlock=1');
+            return res.redirect('/ei2?unlock=1');
         }
 
-        return res.json({ success: true });
+        return res.json({ 
+            success: true, 
+            id: result.lastID, 
+            emailSent: emailResult.status === 'fulfilled' ? emailResult.value?.success : false, 
+            webhookSent: webhookResult.status === 'fulfilled' ? webhookResult.value?.success : false,
+            wordpressSync: syncResults
+        });
     } catch (error) {
-        console.error('Landing subscribe error:', error);
+        console.error('[Landing Subscribe] ❌ ERROR CRÍTICO:', error);
+        console.error('[Landing Subscribe] Tipo de error:', error.constructor.name);
+        console.error('[Landing Subscribe] Mensaje:', error.message);
+        console.error('[Landing Subscribe] Stack trace:', error.stack);
+        
         if (!wantsJson) {
-            return res.redirect('/landing/el-inmortal-2?unlock=0');
+            return res.redirect('/ei2?unlock=0&error=' + encodeURIComponent(error.message));
         }
-        return res.status(500).json({ success: false, error: 'server_error' });
+        return res.status(500).json({ 
+            success: false, 
+            error: 'server_error', 
+            details: error.message,
+            type: error.constructor.name 
+        });
     }
 });
 
 router.get('/stats', async (_req, res) => {
     try {
-        await ensureLandingLeadsTable();
-
-        const topCountries = await getAll(
-            `SELECT country, COUNT(*) AS total
-             FROM landing_email_leads
-             WHERE country IS NOT NULL AND country <> ''
-             GROUP BY country
-             ORDER BY total DESC
-             LIMIT 6`
-        );
-
-        const total = await getOne('SELECT COUNT(*) AS total FROM landing_email_leads');
+        // Obtener estadísticas unificadas de todas las fuentes
+        const stats = await getUnifiedStats();
+        
         return res.json({
-            totalLeads: total?.total || 0,
-            topCountries: topCountries || []
+            totalLeads: stats.total,
+            localLeads: stats.local,
+            wordpressSites: stats.wordpress,
+            topCountries: stats.topCountries || []
         });
     } catch (error) {
         console.error('Landing stats error:', error);
-        return res.status(500).json({ error: 'stats_error' });
+        // Fallback a solo datos locales
+        try {
+            await ensureLandingLeadsTable();
+            const total = await getOne('SELECT COUNT(*) AS total FROM landing_email_leads');
+            const topCountries = await getAll(
+                `SELECT country, COUNT(*) AS total
+                 FROM landing_email_leads
+                 WHERE country IS NOT NULL AND country <> ''
+                 GROUP BY country
+                 ORDER BY total DESC
+                 LIMIT 6`
+            );
+            return res.json({
+                totalLeads: total?.total || 0,
+                localLeads: total?.total || 0,
+                wordpressSites: [],
+                topCountries: topCountries || []
+            });
+        } catch (fallbackError) {
+            return res.status(500).json({ error: 'stats_error' });
+        }
+    }
+});
+
+// GET track info público (solo para fans verificados o admins)
+router.get('/track/:id', async (req, res) => {
+    // Verificar si es admin o fan verificado
+    const isAdmin = req.session.user ? true : false;
+    const isVerifiedFan = req.cookies?.landing_el_inmortal_unlock === '1';
+    
+    if (!isAdmin && !isVerifiedFan) {
+        return res.redirect('/ei2');
+    }
+    
+    try {
+        const trackId = req.params.id;
+        
+        const track = await getOne(
+            `SELECT t.*, p.name as producer_name 
+             FROM tracks t 
+             LEFT JOIN producers p ON t.producer_id = p.id 
+             WHERE t.id = ?`, 
+            [trackId]
+        );
+        
+        if (!track) {
+            return res.status(404).render('error', {
+                title: '404',
+                message: 'Tema no encontrado',
+                error: {}
+            });
+        }
+        
+        // Si es admin, redirigir a la vista admin completa
+        if (isAdmin) {
+            return res.redirect(`/tracks/${trackId}`);
+        }
+        
+        // Fan verificado: mostrar vista solo lectura
+        res.render('landing/track-info', {
+            title: track.title,
+            track: track,
+            isFan: true,
+            isAdmin: false
+        });
+    } catch (error) {
+        console.error('[Landing Track Info] Error:', error);
+        res.status(500).render('error', {
+            title: 'Error',
+            message: 'Error cargando tema',
+            error: process.env.NODE_ENV === 'development' ? error : {}
+        });
+    }
+});
+
+// Endpoint de diagnóstico temporal
+router.get('/debug', async (req, res) => {
+    try {
+        const diagnostics = {
+            timestamp: new Date().toISOString(),
+            node_version: process.version,
+            env_vars: {
+                DB_HOST: process.env.DB_HOST ? '✅ Configurado' : '❌ No configurado',
+                DB_NAME: process.env.DB_NAME ? '✅ Configurado' : '❌ No configurado',
+                MS_GRAPH_TENANT_ID: process.env.MS_GRAPH_TENANT_ID ? '✅ Configurado' : '⚠️ No configurado (email opcional)',
+                N8N_WEBHOOK_URL: process.env.N8N_WEBHOOK_URL ? '✅ Configurado' : '⚠️ No configurado (webhook opcional)'
+            }
+        };
+        
+        // Probar conexión a DB
+        try {
+            await ensureLandingLeadsTable();
+            diagnostics.database = '✅ Conexión exitosa';
+        } catch (dbError) {
+            diagnostics.database = `❌ Error: ${dbError.message}`;
+        }
+        
+        // Probar email helper
+        try {
+            const emailHelper = require('../utils/emailHelper');
+            diagnostics.email_helper = '✅ Cargado correctamente';
+        } catch (helperError) {
+            diagnostics.email_helper = `❌ Error: ${helperError.message}`;
+        }
+        
+        res.json(diagnostics);
+    } catch (error) {
+        res.status(500).json({ error: error.message, stack: error.stack });
     }
 });
 

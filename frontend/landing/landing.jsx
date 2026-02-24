@@ -418,17 +418,23 @@ function LandingApp({ data }) {
         detectCountry();
     }, []);
 
-    // Auto-abrir modal después de 3 segundos si no está desbloqueado
+    // Verificar si está desbloqueado (siempre iniciar bloqueado)
     useEffect(() => {
-        const storageKey = 'landing_el_inmortal_unlock';
-        const isAlreadyUnlocked = localStorage.getItem(storageKey) === '1';
+        // El desbloqueo solo ocurre después de registro exitoso
+        // La cookie httpOnly no es accesible desde JS, así que siempre mostramos bloqueado inicialmente
+        // El backend redirige a /ei2?unlock=1 después del registro
+        const urlParams = new URLSearchParams(window.location.search);
+        const shouldUnlock = urlParams.get('unlock') === '1';
         
-        if (isAlreadyUnlocked) {
+        if (shouldUnlock) {
             setIsUnlocked(true);
+            // Limpiar URL
+            window.history.replaceState({}, document.title, window.location.pathname);
         } else {
+            // Mostrar modal después de 2 segundos
             const timer = setTimeout(() => {
                 setIsModalOpen(true);
-            }, 3000);
+            }, 2000);
             return () => clearTimeout(timer);
         }
     }, []);

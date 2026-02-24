@@ -9,7 +9,134 @@
     <meta property="og:description" content="<%= landingData.description %>">
     <meta property="og:image" content="<%= landingData.coverImage %>">
     <meta property="og:type" content="music.album">
-    <link rel="stylesheet" href="/css/album-landing.tailwind.css">
+    <link rel="stylesheet" href="/css/album-landing.tailwind.css?v=3">
+    
+    <!-- Estilos fallback -->
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { 
+            background: linear-gradient(135deg, #060b15 0%, #0f172a 100%);
+            color: #f1f5f9;
+            font-family: system-ui, -apple-system, sans-serif;
+            min-height: 100vh;
+        }
+        .container { 
+            max-width: 1200px; 
+            margin: 0 auto; 
+            padding: 20px;
+        }
+        .hero {
+            text-align: center;
+            padding: 40px 20px;
+            background: linear-gradient(135deg, rgba(250,204,21,0.1), transparent);
+            border-radius: 20px;
+            margin-bottom: 30px;
+        }
+        h1 { 
+            font-size: clamp(2rem, 5vw, 4rem);
+            color: #facc15;
+            margin-bottom: 10px;
+            font-weight: 800;
+        }
+        .subtitle {
+            color: #94a3b8;
+            font-size: 1.1rem;
+            margin-bottom: 20px;
+        }
+        .form-section {
+            background: rgba(15,23,42,0.8);
+            border: 1px solid rgba(250,204,21,0.3);
+            border-radius: 16px;
+            padding: 30px;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        .form-title {
+            color: #facc15;
+            font-size: 1.5rem;
+            margin-bottom: 10px;
+        }
+        .form-subtitle {
+            color: #94a3b8;
+            margin-bottom: 20px;
+        }
+        form {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .form-row {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        input {
+            flex: 1;
+            min-width: 200px;
+            padding: 14px 18px;
+            border-radius: 12px;
+            border: 1px solid #334155;
+            background: #1e293b;
+            color: #f1f5f9;
+            font-size: 1rem;
+        }
+        input::placeholder { color: #64748b; }
+        input:focus {
+            outline: none;
+            border-color: #facc15;
+            box-shadow: 0 0 0 3px rgba(250,204,21,0.1);
+        }
+        button {
+            padding: 14px 28px;
+            border-radius: 12px;
+            border: none;
+            background: linear-gradient(135deg, #facc15, #fbbf24);
+            color: #0f172a;
+            font-weight: 700;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(250,204,21,0.3);
+        }
+        .checkbox-label {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            color: #94a3b8;
+            font-size: 0.9rem;
+            margin-top: 8px;
+        }
+        .checkbox-label input[type="checkbox"] {
+            width: auto;
+            min-width: auto;
+            margin-top: 3px;
+        }
+        .benefits {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #334155;
+        }
+        .benefits li {
+            color: #cbd5e1;
+            margin: 8px 0;
+            list-style: none;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .benefits li::before {
+            content: "✓";
+            color: #facc15;
+            font-weight: bold;
+        }
+        @media (max-width: 640px) {
+            .form-row { flex-direction: column; }
+            input { min-width: 100%; }
+        }
+    </style>
     
     <!-- Google tag (gtag.js) - GA4 -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-WX59NQJSP4"></script>
@@ -17,47 +144,68 @@
       window.dataLayer = window.dataLayer || [];
       function gtag(){dataLayer.push(arguments);}
       gtag('js', new Date());
-      gtag('config', 'G-WX59NQJSP4', {
-        'custom_map': {'custom_parameter_1': 'landing_version'}
-      });
+      gtag('config', 'G-WX59NQJSP4');
       gtag('event', 'page_view', {
         'page_title': 'El Inmortal 2 - Landing',
-        'page_location': window.location.href,
-        'landing_version': 'ei2_v1'
+        'page_location': window.location.href
       });
     </script>
 </head>
 <body>
     <% if (!assetsReady) { %>
-        <div style="background:#1f2937;color:#f9fafb;padding:12px 18px;font-family:Arial,sans-serif;">
-            ⚠️ Landing assets no encontrados. Ejecuta `npm run landing:build` para regenerarlos.
+        <div style="background:#1f2937;color:#f9fafb;padding:12px 18px;text-align:center;">
+            ⚠️ Cargando experiencia completa...
         </div>
     <% } %>
 
     <noscript>
-        <div style="background:#111827;color:#f9fafb;padding:12px 18px;font-family:Arial,sans-serif;">
-            Este landing necesita JavaScript para la version interactiva.
+        <div style="background:#111827;color:#f9fafb;padding:12px 18px;text-align:center;">
+            Este landing necesita JavaScript para la versión interactiva.
         </div>
     </noscript>
 
-    <div id="album-landing-root">
-        <section style="padding:24px;font-family:Arial,sans-serif;max-width:960px;margin:0 auto;">
-            <h1 style="font-size:32px;margin:0 0 6px;"> <%= landingData.albumName %> </h1>
-            <p style="margin:0 0 12px;color:#6b7280;"> <%= landingData.artistName %> </p>
-            <p style="margin:0 0 16px;"> <%= landingData.description %> </p>
-            <p style="margin:0 0 20px;color:#9ca3af;">Release: <%= landingData.releaseDate %></p>
-
-            <h2 style="margin:18px 0 10px;">Area exclusiva</h2>
-            <p style="margin:0 0 12px;color:#6b7280;">Registra tu email para desbloquear el tracklist completo y el player.</p>
-
-            <form method="post" action="/landing/subscribe" style="display:flex;gap:8px;flex-wrap:wrap;">
-                <input type="text" name="full_name" placeholder="Nombre y apellido" required style="padding:10px 14px;border-radius:999px;border:1px solid #d1d5db;min-width:240px;" />
-                <input type="text" name="country" placeholder="Pais" required style="padding:10px 14px;border-radius:999px;border:1px solid #d1d5db;min-width:200px;" />
-                <input type="email" name="email" placeholder="Tu email" required style="padding:10px 14px;border-radius:999px;border:1px solid #d1d5db;min-width:240px;" />
-                <input type="hidden" name="source" value="landing_el_inmortal_2" />
-                <button type="submit" style="padding:10px 16px;border-radius:999px;border:0;background:#f59e0b;color:#111827;font-weight:600;">Desbloquear</button>
-            </form>
-        </section>
+    <div class="container">
+        <div id="album-landing-root">
+            <!-- Fallback mientras carga React -->
+            <div class="hero">
+                <h1>🎵 <%= landingData.albumName %></h1>
+                <p class="subtitle"><%= landingData.artistName %></p>
+                <p style="color:#94a3b8;max-width:600px;margin:0 auto;">
+                    <%= landingData.description %>
+                </p>
+            </div>
+            
+            <div class="form-section">
+                <h2 class="form-title">🔓 Desbloquea el Álbum Completo</h2>
+                <p class="form-subtitle">
+                    Sé el primero en escuchar "El Inmortal 2" antes que nadie
+                </p>
+                
+                <form method="post" action="/landing/subscribe" id="subscribeForm">
+                    <input type="text" name="full_name" placeholder="Nombre completo *" required />
+                    <input type="email" name="email" placeholder="Email *" required />
+                    <input type="text" name="country" placeholder="País (Detectado automáticamente)" />
+                    
+                    <label class="checkbox-label">
+                        <input type="checkbox" name="accept_emails" checked />
+                        <span>Acepto recibir emails con noticias, lanzamientos y contenido exclusivo de Galante el Emperador</span>
+                    </label>
+                    
+                    <input type="hidden" name="source" value="landing_el_inmortal_2" />
+                    
+                    <button type="submit" id="submitBtn">
+                        🔓 Desbloquear Acceso Ahora
+                    </button>
+                </form>
+                
+                <ul class="benefits">
+                    <li>Escucha todas las 21 canciones</li>
+                    <li>Acceso exclusivo al reproductor</li>
+                    <li>Contenido exclusivo y noticias</li>
+                    <li>🎁 Tu información está segura. Nunca compartimos tus datos.</li>
+                </ul>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -65,33 +213,26 @@
         
         // GA4 Event Tracking
         document.addEventListener('DOMContentLoaded', function() {
-            // Track unlock button click
-            const unlockBtns = document.querySelectorAll('button[type="submit"], .floating-unlock-btn, [data-action="unlock"]');
-            unlockBtns.forEach(btn => {
-                btn.addEventListener('click', function() {
-                    gtag('event', 'begin_checkout', {
-                        'event_category': 'engagement',
-                        'event_label': 'unlock_button_click',
-                        'value': 1
-                    });
+            const form = document.getElementById('subscribeForm');
+            const btn = document.getElementById('submitBtn');
+            
+            btn.addEventListener('click', function() {
+                gtag('event', 'begin_checkout', {
+                    'event_category': 'engagement',
+                    'event_label': 'unlock_button_click'
                 });
             });
             
-            // Track form submission
-            const forms = document.querySelectorAll('form[action*="subscribe"], form[data-form="landing-subscribe"]');
-            forms.forEach(form => {
-                form.addEventListener('submit', function(e) {
-                    const email = form.querySelector('input[type="email"]')?.value;
-                    gtag('event', 'generate_lead', {
-                        'event_category': 'conversion',
-                        'event_label': 'email_submitted',
-                        'value': 1,
-                        'user_email': email ? email.split('@')[1] : 'unknown' // solo dominio por privacidad
-                    });
+            form.addEventListener('submit', function(e) {
+                const email = form.querySelector('input[type="email"]')?.value;
+                gtag('event', 'generate_lead', {
+                    'event_category': 'conversion',
+                    'event_label': 'email_submitted',
+                    'value': 1
                 });
             });
         });
     </script>
-    <script src="/js/album-landing.bundle.js?v=2" defer></script>
+    <script src="/js/album-landing.bundle.js?v=3" defer></script>
 </body>
 </html>

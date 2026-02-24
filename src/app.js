@@ -234,7 +234,7 @@ app.get('/api/health', (req, res) => {
 });
 
 // Redirigir raíz a landing solo si NO está autenticado
-app.get('/', (req, res) => {
+app.get('/', (req, res, next) => {
     // Si es admin (tiene sesión), dejarlo pasar al dashboard
     if (req.session.user) {
         return next();

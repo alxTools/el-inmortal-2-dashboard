@@ -1,13 +1,35 @@
+# El Inmortal 2 Dashboard - Docker Compose
+version: '3.8'
+
 services:
   web:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: el-inmortal-2-webapp
+    container_name: el-inmortal-2-dashboard
     restart: unless-stopped
     env_file:
       - .env
     ports:
-      - "3000:3000"
+      - "3100:3100"
     volumes:
       - ./public/uploads:/app/public/uploads
+      - ./database:/app/database
+    environment:
+      - NODE_ENV=production
+      - PORT=3100
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3100/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - dashboard-network
+    labels:
+      - "com.elinmortal2.description=El Inmortal 2 Launch Dashboard"
+      - "com.elinmortal2.version=1.0.0"
+
+networks:
+  dashboard-network:
+    driver: bridge

@@ -50,3 +50,5 @@ coverage/
 # Misc
 .cache/
 .eslintcache
+
+.vercel

@@ -12,7 +12,8 @@ const alterTableQueries = [
     `ALTER TABLE tracks ADD COLUMN features TEXT`,
     `ALTER TABLE tracks ADD COLUMN audio_file_path TEXT`,
     `ALTER TABLE tracks ADD COLUMN audio_file_type TEXT`,
-    `ALTER TABLE tracks ADD COLUMN cover_image_path TEXT`
+    `ALTER TABLE tracks ADD COLUMN cover_image_path TEXT`,
+    `ALTER TABLE tracks ADD COLUMN audio_description TEXT`
 ];
 
 let completed = 0;

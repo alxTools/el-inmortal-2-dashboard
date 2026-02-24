@@ -1,6 +1,13 @@
-// Dashboard JavaScript
+// Dashboard JavaScript - Enhanced Edition
 
 document.addEventListener('DOMContentLoaded', function() {
+    // Initialize all features
+    initializeRevealAnimations();
+    initializeParallaxEffect();
+    initializeNavbarScroll();
+    initializeQuickLinkAnimations();
+    initializeTableRowEffects();
+    
     // Auto-update stats every 30 seconds
     setInterval(updateStats, 30000);
     
@@ -9,7 +16,171 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Setup 30-minute reminder alert
     setupThirtyMinuteAlert();
+    
+    // Add keyboard shortcuts
+    setupKeyboardShortcuts();
+    
+    // Initialize tooltip system
+    initializeTooltips();
 });
+
+// Reveal animations on scroll
+function initializeRevealAnimations() {
+    const observerOptions = {
+        root: null,
+        rootMargin: '0px',
+        threshold: 0.1
+    };
+    
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                entry.target.style.animationPlayState = 'running';
+                observer.unobserve(entry.target);
+            }
+        });
+    }, observerOptions);
+    
+    document.querySelectorAll('.reveal').forEach(el => {
+        el.style.animationPlayState = 'paused';
+        observer.observe(el);
+    });
+}
+
+// Parallax effect for header
+function initializeParallaxEffect() {
+    const header = document.querySelector('.header');
+    if (!header) return;
+    
+    window.addEventListener('scroll', () => {
+        const scrolled = window.pageYOffset;
+        const rate = scrolled * 0.3;
+        header.style.transform = `translateY(${rate}px)`;
+    }, { passive: true });
+}
+
+// Navbar scroll effect
+function initializeNavbarScroll() {
+    const navbar = document.querySelector('.navbar');
+    if (!navbar) return;
+    
+    let lastScroll = 0;
+    
+    window.addEventListener('scroll', () => {
+        const currentScroll = window.pageYOffset;
+        
+        if (currentScroll > 100) {
+            navbar.classList.add('navbar-scrolled');
+        } else {
+            navbar.classList.remove('navbar-scrolled');
+        }
+        
+        lastScroll = currentScroll;
+    }, { passive: true });
+}
+
+// Quick links hover animations
+function initializeQuickLinkAnimations() {
+    const quickLinks = document.querySelectorAll('.quick-link');
+    
+    quickLinks.forEach(link => {
+        link.addEventListener('mouseenter', function() {
+            this.style.transform = 'translateY(-5px) scale(1.02)';
+        });
+        
+        link.addEventListener('mouseleave', function() {
+            this.style.transform = 'translateY(0) scale(1)';
+        });
+    });
+}
+
+// Table row hover effects
+function initializeTableRowEffects() {
+    const tableRows = document.querySelectorAll('.tracks-table tbody tr');
+    
+    tableRows.forEach(row => {
+        row.addEventListener('mouseenter', function() {
+            this.style.background = 'rgba(255, 215, 0, 0.08)';
+        });
+        
+        row.addEventListener('mouseleave', function() {
+            this.style.background = '';
+        });
+    });
+}
+
+// Tooltip system
+function initializeTooltips() {
+    const tooltipElements = document.querySelectorAll('[data-tooltip]');
+    
+    tooltipElements.forEach(el => {
+        el.addEventListener('mouseenter', function(e) {
+            const tooltip = document.createElement('div');
+            tooltip.className = 'custom-tooltip';
+            tooltip.textContent = this.getAttribute('data-tooltip');
+            document.body.appendChild(tooltip);
+            
+            const rect = this.getBoundingClientRect();
+            tooltip.style.left = `${rect.left + rect.width / 2 - tooltip.offsetWidth / 2}px`;
+            tooltip.style.top = `${rect.top - tooltip.offsetHeight - 10}px`;
+            
+            setTimeout(() => tooltip.classList.add('show'), 10);
+        });
+        
+        el.addEventListener('mouseleave', function() {
+            const tooltip = document.querySelector('.custom-tooltip');
+            if (tooltip) {
+                tooltip.classList.remove('show');
+                setTimeout(() => tooltip.remove(), 300);
+            }
+        });
+    });
+}
+
+// Keyboard shortcuts
+function setupKeyboardShortcuts() {
+    document.addEventListener('keydown', function(e) {
+        // Ctrl/Cmd + K for quick search
+        if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+            e.preventDefault();
+            showQuickSearch();
+        }
+        
+        // Escape to close modals
+        if (e.key === 'Escape') {
+            closeAllModals();
+        }
+    });
+}
+
+// Quick search modal
+function showQuickSearch() {
+    const modal = document.createElement('div');
+    modal.className = 'quick-search-modal';
+    modal.innerHTML = `
+        <div class="quick-search-overlay"></div>
+        <div class="quick-search-container">
+            <input type="text" placeholder="Buscar..." autofocus>
+            <div class="quick-search-results"></div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+    
+    setTimeout(() => modal.classList.add('active'), 10);
+    
+    modal.querySelector('.quick-search-overlay').addEventListener('click', () => {
+        modal.classList.remove('active');
+        setTimeout(() => modal.remove(), 300);
+    });
+}
+
+// Close all modals
+function closeAllModals() {
+    document.querySelectorAll('.modal, .quick-search-modal').forEach(modal => {
+        modal.classList.remove('active');
+        setTimeout(() => modal.remove(), 300);
+    });
+}
 
 // Setup voice alert every 30 minutes
 function setupThirtyMinuteAlert() {
@@ -62,11 +233,28 @@ function speakCurrentTime() {
         utterance.pitch = 1.0;
         utterance.volume = 1.0;
         
-        // Try to find a Spanish voice
+        // Try to find a Spanish FEMALE voice
         const voices = window.speechSynthesis.getVoices();
-        const spanishVoice = voices.find(voice => voice.lang.startsWith('es'));
-        if (spanishVoice) {
-            utterance.voice = spanishVoice;
+        // Buscar voces femeninas españolas (Monica, Helena, etc.)
+        const femaleSpanishVoices = voices.filter(voice => 
+            voice.lang.startsWith('es') && 
+            (voice.name.includes('Monica') || 
+             voice.name.includes('Helena') || 
+             voice.name.includes('Carmen') ||
+             voice.name.includes('Female') ||
+             voice.name.includes('Mujer') ||
+             voice.name.includes('Femenina') ||
+             voice.name.includes('Google español'))
+        );
+        
+        if (femaleSpanishVoices.length > 0) {
+            utterance.voice = femaleSpanishVoices[0];
+        } else {
+            // Fallback a cualquier voz española
+            const spanishVoice = voices.find(voice => voice.lang.startsWith('es'));
+            if (spanishVoice) {
+                utterance.voice = spanishVoice;
+            }
         }
         
         // Speak
@@ -114,10 +302,26 @@ async function speakStatusUpdate() {
         utterance.pitch = 1.0;
         utterance.volume = 1.0;
 
+        // Try to find a Spanish FEMALE voice
         const voices = window.speechSynthesis.getVoices();
-        const spanishVoice = voices.find(voice => voice.lang.startsWith('es'));
-        if (spanishVoice) {
-            utterance.voice = spanishVoice;
+        const femaleSpanishVoices = voices.filter(voice => 
+            voice.lang.startsWith('es') && 
+            (voice.name.includes('Monica') || 
+             voice.name.includes('Helena') || 
+             voice.name.includes('Carmen') ||
+             voice.name.includes('Female') ||
+             voice.name.includes('Mujer') ||
+             voice.name.includes('Femenina') ||
+             voice.name.includes('Google español'))
+        );
+        
+        if (femaleSpanishVoices.length > 0) {
+            utterance.voice = femaleSpanishVoices[0];
+        } else {
+            const spanishVoice = voices.find(voice => voice.lang.startsWith('es'));
+            if (spanishVoice) {
+                utterance.voice = spanishVoice;
+            }
         }
 
         window.speechSynthesis.speak(utterance);
@@ -149,16 +353,42 @@ async function updateStats() {
             statNumbers[3].textContent = `${data.content.total}/${data.content.target}`;
         }
         
-        // Update progress bars
+        // Update progress bars with animation
         const progressBars = document.querySelectorAll('.progress-fill');
         if (progressBars.length >= 3) {
             progressBars[0].style.width = `${(data.tracks.total / data.tracks.target * 100)}%`;
             progressBars[1].style.width = data.tracks.total > 0 ? `${(data.splitsheets.confirmed / data.tracks.total * 100)}%` : '0%';
             progressBars[2].style.width = `${(data.content.total / data.content.target * 100)}%`;
         }
+        
+        // Show toast notification
+        showToast('Stats actualizados', 'success');
     } catch (error) {
         console.error('Error updating stats:', error);
     }
+}
+
+// Toast notification system
+function showToast(message, type = 'info') {
+    const existingToast = document.querySelector('.dashboard-toast');
+    if (existingToast) {
+        existingToast.remove();
+    }
+    
+    const toast = document.createElement('div');
+    toast.className = `dashboard-toast ${type}`;
+    toast.innerHTML = `
+        <span class="toast-icon">${type === 'success' ? '✓' : type === 'error' ? '✕' : 'ℹ'}</span>
+        <span class="toast-message">${message}</span>
+    `;
+    
+    document.body.appendChild(toast);
+    
+    setTimeout(() => toast.classList.add('show'), 10);
+    setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => toast.remove(), 300);
+    }, 3000);
 }
 
 // Toggle track status
@@ -174,11 +404,12 @@ async function toggleTrackStatus(trackId, field) {
         
         const data = await response.json();
         if (data.success) {
-            location.reload();
+            showToast('Estado actualizado', 'success');
+            setTimeout(() => location.reload(), 500);
         }
     } catch (error) {
         console.error('Error:', error);
-        alert('Error actualizando estado');
+        showToast('Error actualizando estado', 'error');
     }
 }
 
@@ -190,14 +421,15 @@ function confirmDelete(type, id) {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            location.reload();
+            showToast('Eliminado correctamente', 'success');
+            setTimeout(() => location.reload(), 500);
         } else {
-            alert('Error eliminando');
+            showToast('Error eliminando', 'error');
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        alert('Error eliminando');
+        showToast('Error eliminando', 'error');
     });
 }
 
@@ -212,6 +444,8 @@ function validateForm(formId) {
     requiredFields.forEach(field => {
         if (!field.value.trim()) {
             field.style.borderColor = '#dc3545';
+            field.classList.add('shake');
+            setTimeout(() => field.classList.remove('shake'), 500);
             isValid = false;
         } else {
             field.style.borderColor = '';
@@ -219,7 +453,7 @@ function validateForm(formId) {
     });
     
     if (!isValid) {
-        alert('Por favor completa todos los campos requeridos');
+        showToast('Por favor completa todos los campos requeridos', 'error');
     }
     
     return isValid;
@@ -243,3 +477,13 @@ function updateClock() {
 // Update clock every second
 setInterval(updateClock, 1000);
 updateClock();
+
+// Export functions for global use
+window.Dashboard = {
+    showToast,
+    updateStats,
+    toggleTrackStatus,
+    confirmDelete,
+    validateForm,
+    showQuickSearch
+};

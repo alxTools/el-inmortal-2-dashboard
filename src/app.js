@@ -271,7 +271,7 @@ app.use('/settings', requireAuth, settingsRouter);
 app.use((err, req, res, next) => {
     if (err.code === 'LIMIT_FILE_SIZE') {
         return res.status(400).json({ 
-            error: 'Archivo demasiado grande. Máximo 100MB.' 
+            error: 'Archivo demasiado grande. Máximo 150MB.' 
         });
     }
     if (err.message && err.message.includes('Solo se permiten archivos')) {

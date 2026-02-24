@@ -10,6 +10,22 @@
     <meta property="og:image" content="<%= landingData.coverImage %>">
     <meta property="og:type" content="music.album">
     <link rel="stylesheet" href="/css/album-landing.tailwind.css">
+    
+    <!-- Google tag (gtag.js) - GA4 -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-WX59NQJSP4"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-WX59NQJSP4', {
+        'custom_map': {'custom_parameter_1': 'landing_version'}
+      });
+      gtag('event', 'page_view', {
+        'page_title': 'El Inmortal 2 - Landing',
+        'page_location': window.location.href,
+        'landing_version': 'ei2_v1'
+      });
+    </script>
 </head>
 <body>
     <% if (!assetsReady) { %>
@@ -46,6 +62,35 @@
 
     <script>
         window.__ALBUM_LANDING_DATA__ = <%- landingDataJson %>;
+        
+        // GA4 Event Tracking
+        document.addEventListener('DOMContentLoaded', function() {
+            // Track unlock button click
+            const unlockBtns = document.querySelectorAll('button[type="submit"], .floating-unlock-btn, [data-action="unlock"]');
+            unlockBtns.forEach(btn => {
+                btn.addEventListener('click', function() {
+                    gtag('event', 'begin_checkout', {
+                        'event_category': 'engagement',
+                        'event_label': 'unlock_button_click',
+                        'value': 1
+                    });
+                });
+            });
+            
+            // Track form submission
+            const forms = document.querySelectorAll('form[action*="subscribe"], form[data-form="landing-subscribe"]');
+            forms.forEach(form => {
+                form.addEventListener('submit', function(e) {
+                    const email = form.querySelector('input[type="email"]')?.value;
+                    gtag('event', 'generate_lead', {
+                        'event_category': 'conversion',
+                        'event_label': 'email_submitted',
+                        'value': 1,
+                        'user_email': email ? email.split('@')[1] : 'unknown' // solo dominio por privacidad
+                    });
+                });
+            });
+        });
     </script>
     <script src="/js/album-landing.bundle.js?v=2" defer></script>
 </body>

@@ -324,8 +324,18 @@ router.get('/stats', async (_req, res) => {
         // Obtener estadísticas unificadas de todas las fuentes
         const stats = await getUnifiedStats();
         
+        // NÚMERO REAL (para logs internos)
+        const realTotal = stats.total || 0;
+        
+        // Multiplicador aleatorio entre 15 y 20 para efecto viral
+        const multiplier = 15 + Math.random() * 5; // Entre 15 y 20
+        const inflatedTotal = Math.floor(realTotal * multiplier);
+        
+        // Log para que veas el número real
+        console.log(`[Landing Stats] Real: ${realTotal} | Mostrado: ${inflatedTotal} | Multiplicador: ${multiplier.toFixed(2)}x`);
+        
         return res.json({
-            totalLeads: stats.total,
+            totalLeads: inflatedTotal,
             localLeads: stats.local,
             wordpressSites: stats.wordpress,
             topCountries: stats.topCountries || []
@@ -344,9 +354,16 @@ router.get('/stats', async (_req, res) => {
                  ORDER BY total DESC
                  LIMIT 6`
             );
+            
+            const realTotal = total?.total || 0;
+            const multiplier = 15 + Math.random() * 5;
+            const inflatedTotal = Math.floor(realTotal * multiplier);
+            
+            console.log(`[Landing Stats - Fallback] Real: ${realTotal} | Mostrado: ${inflatedTotal} | Multiplicador: ${multiplier.toFixed(2)}x`);
+            
             return res.json({
-                totalLeads: total?.total || 0,
-                localLeads: total?.total || 0,
+                totalLeads: inflatedTotal,
+                localLeads: realTotal,
                 wordpressSites: [],
                 topCountries: topCountries || []
             });

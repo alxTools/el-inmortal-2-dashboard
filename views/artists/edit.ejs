@@ -127,5 +127,47 @@
     </div>
 
     <%- include('../partials/footer') %>
+    
+    <script>
+        // Avatar upload handler
+        document.getElementById('avatarUploadForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            const artistId = '<%= artist.id %>';
+            
+            try {
+                const response = await fetch(`/uploads/avatar/artist/${artistId}`, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok && result.success) {
+                    alert('✅ Avatar actualizado exitosamente');
+                    location.reload();
+                } else {
+                    throw new Error(result.error || 'Error al subir avatar');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('❌ Error: ' + error.message);
+            }
+        });
+        
+        // Preview image before upload
+        document.getElementById('avatarInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    document.getElementById('avatarPreviewImg').src = e.target.result;
+                    document.getElementById('avatarPreview').style.display = 'block';
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+    </script>
 </body>
 </html>

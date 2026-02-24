@@ -34,7 +34,7 @@ app.use(helmet({
             defaultSrc: ["'self'"],
             styleSrc: ["'self'", "'unsafe-inline'", "https:"],
             scriptSrc: ["'self'", "'unsafe-inline'"],
-            imgSrc: ["'self'", "data:", "https:"],
+            imgSrc: ["'self'", "data:", "blob:", "https:"],
             fontSrc: ["'self'", "data:", "https:"],
         },
     },
@@ -233,8 +233,13 @@ app.get('/api/health', (req, res) => {
     });
 });
 
-// Redirigir raíz a landing (antes de las rutas protegidas)
+// Redirigir raíz a landing solo si NO está autenticado
 app.get('/', (req, res) => {
+    // Si es admin (tiene sesión), dejarlo pasar al dashboard
+    if (req.session.user) {
+        return next();
+    }
+    // Si no está autenticado, ir al landing
     res.redirect('/landing');
 });
 

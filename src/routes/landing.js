@@ -132,9 +132,10 @@ async function renderLandingPage(res) {
     const normalizedTracks = FALLBACK_TRACKS.map((fallback, idx) => {
         const key = normalizeTitle(fallback.title);
         const dbTrack = trackMap.get(key);
+        const trackNum = Number(fallback.trackNumber || idx + 1);
         return {
-            id: dbTrack?.id || null,
-            trackNumber: Number(fallback.trackNumber || idx + 1),
+            id: dbTrack?.id || `track_${trackNum}`,
+            trackNumber: trackNum,
             title: fallback.title,
             producer: fallback.producer,
             features: fallback.features,

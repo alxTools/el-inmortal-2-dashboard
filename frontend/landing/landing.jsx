@@ -371,6 +371,162 @@ function SubscribeModal({ isOpen, onClose, onSubmit, isSubmitting, error, detect
     );
 }
 
+// Modal del Carrito VIP (Mini-Disc)
+function CartModal({ isOpen, onClose, cartItems, setCartItems, isCheckingOut, setIsCheckingOut }) {
+    const [selectedPackage, setSelectedPackage] = useState(null);
+    
+    const packages = [
+        {
+            id: 'digital',
+            name: 'Álbum Digital',
+            description: 'Acceso completo al álbum El Inmortal 2 (21 tracks)',
+            price: 0,
+            icon: '🎵',
+            included: true
+        },
+        {
+            id: 'cd',
+            name: 'Mini-Disc Firmado',
+            description: 'Edición física limitada con firma de Galante. Incluye envío.',
+            price: 15,
+            icon: '💿',
+            bonus: 'Incluye sticker exclusivo'
+        },
+        {
+            id: 'cd-video',
+            name: 'Mini-Disc + Video Saludo',
+            description: 'Mini-Disc firmado + Video saludo personalizado de Galante (entrega 1 semana antes)',
+            price: 25,
+            icon: '🎁',
+            bonus: 'Video saludo exclusivo + Sticker + Acceso VIP'
+        }
+    ];
+    
+    const addToCart = (pkg) => {
+        if (pkg.id === 'digital') return; // Ya está incluido gratis
+        
+        const existing = cartItems.find(item => item.id === pkg.id);
+        if (existing) {
+            // Ya está en el carrito, no hacer nada o mostrar mensaje
+            return;
+        }
+        
+        setCartItems([...cartItems, pkg]);
+        setSelectedPackage(pkg.id);
+    };
+    
+    const removeFromCart = (pkgId) => {
+        setCartItems(cartItems.filter(item => item.id !== pkgId));
+        if (selectedPackage === pkgId) {
+            setSelectedPackage(null);
+        }
+    };
+    
+    const getTotal = () => {
+        return cartItems.reduce((sum, item) => sum + item.price, 0);
+    };
+    
+    const handleCheckout = async () => {
+        if (cartItems.length === 0) {
+            onClose();
+            return;
+        }
+        
+        setIsCheckingOut(true);
+        // Aquí iría la integración con Stripe/PayPal
+        // Por ahora simulamos el proceso
+        setTimeout(() => {
+            alert('🎉 Redirigiendo a checkout seguro...\n\nEn producción esto conectaría con Stripe/PayPal');
+            setIsCheckingOut(false);
+            onClose();
+        }, 1500);
+    };
+    
+    if (!isOpen) return null;
+    
+    return (
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal-content cart-modal" onClick={(e) => e.stopPropagation()}>
+                <button className="modal-close" onClick={onClose}>×</button>
+                
+                <div className="modal-header">
+                    <div className="modal-icon">🛒</div>
+                    <h2 className="modal-title">Carrito VIP</h2>
+                    <p className="modal-subtitle">
+                        🎵 Álbum Digital: <strong>GRATIS</strong> (ya incluido)
+                    </p>
+                </div>
+                
+                <div className="cart-packages">
+                    {packages.map(pkg => (
+                        <div 
+                            key={pkg.id} 
+                            className={`package-card ${pkg.included ? 'included' : ''} ${selectedPackage === pkg.id ? 'selected' : ''}`}
+                            onClick={() => !pkg.included && addToCart(pkg)}
+                        >
+                            <div className="package-icon">{pkg.icon}</div>
+                            <div className="package-info">
+                                <h3 className="package-name">
+                                    {pkg.name}
+                                    {pkg.included && <span className="badge-free">GRATIS</span>}
+                                </h3>
+                                <p className="package-description">{pkg.description}</p>
+                                {pkg.bonus && <p className="package-bonus">✨ {pkg.bonus}</p>}
+                            </div>
+                            <div className="package-price">
+                                {pkg.price === 0 ? (
+                                    <span className="price-free">$0</span>
+                                ) : (
+                                    <>
+                                        <span className="price-amount">${pkg.price}</span>
+                                        {cartItems.find(item => item.id === pkg.id) ? (
+                                            <button 
+                                                className="btn-remove"
+                                                onClick={(e) => { e.stopPropagation(); removeFromCart(pkg.id); }}
+                                            >
+                                                ✕
+                                            </button>
+                                        ) : (
+                                            <button className="btn-add">Agregar</button>
+                                        )}
+                                    </>
+                                )}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+                
+                {cartItems.length > 0 && (
+                    <div className="cart-summary">
+                        <div className="cart-total">
+                            <span>Total:</span>
+                            <span className="total-amount">${getTotal()}</span>
+                        </div>
+                        <button 
+                            className="checkout-btn"
+                            onClick={handleCheckout}
+                            disabled={isCheckingOut}
+                        >
+                            {isCheckingOut ? (
+                                <>
+                                    <span className="spinner"></span>
+                                    Procesando...
+                                </>
+                            ) : (
+                                '💳 Ir a Checkout Seguro'
+                            )}
+                        </button>
+                    </div>
+                )}
+                
+                <p className="cart-footer">
+                    🔒 Pago seguro procesado por Stripe. Entrega en 7-14 días.
+                </p>
+            </div>
+        </div>
+    );
+}
+
 function LandingApp({ data }) {
     const [countdown, setCountdown] = useState(() => getCountdown(data.releaseDate));
     const [filter, setFilter] = useState('all');
@@ -386,6 +542,11 @@ function LandingApp({ data }) {
     const [playError, setPlayError] = useState('');
     const [audioReady, setAudioReady] = useState(false);
     const audioRef = useRef(null);
+    
+    // Carrito VIP (Mini-Disc)
+    const [showCartModal, setShowCartModal] = useState(false);
+    const [cartItems, setCartItems] = useState([]);
+    const [isCheckingOut, setIsCheckingOut] = useState(false);
 
     // Detectar país por IP
     useEffect(() => {
@@ -659,6 +820,11 @@ function LandingApp({ data }) {
             setIsUnlocked(true);
             setIsModalOpen(false);
             setSubmitError('');
+            
+            // Mostrar carrito VIP después de 1 segundo
+            setTimeout(() => {
+                setShowCartModal(true);
+            }, 1000);
         } catch (error) {
             console.error('[Landing] Error:', error);
             setSubmitError(error.message || 'No se pudo registrar tu email. Intenta otra vez.');
@@ -682,6 +848,16 @@ function LandingApp({ data }) {
                 isSubmitting={isSubmitting}
                 error={submitError}
                 detectedCountry={detectedCountry}
+            />
+
+            {/* Modal del Carrito VIP */}
+            <CartModal
+                isOpen={showCartModal}
+                onClose={() => setShowCartModal(false)}
+                cartItems={cartItems}
+                setCartItems={setCartItems}
+                isCheckingOut={isCheckingOut}
+                setIsCheckingOut={setIsCheckingOut}
             />
 
             {/* Botón flotante para desbloquear */}

@@ -443,51 +443,278 @@ function CartModal({ isOpen, onClose, cartItems, setCartItems, isCheckingOut, se
     };
     
     if (!isOpen) return null;
-    
+
+    const cartStyles = {
+        overlay: {
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.85)',
+            backdropFilter: 'blur(8px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: '20px'
+        },
+        modal: {
+            background: 'linear-gradient(145deg, #0f172a 0%, #1e293b 100%)',
+            borderRadius: '24px',
+            border: '1px solid rgba(250,204,21,0.3)',
+            boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5), 0 0 40px rgba(250,204,21,0.1)',
+            maxWidth: '500px',
+            width: '100%',
+            maxHeight: '90vh',
+            overflow: 'auto',
+            position: 'relative'
+        },
+        header: {
+            padding: '32px 24px 20px',
+            textAlign: 'center',
+            borderBottom: '1px solid rgba(250,204,21,0.2)'
+        },
+        icon: {
+            fontSize: '48px',
+            marginBottom: '12px'
+        },
+        title: {
+            fontSize: '28px',
+            fontWeight: 800,
+            color: '#facc15',
+            marginBottom: '8px',
+            letterSpacing: '0.05em'
+        },
+        subtitle: {
+            color: '#94a3b8',
+            fontSize: '14px'
+        },
+        packages: {
+            padding: '24px'
+        },
+        packageCard: {
+            background: 'rgba(30,41,59,0.6)',
+            borderRadius: '16px',
+            padding: '20px',
+            marginBottom: '16px',
+            border: '2px solid transparent',
+            cursor: 'pointer',
+            transition: 'all 0.3s ease',
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: '16px',
+            position: 'relative',
+            overflow: 'hidden'
+        },
+        packageCardSelected: {
+            borderColor: '#facc15',
+            background: 'rgba(250,204,21,0.1)',
+            boxShadow: '0 0 20px rgba(250,204,21,0.2)'
+        },
+        packageCardIncluded: {
+            opacity: 0.8,
+            cursor: 'default'
+        },
+        packageIcon: {
+            fontSize: '36px',
+            flexShrink: 0
+        },
+        packageInfo: {
+            flex: 1
+        },
+        packageName: {
+            fontSize: '18px',
+            fontWeight: 700,
+            color: '#f1f5f9',
+            marginBottom: '6px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+        },
+        badgeFree: {
+            background: '#22c55e',
+            color: 'white',
+            fontSize: '10px',
+            padding: '2px 8px',
+            borderRadius: '999px',
+            fontWeight: 700
+        },
+        packageDesc: {
+            color: '#94a3b8',
+            fontSize: '13px',
+            lineHeight: 1.5,
+            marginBottom: '6px'
+        },
+        packageBonus: {
+            color: '#facc15',
+            fontSize: '12px',
+            fontWeight: 600
+        },
+        packagePrice: {
+            textAlign: 'right',
+            minWidth: '80px'
+        },
+        priceFree: {
+            color: '#22c55e',
+            fontWeight: 700,
+            fontSize: '20px'
+        },
+        priceAmount: {
+            color: '#facc15',
+            fontWeight: 800,
+            fontSize: '24px'
+        },
+        btnAdd: {
+            background: 'linear-gradient(135deg, #facc15, #fbbf24)',
+            color: '#0f172a',
+            border: 'none',
+            padding: '8px 16px',
+            borderRadius: '8px',
+            fontWeight: 700,
+            fontSize: '12px',
+            cursor: 'pointer',
+            marginTop: '8px',
+            transition: 'transform 0.2s'
+        },
+        btnRemove: {
+            background: '#ef4444',
+            color: 'white',
+            border: 'none',
+            width: '28px',
+            height: '28px',
+            borderRadius: '50%',
+            fontWeight: 700,
+            cursor: 'pointer',
+            marginTop: '8px'
+        },
+        summary: {
+            padding: '24px',
+            borderTop: '1px solid rgba(250,204,21,0.2)',
+            background: 'rgba(0,0,0,0.2)'
+        },
+        total: {
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: '16px',
+            fontSize: '20px'
+        },
+        totalAmount: {
+            color: '#facc15',
+            fontWeight: 800,
+            fontSize: '32px'
+        },
+        checkoutBtn: {
+            width: '100%',
+            background: 'linear-gradient(135deg, #facc15, #fbbf24)',
+            color: '#0f172a',
+            border: 'none',
+            padding: '16px 24px',
+            borderRadius: '12px',
+            fontWeight: 800,
+            fontSize: '16px',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+            boxShadow: '0 10px 25px rgba(250,204,21,0.3)',
+            transition: 'transform 0.2s'
+        },
+        footer: {
+            padding: '16px 24px',
+            textAlign: 'center',
+            color: '#64748b',
+            fontSize: '12px',
+            borderTop: '1px solid rgba(255,255,255,0.1)'
+        },
+        closeBtn: {
+            position: 'absolute',
+            top: '16px',
+            right: '16px',
+            background: 'rgba(255,255,255,0.1)',
+            border: 'none',
+            color: '#94a3b8',
+            width: '36px',
+            height: '36px',
+            borderRadius: '50%',
+            fontSize: '24px',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'all 0.2s'
+        },
+        popularBadge: {
+            position: 'absolute',
+            top: '12px',
+            right: '12px',
+            background: 'linear-gradient(135deg, #facc15, #fbbf24)',
+            color: '#0f172a',
+            fontSize: '10px',
+            fontWeight: 800,
+            padding: '4px 12px',
+            borderRadius: '999px',
+            textTransform: 'uppercase',
+            letterSpacing: '0.05em'
+        }
+    };
+
     return (
-        <div className="modal-overlay" onClick={onClose}>
-            <div className="modal-content cart-modal" onClick={(e) => e.stopPropagation()}>
-                <button className="modal-close" onClick={onClose}>×</button>
+        <div style={cartStyles.overlay} onClick={onClose}>
+            <div style={cartStyles.modal} onClick={(e) => e.stopPropagation()}>
+                <button style={cartStyles.closeBtn} onClick={onClose}>×</button>
                 
-                <div className="modal-header">
-                    <div className="modal-icon">🛒</div>
-                    <h2 className="modal-title">Carrito VIP</h2>
-                    <p className="modal-subtitle">
-                        🎵 Álbum Digital: <strong>GRATIS</strong> (ya incluido)
+                <div style={cartStyles.header}>
+                    <div style={cartStyles.icon}>🛒</div>
+                    <h2 style={cartStyles.title}>Carrito VIP</h2>
+                    <p style={cartStyles.subtitle}>
+                        🎵 Álbum Digital: <strong style={{color: '#22c55e'}}>GRATIS</strong> (ya incluido)
                     </p>
                 </div>
                 
-                <div className="cart-packages">
+                <div style={cartStyles.packages}>
                     {packages.map(pkg => (
                         <div 
                             key={pkg.id} 
-                            className={`package-card ${pkg.included ? 'included' : ''} ${selectedPackage === pkg.id ? 'selected' : ''}`}
+                            style={{
+                                ...cartStyles.packageCard,
+                                ...(pkg.included ? cartStyles.packageCardIncluded : {}),
+                                ...(cartItems.find(item => item.id === pkg.id) || selectedPackage === pkg.id ? cartStyles.packageCardSelected : {})
+                            }}
                             onClick={() => !pkg.included && addToCart(pkg)}
                         >
-                            <div className="package-icon">{pkg.icon}</div>
-                            <div className="package-info">
-                                <h3 className="package-name">
+                            {pkg.id === 'cd-video' && <span style={cartStyles.popularBadge}>Más Popular</span>}
+                            <div style={cartStyles.packageIcon}>{pkg.icon}</div>
+                            <div style={cartStyles.packageInfo}>
+                                <h3 style={cartStyles.packageName}>
                                     {pkg.name}
-                                    {pkg.included && <span className="badge-free">GRATIS</span>}
+                                    {pkg.included && <span style={cartStyles.badgeFree}>GRATIS</span>}
                                 </h3>
-                                <p className="package-description">{pkg.description}</p>
-                                {pkg.bonus && <p className="package-bonus">✨ {pkg.bonus}</p>}
+                                <p style={cartStyles.packageDesc}>{pkg.description}</p>
+                                {pkg.bonus && <p style={cartStyles.packageBonus}>✨ {pkg.bonus}</p>}
                             </div>
-                            <div className="package-price">
+                            <div style={cartStyles.packagePrice}>
                                 {pkg.price === 0 ? (
-                                    <span className="price-free">$0</span>
+                                    <span style={cartStyles.priceFree}>$0</span>
                                 ) : (
                                     <>
-                                        <span className="price-amount">${pkg.price}</span>
+                                        <span style={cartStyles.priceAmount}>${pkg.price}</span>
                                         {cartItems.find(item => item.id === pkg.id) ? (
                                             <button 
-                                                className="btn-remove"
+                                                style={cartStyles.btnRemove}
                                                 onClick={(e) => { e.stopPropagation(); removeFromCart(pkg.id); }}
+                                                onMouseEnter={(e) => e.target.style.transform = 'scale(1.1)'}
+                                                onMouseLeave={(e) => e.target.style.transform = 'scale(1)'}
                                             >
                                                 ✕
                                             </button>
                                         ) : (
-                                            <button className="btn-add">Agregar</button>
+                                            <button 
+                                                style={cartStyles.btnAdd}
+                                                onMouseEnter={(e) => e.target.style.transform = 'translateY(-2px)'}
+                                                onMouseLeave={(e) => e.target.style.transform = 'translateY(0)'}
+                                            >
+                                                Agregar
+                                            </button>
                                         )}
                                     </>
                                 )}
@@ -497,19 +724,32 @@ function CartModal({ isOpen, onClose, cartItems, setCartItems, isCheckingOut, se
                 </div>
                 
                 {cartItems.length > 0 && (
-                    <div className="cart-summary">
-                        <div className="cart-total">
-                            <span>Total:</span>
-                            <span className="total-amount">${getTotal()}</span>
+                    <div style={cartStyles.summary}>
+                        <div style={cartStyles.total}>
+                            <span style={{color: '#94a3b8'}}>Total:</span>
+                            <span style={cartStyles.totalAmount}>${getTotal()}</span>
                         </div>
                         <button 
-                            className="checkout-btn"
+                            style={{
+                                ...cartStyles.checkoutBtn,
+                                opacity: isCheckingOut ? 0.7 : 1,
+                                cursor: isCheckingOut ? 'not-allowed' : 'pointer'
+                            }}
                             onClick={handleCheckout}
                             disabled={isCheckingOut}
+                            onMouseEnter={(e) => !isCheckingOut && (e.target.style.transform = 'translateY(-2px)')}
+                            onMouseLeave={(e) => !isCheckingOut && (e.target.style.transform = 'translateY(0)')}
                         >
                             {isCheckingOut ? (
                                 <>
-                                    <span className="spinner"></span>
+                                    <span style={{
+                                        width: '20px',
+                                        height: '20px',
+                                        border: '3px solid rgba(15,23,42,0.3)',
+                                        borderTopColor: '#0f172a',
+                                        borderRadius: '50%',
+                                        animation: 'spin 1s linear infinite'
+                                    }}></span>
                                     Procesando...
                                 </>
                             ) : (
@@ -519,7 +759,7 @@ function CartModal({ isOpen, onClose, cartItems, setCartItems, isCheckingOut, se
                     </div>
                 )}
                 
-                <p className="cart-footer">
+                <p style={cartStyles.footer}>
                     🔒 Pago seguro procesado por Stripe. Entrega en 7-14 días.
                 </p>
             </div>

@@ -320,6 +320,9 @@ router.post('/subscribe', async (req, res) => {
     }
 });
 
+// Variable para mantener el número más alto mostrado (nunca baja)
+let highestDisplayedCount = 15000; // Número base inicial
+
 router.get('/stats', async (_req, res) => {
     try {
         // Obtener estadísticas unificadas de todas las fuentes
@@ -328,49 +331,36 @@ router.get('/stats', async (_req, res) => {
         // NÚMERO REAL (para logs internos)
         const realTotal = stats.total || 0;
         
-        // Multiplicador aleatorio entre 15 y 20 para efecto viral
-        const multiplier = 15 + Math.random() * 5; // Entre 15 y 20
-        const inflatedTotal = Math.floor(realTotal * multiplier);
+        // Calcular número inflado basado en real
+        const baseInflated = Math.floor(realTotal * 18); // Multiplicador fijo de 18x
+        
+        // Agregar incremento aleatorio pequeño (0-50) para simular actividad
+        const randomIncrement = Math.floor(Math.random() * 50);
+        const newTotal = baseInflated + randomIncrement;
+        
+        // Solo actualizar si es mayor (nunca baja)
+        if (newTotal > highestDisplayedCount) {
+            highestDisplayedCount = newTotal;
+        }
         
         // Log para que veas el número real
-        console.log(`[Landing Stats] Real: ${realTotal} | Mostrado: ${inflatedTotal} | Multiplicador: ${multiplier.toFixed(2)}x`);
+        console.log(`[Landing Stats] Real: ${realTotal} | Mostrado: ${highestDisplayedCount}`);
         
         return res.json({
-            totalLeads: inflatedTotal,
+            totalLeads: highestDisplayedCount,
             localLeads: stats.local,
             wordpressSites: stats.wordpress,
             topCountries: stats.topCountries || []
         });
     } catch (error) {
         console.error('Landing stats error:', error);
-        // Fallback a solo datos locales
-        try {
-            await ensureLandingLeadsTable();
-            const total = await getOne('SELECT COUNT(*) AS total FROM landing_email_leads');
-            const topCountries = await getAll(
-                `SELECT country, COUNT(*) AS total
-                 FROM landing_email_leads
-                 WHERE country IS NOT NULL AND country <> ''
-                 GROUP BY country
-                 ORDER BY total DESC
-                 LIMIT 6`
-            );
-            
-            const realTotal = total?.total || 0;
-            const multiplier = 15 + Math.random() * 5;
-            const inflatedTotal = Math.floor(realTotal * multiplier);
-            
-            console.log(`[Landing Stats - Fallback] Real: ${realTotal} | Mostrado: ${inflatedTotal} | Multiplicador: ${multiplier.toFixed(2)}x`);
-            
-            return res.json({
-                totalLeads: inflatedTotal,
-                localLeads: realTotal,
-                wordpressSites: [],
-                topCountries: topCountries || []
-            });
-        } catch (fallbackError) {
-            return res.status(500).json({ error: 'stats_error' });
-        }
+        // Fallback - devolver el número más alto conocido
+        return res.json({
+            totalLeads: highestDisplayedCount,
+            localLeads: 0,
+            wordpressSites: [],
+            topCountries: []
+        });
     }
 });
 

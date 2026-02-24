@@ -543,19 +543,28 @@ function LandingApp({ data }) {
                         {data.description}
                     </p>
 
-                    <div className="mt-8 flex flex-wrap gap-3">
-                        <a
-                            href={data.streamingLinks.spotify || '#'}
-                            className="rounded-full bg-amber-400 px-6 py-3 text-sm font-semibold uppercase tracking-[0.12em] text-slate-950 transition hover:bg-amber-300"
-                        >
-                            Escuchar en Spotify
-                        </a>
-                        <a
-                            href={data.streamingLinks.youtubeMusic || '#'}
-                            className="rounded-full border border-cyan-300/45 bg-cyan-400/10 px-6 py-3 text-sm font-semibold uppercase tracking-[0.12em] text-cyan-100 transition hover:border-cyan-200 hover:bg-cyan-300/20"
-                        >
-                            Ver en YouTube Music
-                        </a>
+                    <div className="mt-8 flex flex-wrap items-center gap-4">
+                        <span className="text-xs uppercase tracking-[0.2em] text-slate-400">Disponible en:</span>
+                        <div className="flex gap-3">
+                            <a href={data.streamingLinks.spotify || '#'} className="flex h-11 w-11 items-center justify-center rounded-full bg-[#1DB954] text-white transition hover:scale-110 hover:shadow-lg" title="Spotify">
+                                <svg className="h-6 w-6" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>
+                            </a>
+                            <a href={data.streamingLinks.youtubeMusic || '#'} className="flex h-11 w-11 items-center justify-center rounded-full bg-[#FF0000] text-white transition hover:scale-110 hover:shadow-lg" title="YouTube Music">
+                                <svg className="h-6 w-6" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0C5.376 0 0 5.376 0 12s5.376 12 12 12 12-5.376 12-12S18.624 0 12 0zm0 19.104c-3.924 0-7.104-3.18-7.104-7.104S8.076 4.896 12 4.896s7.104 3.18 7.104 7.104-3.18 7.104-7.104 7.104zm0-13.332c-3.432 0-6.228 2.796-6.228 6.228S8.568 18.228 12 18.228 18.228 15.432 18.228 12 15.432 5.772 12 5.772zM9.684 15.852V8.148L15.816 12l-6.132 3.852z"/></svg>
+                            </a>
+                            <a href={data.streamingLinks.appleMusic || '#'} className="flex h-11 w-11 items-center justify-center rounded-full bg-[#FA243C] text-white transition hover:scale-110 hover:shadow-lg" title="Apple Music">
+                                <svg className="h-6 w-6" fill="currentColor" viewBox="0 0 24 24"><path d="M23.994 6.124a9.23 9.23 0 00-.24-2.19c-.317-1.31-1.062-2.31-2.18-3.043a5.022 5.022 0 00-1.877-.726 10.496 10.496 0 00-1.564-.15c-.04-.003-.083-.01-.124-.013H5.986c-.152.01-.303.017-.455.026-.747.043-1.49.123-2.214.265-1.333.272-2.397.918-3.062 2.065a4.845 4.845 0 00-.676 1.992 9.51 9.51 0 00-.099 1.114c-.004.064-.01.13-.01.195v8.16c.01.12.017.242.024.363.04.718.106 1.435.238 2.144.24 1.27.793 2.273 1.805 3.02.913.672 1.955 1.012 3.082 1.147.737.09 1.48.153 2.22.177.18.01.363.014.543.014h11.19c.065-.003.133-.01.195-.012.798-.024 1.596-.086 2.385-.208 1.21-.19 2.235-.666 3.026-1.505.684-.726 1.078-1.59 1.23-2.59.06-.417.093-.84.108-1.265.01-.134.02-.269.02-.404V6.514c0-.135-.01-.269-.02-.39zm-6.5 6.044l-4.6 3.24c-.24.17-.54.186-.78.04-.06-.04-.11-.09-.15-.146V7.4c.02-.06.06-.12.1-.17.16-.16.4-.19.6-.08l4.59 3.23c.04.03.07.07.1.11.12.2.12.44-.02.64-.04.04-.08.08-.13.11l.19.14z"/></svg>
+                            </a>
+                            <a href={data.streamingLinks.deezer || '#'} className="flex h-11 w-11 items-center justify-center rounded-full bg-[#FF0000] text-white transition hover:scale-110 hover:shadow-lg" title="Deezer">
+                                <svg className="h-6 w-6" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.6 0 12 0zm4.8 16.8h-2.4v-4.8H12v4.8H9.6v-4.8H7.2v4.8H4.8V7.2h2.4v4.8h2.4V7.2H12v4.8h2.4V7.2h2.4v9.6z"/></svg>
+                            </a>
+                            <a href={data.streamingLinks.amazonMusic || '#'} className="flex h-11 w-11 items-center justify-center rounded-full bg-[#00A8E1] text-white transition hover:scale-110 hover:shadow-lg" title="Amazon Music">
+                                <svg className="h-6 w-6" fill="currentColor" viewBox="0 0 24 24"><path d="M.045 18.02c.072-.116.187-.124.348-.022 3.636 2.11 7.594 3.166 11.87 3.166 2.852 0 5.668-.533 8.447-1.582l.315-.118c.138-.053.209-.053.276 0 .053.043.072.115.043.206-.138.548-.206.986-.206 1.314 0 1.507 1.186 2.666 2.68 2.666.434 0 .872-.108 1.308-.339.051-.023.107-.023.152 0 .044.021.067.064.067.118 0 .06-.024.098-.067.126-1.13.77-2.41 1.206-3.79 1.206-1.45 0-2.76-.47-3.93-1.41-.39-.32-.8-.53-1.23-.64-.43-.11-.84-.05-1.24.17-2.27 1.35-4.79 2.02-7.56 2.02-2.4 0-4.65-.5-6.75-1.51-.55-.26-.93-.35-1.14-.26-.21.09-.33.3-.38.64-.05.34-.18.6-.38.8-.2.2-.5.3-.9.3-.76 0-1.39-.27-1.88-.82-.5-.55-.75-1.22-.75-2.03 0-.57.14-1.18.41-1.83.27-.65.66-1.29 1.15-1.93zm5.19-1.65c-.12-.063-.18-.142-.18-.237 0-.06.02-.12.06-.18l2.32-3.17c.08-.11.18-.16.3-.16.12 0 .22.05.3.16l2.32 3.17c.04.06.06.12.06.18 0 .095-.06.174-.18.237l-.48.27c-.12.063-.22.063-.3 0-.08-.063-.12-.142-.12-.237v-1.8h-2.86v1.8c0 .095-.04.174-.12.237-.08.063-.18.063-.3 0l-.48-.27zm4.99 0c-.12-.063-.18-.142-.18-.237 0-.06.02-.12.06-.18l2.32-3.17c.08-.11.18-.16.3-.16.12 0 .22.05.3.16l2.32 3.17c.04.06.06.12.06.18 0 .095-.06.174-.18.237l-.48.27c-.12.063-.22.063-.3 0-.08-.063-.12-.142-.12-.237v-1.8h-2.86v1.8c0 .095-.04.174-.12.237-.08.063-.18.063-.3 0l-.48-.27z"/></svg>
+                            </a>
+                            <a href={data.streamingLinks.tidal || '#'} className="flex h-11 w-11 items-center justify-center rounded-full bg-black text-white transition hover:scale-110 hover:shadow-lg" title="Tidal">
+                                <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12.012 0L6.555 5.447l5.457 5.454L6.555 16.35l5.457 5.454 5.463-5.454-5.463-5.449 5.463-5.454L12.012 0zm5.463 5.447l-5.463 5.454 5.463 5.449-5.457 5.454L6.555 16.35l5.463-5.454-5.463-5.449L12.018 0l5.457 5.447z"/></svg>
+                            </a>
+                        </div>
                     </div>
                 </div>
 

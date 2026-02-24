@@ -50,6 +50,13 @@
                 </div>
             </form>
         </div>
+        
+        <!-- Sección de subida masiva (aparece después de crear el álbum) -->
+        <div id="bulkUploadSection" style="display: none; margin-top: 30px;" class="section">
+            <h3 style="color: #ffd700; margin-bottom: 20px;">📤 Subir Temas en Lote</h3>
+            <p style="color: #888; margin-bottom: 15px;">Sube múltiples archivos de audio para este álbum</p>
+            <a id="bulkUploadLink" href="#" class="btn" style="display: inline-block;">🎵 Ir a Subida Masiva</a>
+        </div>
     </div>
 
     <%- include('../partials/footer') %>
@@ -78,10 +85,17 @@
                 
                 const result = await response.json();
                 
-                if (response.ok && result.success) {
-                    window.location.href = '/albums';
+                if (response.ok && result.data) {
+                    // Mostrar opción de subida masiva
+                    document.getElementById('bulkUploadSection').style.display = 'block';
+                    document.getElementById('bulkUploadLink').href = `/bulk-upload?album_id=${result.data.id}`;
+                    
+                    // Scroll a la sección de subida
+                    document.getElementById('bulkUploadSection').scrollIntoView({ behavior: 'smooth' });
+                    
+                    alert('✅ Álbum creado exitosamente. Ahora puedes subir los temas en la sección de abajo.');
                 } else {
-                    alert('Error: ' + (result.error || 'Error al crear álbum'));
+                    alert('Error: ' + (result.error || result.message || 'Error al crear álbum'));
                 }
             } catch (error) {
                 console.error('Error:', error);

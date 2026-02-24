@@ -233,6 +233,11 @@ app.get('/api/health', (req, res) => {
     });
 });
 
+// Redirigir raíz a landing (antes de las rutas protegidas)
+app.get('/', (req, res) => {
+    res.redirect('/landing');
+});
+
 // Protected routes (auth required)
 app.use('/', requireAuth, indexRouter);
 app.use('/tracks', requireAuth, tracksRouter);

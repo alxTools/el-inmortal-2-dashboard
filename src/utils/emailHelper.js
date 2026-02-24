@@ -72,6 +72,7 @@ async function sendWelcomeEmail({ to, name, country }) {
                             <!-- Header -->
                             <tr>
                                 <td style="background:linear-gradient(135deg, rgba(250,204,21,0.2), rgba(15,23,42,0.8));padding:40px 30px;text-align:center;border-bottom:2px solid rgba(250,204,21,0.5);">
+                                    <img src="https://galantealx.com/images/logo.png" alt="Galante el Emperador" style="max-width:120px;height:auto;margin-bottom:20px;border-radius:50%;" />
                                     <h1 style="color:#facc15;font-size:32px;margin:0;font-weight:bold;letter-spacing:2px;">EL INMORTAL 2</h1>
                                     <p style="color:#e2e8f0;margin:10px 0 0 0;font-size:16px;">Galante el Emperador</p>
                                 </td>
@@ -88,9 +89,9 @@ async function sendWelcomeEmail({ to, name, country }) {
                                     
                                     <div style="background:rgba(250,204,21,0.1);border:1px solid rgba(250,204,21,0.3);border-radius:12px;padding:25px;margin:25px 0;text-align:center;">
                                         <p style="color:#facc15;font-size:18px;margin:0 0 15px 0;font-weight:bold;">🔓 Tu acceso está desbloqueado</p>
-                                        <a href="https://galantealx.com/ei2" 
+                                        <a href="https://ei2.galantealx.com/landing" 
                                            style="display:inline-block;background:linear-gradient(135deg,#facc15,#fbbf24);color:#0f172a;text-decoration:none;padding:15px 30px;border-radius:50px;font-weight:bold;font-size:16px;">
-                                            🎧 Escuchar el Álbum Ahora
+                                             🎧 Escuchar el Álbum Ahora
                                         </a>
                                     </div>
                                     

@@ -1,5 +1,166 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { createRoot } from 'react-dom/client';
+
+// ========================================
+// AUDIO WAVES BACKGROUND COMPONENT
+// ========================================
+function AudioWavesBackground() {
+    const bars = useMemo(() => {
+        return Array.from({ length: 60 }, (_, i) => ({
+            id: i,
+            minHeight: 10 + Math.random() * 30,
+            maxHeight: 60 + Math.random() * 140,
+            duration: 0.8 + Math.random() * 1.2,
+            delay: Math.random() * 2
+        }));
+    }, []);
+
+    return (
+        <div className="audio-waves-container">
+            <div className="audio-waves">
+                {bars.map((bar) => (
+                    <div
+                        key={bar.id}
+                        className="audio-bar"
+                        style={{
+                            '--min-height': `${bar.minHeight}px`,
+                            '--max-height': `${bar.maxHeight}px`,
+                            '--duration': `${bar.duration}s`,
+                            '--delay': `${bar.delay}s`
+                        }}
+                    />
+                ))}
+            </div>
+        </div>
+    );
+}
+
+// ========================================
+// FLOATING PARTICLES COMPONENT
+// ========================================
+function FloatingParticles() {
+    const particles = useMemo(() => {
+        return Array.from({ length: 20 }, (_, i) => ({
+            id: i,
+            left: Math.random() * 100,
+            duration: 15 + Math.random() * 20,
+            delay: Math.random() * 10,
+            size: 2 + Math.random() * 4
+        }));
+    }, []);
+
+    return (
+        <div className="particles-container">
+            {particles.map((p) => (
+                <div
+                    key={p.id}
+                    className="particle"
+                    style={{
+                        left: `${p.left}%`,
+                        width: `${p.size}px`,
+                        height: `${p.size}px`,
+                        '--duration': `${p.duration}s`,
+                        animationDelay: `${p.delay}s`
+                    }}
+                />
+            ))}
+        </div>
+    );
+}
+
+// ========================================
+// 3D TILT COVER COMPONENT
+// ========================================
+function Cover3D({ src, alt }) {
+    const coverRef = useRef(null);
+
+    const handleMouseMove = useCallback((e) => {
+        const cover = coverRef.current;
+        if (!cover) return;
+
+        const rect = cover.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        const centerX = rect.width / 2;
+        const centerY = rect.height / 2;
+
+        const rotateX = (y - centerY) / 10;
+        const rotateY = (centerX - x) / 10;
+
+        cover.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale3d(1.02, 1.02, 1.02)`;
+    }, []);
+
+    const handleMouseLeave = useCallback(() => {
+        const cover = coverRef.current;
+        if (cover) {
+            cover.style.transform = 'perspective(1000px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)';
+        }
+    }, []);
+
+    return (
+        <div className="cover-3d-container">
+            <div
+                ref={coverRef}
+                className="cover-3d"
+                onMouseMove={handleMouseMove}
+                onMouseLeave={handleMouseLeave}
+            >
+                <img src={src} alt={alt} />
+            </div>
+        </div>
+    );
+}
+
+// ========================================
+// TYPING TEXT COMPONENT
+// ========================================
+function TypingText({ text, className = '' }) {
+    const [displayText, setDisplayText] = useState('');
+    const [showCursor, setShowCursor] = useState(true);
+
+    useEffect(() => {
+        let index = 0;
+        const timer = setInterval(() => {
+            if (index < text.length) {
+                setDisplayText(text.slice(0, index + 1));
+                index++;
+            } else {
+                clearInterval(timer);
+                // Keep cursor blinking after typing is done
+            }
+        }, 80);
+
+        const cursorTimer = setInterval(() => {
+            setShowCursor((prev) => !prev);
+        }, 500);
+
+        return () => {
+            clearInterval(timer);
+            clearInterval(cursorTimer);
+        };
+    }, [text]);
+
+    return (
+        <span className={className}>
+            {displayText}
+            <span style={{ opacity: showCursor ? 1 : 0, color: '#facc15' }}>|</span>
+        </span>
+    );
+}
+
+// ========================================
+// SCROLL INDICATOR COMPONENT
+// ========================================
+function ScrollIndicator() {
+    return (
+        <div className="scroll-indicator">
+            <span>Scroll</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M12 5v14M5 12l7 7 7-7" />
+            </svg>
+        </div>
+    );
+}
 
 const DEFAULT_LANDING_DATA = {
     albumName: 'El Inmortal 2',
@@ -501,7 +662,10 @@ function LandingApp({ data }) {
     };
 
     return (
-        <main className="relative overflow-hidden pb-20 text-slate-100">
+        <main className="relative overflow-hidden text-slate-100">
+            {/* Background Effects */}
+            <AudioWavesBackground />
+            <FloatingParticles />
             <div className="hero-aurora" />
 
             {/* Modal de registro */}
@@ -525,91 +689,141 @@ function LandingApp({ data }) {
                 </button>
             )}
 
-            <section className="mx-auto grid w-full max-w-6xl gap-8 px-6 pt-12 md:px-10 md:pt-16 lg:grid-cols-[1.15fr,0.85fr] lg:items-end">
-                <div className="reveal">
-                    <p className="mb-4 inline-flex items-center gap-2 rounded-full border border-amber-200/25 bg-amber-300/10 px-4 py-1 text-xs uppercase tracking-[0.2em] text-amber-200">
-                        Nuevo album oficial
+            {/* ========================================
+                HERO SECTION - FULLSCREEN
+                ======================================== */}
+            <section className="hero-fullscreen">
+                <div className="reveal mb-6">
+                    <p className="inline-flex items-center gap-2 rounded-full border border-amber-200/30 bg-amber-300/10 px-5 py-2 text-xs uppercase tracking-[0.25em] text-amber-200 backdrop-blur-sm">
+                        <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-amber-400"></span>
+                        Nuevo Album Oficial
                     </p>
+                </div>
 
-                    <h1 className="font-display text-6xl leading-[0.88] text-white md:text-7xl lg:text-8xl">
-                        {data.albumName}
-                    </h1>
+                {/* Album Title with Glitch Effect */}
+                <h1 
+                    className="font-display text-6xl leading-[0.9] text-white md:text-8xl lg:text-9xl glitch-text reveal reveal-delay-1"
+                    data-text={data.albumName}
+                >
+                    {data.albumName}
+                </h1>
 
-                    <p className="mt-2 text-base font-medium uppercase tracking-[0.16em] text-cyan-200/85 md:text-lg">
-                        {data.artistName}
-                    </p>
+                {/* Artist Name */}
+                <p className="mt-4 text-lg font-medium uppercase tracking-[0.25em] text-cyan-300 md:text-xl reveal reveal-delay-2">
+                    <TypingText text={data.artistName} />
+                </p>
 
-                    <p className="mt-6 max-w-2xl text-sm leading-7 text-slate-300 md:text-base">
-                        {data.description}
-                    </p>
+                {/* 3D Cover */}
+                <div className="mt-10 reveal reveal-delay-2">
+                    <Cover3D 
+                        src={data.coverImage} 
+                        alt={`${data.albumName} cover art`} 
+                    />
+                </div>
 
-                    <div className="mt-8 flex flex-wrap items-center gap-4">
-                        <span className="text-xs uppercase tracking-[0.2em] text-slate-400">Disponible en:</span>
-                        <div className="flex gap-3">
-                            <a href={data.streamingLinks.spotify || '#'} className="flex h-11 w-11 items-center justify-center rounded-full bg-[#1DB954] text-white transition hover:scale-110 hover:shadow-lg" title="Spotify">
-                                <svg className="h-6 w-6" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>
-                            </a>
-                            <a href={data.streamingLinks.youtubeMusic || '#'} className="flex h-11 w-11 items-center justify-center rounded-full bg-[#FF0000] text-white transition hover:scale-110 hover:shadow-lg" title="YouTube Music">
-                                <svg className="h-6 w-6" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0C5.376 0 0 5.376 0 12s5.376 12 12 12 12-5.376 12-12S18.624 0 12 0zm0 19.104c-3.924 0-7.104-3.18-7.104-7.104S8.076 4.896 12 4.896s7.104 3.18 7.104 7.104-3.18 7.104-7.104 7.104zm0-13.332c-3.432 0-6.228 2.796-6.228 6.228S8.568 18.228 12 18.228 18.228 15.432 18.228 12 15.432 5.772 12 5.772zM9.684 15.852V8.148L15.816 12l-6.132 3.852z"/></svg>
-                            </a>
-                            <a href={data.streamingLinks.appleMusic || '#'} className="flex h-11 w-11 items-center justify-center rounded-full bg-[#FA243C] text-white transition hover:scale-110 hover:shadow-lg" title="Apple Music">
-                                <svg className="h-6 w-6" fill="currentColor" viewBox="0 0 24 24"><path d="M23.994 6.124a9.23 9.23 0 00-.24-2.19c-.317-1.31-1.062-2.31-2.18-3.043a5.022 5.022 0 00-1.877-.726 10.496 10.496 0 00-1.564-.15c-.04-.003-.083-.01-.124-.013H5.986c-.152.01-.303.017-.455.026-.747.043-1.49.123-2.214.265-1.333.272-2.397.918-3.062 2.065a4.845 4.845 0 00-.676 1.992 9.51 9.51 0 00-.099 1.114c-.004.064-.01.13-.01.195v8.16c.01.12.017.242.024.363.04.718.106 1.435.238 2.144.24 1.27.793 2.273 1.805 3.02.913.672 1.955 1.012 3.082 1.147.737.09 1.48.153 2.22.177.18.01.363.014.543.014h11.19c.065-.003.133-.01.195-.012.798-.024 1.596-.086 2.385-.208 1.21-.19 2.235-.666 3.026-1.505.684-.726 1.078-1.59 1.23-2.59.06-.417.093-.84.108-1.265.01-.134.02-.269.02-.404V6.514c0-.135-.01-.269-.02-.39zm-6.5 6.044l-4.6 3.24c-.24.17-.54.186-.78.04-.06-.04-.11-.09-.15-.146V7.4c.02-.06.06-.12.1-.17.16-.16.4-.19.6-.08l4.59 3.23c.04.03.07.07.1.11.12.2.12.44-.02.64-.04.04-.08.08-.13.11l.19.14z"/></svg>
-                            </a>
-                            <a href={data.streamingLinks.deezer || '#'} className="flex h-11 w-11 items-center justify-center rounded-full bg-[#FF0000] text-white transition hover:scale-110 hover:shadow-lg" title="Deezer">
-                                <svg className="h-6 w-6" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.6 0 12 0zm4.8 16.8h-2.4v-4.8H12v4.8H9.6v-4.8H7.2v4.8H4.8V7.2h2.4v4.8h2.4V7.2H12v4.8h2.4V7.2h2.4v9.6z"/></svg>
-                            </a>
-                            <a href={data.streamingLinks.amazonMusic || '#'} className="flex h-11 w-11 items-center justify-center rounded-full bg-[#00A8E1] text-white transition hover:scale-110 hover:shadow-lg" title="Amazon Music">
-                                <svg className="h-6 w-6" fill="currentColor" viewBox="0 0 24 24"><path d="M.045 18.02c.072-.116.187-.124.348-.022 3.636 2.11 7.594 3.166 11.87 3.166 2.852 0 5.668-.533 8.447-1.582l.315-.118c.138-.053.209-.053.276 0 .053.043.072.115.043.206-.138.548-.206.986-.206 1.314 0 1.507 1.186 2.666 2.68 2.666.434 0 .872-.108 1.308-.339.051-.023.107-.023.152 0 .044.021.067.064.067.118 0 .06-.024.098-.067.126-1.13.77-2.41 1.206-3.79 1.206-1.45 0-2.76-.47-3.93-1.41-.39-.32-.8-.53-1.23-.64-.43-.11-.84-.05-1.24.17-2.27 1.35-4.79 2.02-7.56 2.02-2.4 0-4.65-.5-6.75-1.51-.55-.26-.93-.35-1.14-.26-.21.09-.33.3-.38.64-.05.34-.18.6-.38.8-.2.2-.5.3-.9.3-.76 0-1.39-.27-1.88-.82-.5-.55-.75-1.22-.75-2.03 0-.57.14-1.18.41-1.83.27-.65.66-1.29 1.15-1.93zm5.19-1.65c-.12-.063-.18-.142-.18-.237 0-.06.02-.12.06-.18l2.32-3.17c.08-.11.18-.16.3-.16.12 0 .22.05.3.16l2.32 3.17c.04.06.06.12.06.18 0 .095-.06.174-.18.237l-.48.27c-.12.063-.22.063-.3 0-.08-.063-.12-.142-.12-.237v-1.8h-2.86v1.8c0 .095-.04.174-.12.237-.08.063-.18.063-.3 0l-.48-.27zm4.99 0c-.12-.063-.18-.142-.18-.237 0-.06.02-.12.06-.18l2.32-3.17c.08-.11.18-.16.3-.16.12 0 .22.05.3.16l2.32 3.17c.04.06.06.12.06.18 0 .095-.06.174-.18.237l-.48.27c-.12.063-.22.063-.3 0-.08-.063-.12-.142-.12-.237v-1.8h-2.86v1.8c0 .095-.04.174-.12.237-.08.063-.18.063-.3 0l-.48-.27z"/></svg>
-                            </a>
-                            <a href={data.streamingLinks.tidal || '#'} className="flex h-11 w-11 items-center justify-center rounded-full bg-black text-white transition hover:scale-110 hover:shadow-lg" title="Tidal">
-                                <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12.012 0L6.555 5.447l5.457 5.454L6.555 16.35l5.457 5.454 5.463-5.454-5.463-5.449 5.463-5.454L12.012 0zm5.463 5.447l-5.463 5.454 5.463 5.449-5.457 5.454L6.555 16.35l5.463-5.454-5.463-5.449L12.018 0l5.457 5.447z"/></svg>
-                            </a>
-                        </div>
+                {/* Stats Row */}
+                <div className="mt-10 flex flex-wrap items-center justify-center gap-8 md:gap-12 reveal reveal-delay-3">
+                    <div className="text-center">
+                        <p className="stat-number">{data.stats.totalTracks || 21}</p>
+                        <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Tracks</p>
+                    </div>
+                    <div className="h-12 w-px bg-gradient-to-b from-transparent via-slate-600 to-transparent"></div>
+                    <div className="text-center">
+                        <p className="stat-number">{data.stats.collaborators || 24}</p>
+                        <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Colaboradores</p>
+                    </div>
+                    <div className="h-12 w-px bg-gradient-to-b from-transparent via-slate-600 to-transparent"></div>
+                    <div className="text-center">
+                        <p className="stat-number">{data.stats.featuredTracks || 11}</p>
+                        <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Featurings</p>
                     </div>
                 </div>
 
-                <aside className="glass-panel reveal reveal-delay-1 rounded-3xl p-5 shadow-stage md:p-6">
-                    <div className="overflow-hidden rounded-2xl border border-slate-100/10 bg-slate-950/65">
-                        <img
-                            src={data.coverImage}
-                            alt={`${data.albumName} cover art`}
-                            className="h-full min-h-[280px] w-full object-cover"
-                        />
-                    </div>
+                {/* CTA Buttons */}
+                <div className="mt-10 flex flex-wrap items-center justify-center gap-4 reveal reveal-delay-3">
+                    {!isUnlocked ? (
+                        <button 
+                            onClick={() => setIsModalOpen(true)}
+                            className="btn-neon"
+                        >
+                            <span>🔓</span>
+                            <span>Desbloquear Álbum</span>
+                        </button>
+                    ) : (
+                        <a href="#tracklist" className="btn-neon">
+                            <span>🎵</span>
+                            <span>Ver Tracklist</span>
+                        </a>
+                    )}
+                    <a href="#streaming" className="btn-neon btn-neon-cyan">
+                        <span>▶</span>
+                        <span>Escuchar Ahora</span>
+                    </a>
+                </div>
 
-                    <div className="mt-4 rounded-2xl border border-white/10 bg-slate-900/65 p-4">
-                        <p className="text-[11px] uppercase tracking-[0.2em] text-slate-400">Release</p>
-                        <p className="mt-2 text-sm font-semibold capitalize text-slate-100">{releaseDateLabel}</p>
-                        {countdown.launched ? (
-                            <p className="mt-3 text-sm font-semibold text-emerald-300">El album ya esta activo en plataformas.</p>
-                        ) : (
-                            <p className="mt-3 text-sm text-slate-300">
-                                Faltan{' '}
-                                <span className="font-semibold text-amber-300">{countdown.days}d</span>{' '}
-                                <span className="font-semibold text-cyan-200">{countdown.hours}h</span>{' '}
-                                <span className="font-semibold text-slate-100">{countdown.minutes}m</span>
-                            </p>
-                        )}
-                    </div>
-                </aside>
+                {/* Release Date Badge */}
+                <div className="mt-8 glass-panel-enhanced px-6 py-4 reveal reveal-delay-3">
+                    {countdown.launched ? (
+                        <p className="text-sm font-semibold text-emerald-400">
+                            <span className="mr-2">✓</span>
+                            Ya disponible en todas las plataformas
+                        </p>
+                    ) : (
+                        <p className="text-sm text-slate-300">
+                            <span className="text-slate-500 mr-2">Lanzamiento:</span>
+                            <span className="font-semibold text-white">{releaseDateLabel}</span>
+                            <span className="mx-3 text-slate-600">|</span>
+                            <span className="font-semibold text-amber-300">{countdown.days}d</span>{' '}
+                            <span className="font-semibold text-cyan-300">{countdown.hours}h</span>{' '}
+                            <span className="font-semibold text-slate-300">{countdown.minutes}m</span>
+                        </p>
+                    )}
+                </div>
+
+                <ScrollIndicator />
             </section>
 
-            <section className="mx-auto mt-8 grid w-full max-w-6xl gap-4 px-6 md:mt-10 md:grid-cols-3 md:px-10">
-                {cards.map((card, index) => (
-                    <article
-                        key={card.label}
-                        className={`glass-panel reveal rounded-2xl p-5 reveal-delay-${Math.min(index + 1, 3)}`}
-                    >
-                        <p className="text-[11px] uppercase tracking-[0.2em] text-slate-300">{card.label}</p>
-                        <p className="mt-2 text-4xl font-semibold text-white">{card.value}</p>
-                        <p className="mt-2 text-xs uppercase tracking-[0.12em] text-slate-400">{card.detail}</p>
-                    </article>
-                ))}
+            {/* ========================================
+                STREAMING PLATFORMS SECTION
+                ======================================== */}
+            <section id="streaming" className="relative z-10 py-16 px-6">
+                <div className="mx-auto max-w-4xl text-center">
+                    <h2 className="font-display text-3xl text-white md:text-4xl mb-8 reveal">
+                        Escucha en tu plataforma favorita
+                    </h2>
+                    <div className="flex flex-wrap items-center justify-center gap-4 reveal reveal-delay-1">
+                        <a href={data.streamingLinks.spotify || '#'} className="streaming-btn bg-[#1DB954]" title="Spotify">
+                            <svg className="h-7 w-7" fill="white" viewBox="0 0 24 24"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>
+                        </a>
+                        <a href={data.streamingLinks.youtubeMusic || '#'} className="streaming-btn bg-[#FF0000]" title="YouTube Music">
+                            <svg className="h-7 w-7" fill="white" viewBox="0 0 24 24"><path d="M12 0C5.376 0 0 5.376 0 12s5.376 12 12 12 12-5.376 12-12S18.624 0 12 0zm0 19.104c-3.924 0-7.104-3.18-7.104-7.104S8.076 4.896 12 4.896s7.104 3.18 7.104 7.104-3.18 7.104-7.104 7.104zm0-13.332c-3.432 0-6.228 2.796-6.228 6.228S8.568 18.228 12 18.228 18.228 15.432 18.228 12 15.432 5.772 12 5.772zM9.684 15.852V8.148L15.816 12l-6.132 3.852z"/></svg>
+                        </a>
+                        <a href={data.streamingLinks.appleMusic || '#'} className="streaming-btn bg-[#FA243C]" title="Apple Music">
+                            <svg className="h-7 w-7" fill="white" viewBox="0 0 24 24"><path d="M23.994 6.124a9.23 9.23 0 00-.24-2.19c-.317-1.31-1.062-2.31-2.18-3.043a5.022 5.022 0 00-1.877-.726 10.496 10.496 0 00-1.564-.15c-.04-.003-.083-.01-.124-.013H5.986c-.152.01-.303.017-.455.026-.747.043-1.49.123-2.214.265-1.333.272-2.397.918-3.062 2.065a4.845 4.845 0 00-.676 1.992 9.51 9.51 0 00-.099 1.114c-.004.064-.01.13-.01.195v8.16c.01.12.017.242.024.363.04.718.106 1.435.238 2.144.24 1.27.793 2.273 1.805 3.02.913.672 1.955 1.012 3.082 1.147.737.09 1.48.153 2.22.177.18.01.363.014.543.014h11.19c.065-.003.133-.01.195-.012.798-.024 1.596-.086 2.385-.208 1.21-.19 2.235-.666 3.026-1.505.684-.726 1.078-1.59 1.23-2.59.06-.417.093-.84.108-1.265.01-.134.02-.269.02-.404V6.514c0-.135-.01-.269-.02-.39zm-6.5 6.044l-4.6 3.24c-.24.17-.54.186-.78.04-.06-.04-.11-.09-.15-.146V7.4c.02-.06.06-.12.1-.17.16-.16.4-.19.6-.08l4.59 3.23c.04.03.07.07.1.11.12.2.12.44-.02.64-.04.04-.08.08-.13.11l.19.14z"/></svg>
+                        </a>
+                        <a href={data.streamingLinks.deezer || '#'} className="streaming-btn bg-[#A238FF]" title="Deezer">
+                            <svg className="h-7 w-7" fill="white" viewBox="0 0 24 24"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.6 0 12 0zm4.8 16.8h-2.4v-4.8H12v4.8H9.6v-4.8H7.2v4.8H4.8V7.2h2.4v4.8h2.4V7.2H12v4.8h2.4V7.2h2.4v9.6z"/></svg>
+                        </a>
+                        <a href={data.streamingLinks.amazonMusic || '#'} className="streaming-btn bg-[#00A8E1]" title="Amazon Music">
+                            <svg className="h-7 w-7" fill="white" viewBox="0 0 24 24"><path d="M.045 18.02c.072-.116.187-.124.348-.022 3.636 2.11 7.594 3.166 11.87 3.166 2.852 0 5.668-.533 8.447-1.582l.315-.118c.138-.053.209-.053.276 0 .053.043.072.115.043.206-.138.548-.206.986-.206 1.314 0 1.507 1.186 2.666 2.68 2.666.434 0 .872-.108 1.308-.339.051-.023.107-.023.152 0 .044.021.067.064.067.118 0 .06-.024.098-.067.126-1.13.77-2.41 1.206-3.79 1.206-1.45 0-2.76-.47-3.93-1.41-.39-.32-.8-.53-1.23-.64-.43-.11-.84-.05-1.24.17-2.27 1.35-4.79 2.02-7.56 2.02-2.4 0-4.65-.5-6.75-1.51-.55-.26-.93-.35-1.14-.26-.21.09-.33.3-.38.64-.05.34-.18.6-.38.8-.2.2-.5.3-.9.3-.76 0-1.39-.27-1.88-.82-.5-.55-.75-1.22-.75-2.03 0-.57.14-1.18.41-1.83.27-.65.66-1.29 1.15-1.93z"/></svg>
+                        </a>
+                        <a href={data.streamingLinks.tidal || '#'} className="streaming-btn bg-black border border-white/20" title="Tidal">
+                            <svg className="h-6 w-6" fill="white" viewBox="0 0 24 24"><path d="M12.012 0L6.555 5.447l5.457 5.454L6.555 16.35l5.457 5.454 5.463-5.454-5.463-5.449 5.463-5.454L12.012 0zm5.463 5.447l-5.463 5.454 5.463 5.449-5.457 5.454L6.555 16.35l5.463-5.454-5.463-5.449L12.018 0l5.457 5.447z"/></svg>
+                        </a>
+                    </div>
+                </div>
             </section>
 
-            <section className="mx-auto mt-10 w-full max-w-6xl px-6 md:px-10">
-                <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                    <h2 className="font-display text-4xl text-white md:text-5xl">Tracklist</h2>
+            {/* Stats cards section removed - now integrated in hero */}
+
+            {/* ========================================
+                TRACKLIST SECTION
+                ======================================== */}
+            <section id="tracklist" className="relative z-10 mx-auto mt-10 w-full max-w-6xl px-6 pb-20 md:px-10">
+                <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+                    <h2 className="font-display text-4xl text-white md:text-5xl">
+                        <span className="text-amber-400">#</span> Tracklist
+                    </h2>
                     <div className="flex flex-wrap gap-2">
                         <button
                             type="button"
@@ -648,24 +862,30 @@ function LandingApp({ data }) {
                 </div>
 
                 {!isUnlocked ? (
-                    <div className="tracklist-locked glass-panel rounded-3xl border border-amber-200/30 bg-slate-950/70 p-8 md:p-12 text-center">
-                        <div className="locked-icon">🔒</div>
-                        <h3 className="mt-4 font-display text-3xl text-white md:text-4xl">
-                            Tracklist Bloqueado
-                        </h3>
-                        <p className="mt-3 max-w-xl mx-auto text-sm leading-7 text-slate-300 md:text-base">
-                            Regístrate con tu email para desbloquear el tracklist completo y escuchar 
-                            todas las 21 canciones antes que nadie.
-                        </p>
-                        <button
-                            onClick={() => setIsModalOpen(true)}
-                            className="mt-6 rounded-full bg-amber-400 px-8 py-4 text-sm font-semibold uppercase tracking-[0.12em] text-slate-950 transition hover:bg-amber-300 hover:scale-105"
-                        >
-                            🔓 Desbloquear Ahora
-                        </button>
-                        <p className="mt-4 text-xs text-slate-500">
-                            +{fanStats.totalLeads || '1,247'} fans ya se han registrado
-                        </p>
+                    <div className="tracklist-locked glass-panel-enhanced rounded-3xl border border-amber-300/20 p-10 md:p-16 text-center relative overflow-hidden">
+                        {/* Background glow */}
+                        <div className="absolute inset-0 bg-gradient-to-br from-amber-500/5 via-transparent to-cyan-500/5 pointer-events-none"></div>
+                        
+                        <div className="relative z-10">
+                            <div className="locked-icon text-7xl mb-4 animate-pulse">🔒</div>
+                            <h3 className="font-display text-4xl text-white md:text-5xl">
+                                Tracklist <span className="text-amber-400">Bloqueado</span>
+                            </h3>
+                            <p className="mt-4 max-w-lg mx-auto text-base leading-7 text-slate-300">
+                                Regístrate con tu email para desbloquear el tracklist completo y escuchar 
+                                todas las <span className="text-amber-300 font-semibold">21 canciones</span> antes que nadie.
+                            </p>
+                            <button
+                                onClick={() => setIsModalOpen(true)}
+                                className="btn-neon mt-8"
+                            >
+                                <span>🔓</span>
+                                <span>Desbloquear Ahora</span>
+                            </button>
+                            <p className="mt-6 text-sm text-slate-400">
+                                <span className="text-amber-400 font-semibold">+{fanStats.totalLeads || '1,247'}</span> fans ya se han registrado
+                            </p>
+                        </div>
                     </div>
                 ) : (
                     <>
@@ -703,54 +923,61 @@ function LandingApp({ data }) {
                             </div>
                         </div>
 
-                        <div className="grid gap-3 md:grid-cols-2">
+                        <div className="grid gap-4 md:grid-cols-2">
                             {filteredTracks.map((track) => (
                                 <article
                                     key={`${track.trackNumber}-${track.title}`}
-                                    className="track-card glass-panel rounded-2xl p-4"
+                                    className="track-card glass-panel-enhanced rounded-2xl p-5 group"
                                 >
                                     <div className="flex items-start gap-4">
-                                        <div className="font-display text-3xl leading-none text-amber-300">
+                                        <div className="font-display text-4xl leading-none bg-gradient-to-br from-amber-300 to-amber-500 bg-clip-text text-transparent group-hover:from-amber-200 group-hover:to-amber-400 transition-all">
                                             {formatTrackNumber(track.trackNumber)}
                                         </div>
-                                        <div className="flex-1">
-                                            <p className="text-base font-semibold text-white">{track.title}</p>
-                                            <p className="mt-1 text-xs uppercase tracking-[0.11em] text-cyan-200/80">
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-base font-semibold text-white truncate group-hover:text-amber-100 transition-colors">{track.title}</p>
+                                            <p className="mt-1 text-xs uppercase tracking-[0.11em] text-cyan-300/80">
                                                 Prod. {track.producer || 'Pendiente'}
                                             </p>
                                             {track.features ? (
-                                                <p className="mt-2 text-sm text-amber-100/85">Feat: {track.features}</p>
+                                                <p className="mt-2 text-sm text-amber-200/90 flex items-center gap-2">
+                                                    <span className="text-xs bg-amber-500/20 px-2 py-0.5 rounded-full">FEAT</span>
+                                                    {track.features}
+                                                </p>
                                             ) : null}
                                         </div>
-                                        <div className="pt-1 flex flex-col gap-2">
+                                        <div className="pt-1 flex flex-col gap-2 shrink-0">
                                             <button
                                                 type="button"
                                                 onClick={() => handlePlayToggle(track)}
                                                 disabled={isLoading && currentTrack && currentTrack.trackNumber === track.trackNumber}
-                                                className={`rounded-full px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.2em] transition ${
+                                                className={`rounded-full px-4 py-2.5 text-[11px] font-bold uppercase tracking-[0.15em] transition-all duration-300 ${
                                                     isLoading && currentTrack && currentTrack.trackNumber === track.trackNumber
                                                         ? 'cursor-wait border border-white/20 bg-white/5 text-slate-400'
-                                                        : track.audioUrl
-                                                            ? 'border border-amber-300/50 bg-amber-300/10 text-amber-200 hover:bg-amber-300/20'
-                                                            : 'cursor-not-allowed border border-white/10 bg-white/5 text-slate-500'
+                                                        : currentTrack && currentTrack.trackNumber === track.trackNumber && isPlaying
+                                                            ? 'border-2 border-emerald-400 bg-emerald-400/20 text-emerald-300 shadow-[0_0_20px_rgba(52,211,153,0.3)]'
+                                                            : track.audioUrl
+                                                                ? 'border border-amber-400/50 bg-amber-400/10 text-amber-300 hover:bg-amber-400/25 hover:border-amber-400 hover:shadow-[0_0_15px_rgba(251,191,36,0.3)]'
+                                                                : 'cursor-not-allowed border border-white/10 bg-white/5 text-slate-500'
                                                 }`}
                                             >
                                                 {currentTrack && currentTrack.trackNumber === track.trackNumber
                                                     ? isLoading
-                                                        ? 'Cargando...'
+                                                        ? '...'
                                                         : isPlaying
-                                                            ? 'Pausar'
-                                                            : 'Play'
+                                                            ? '⏸ Pause'
+                                                            : '▶ Play'
                                                     : track.audioUrl
-                                                        ? 'Play'
-                                                        : 'Sin audio'}
+                                                        ? '▶ Play'
+                                                        : '—'}
                                             </button>
-                                            <a
-                                                href={`/landing/track/${track.id}`}
-                                                className="rounded-full px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.15em] transition border border-cyan-300/30 bg-cyan-300/10 text-cyan-200 hover:bg-cyan-300/20 text-center"
-                                            >
-                                                Ver Info
-                                            </a>
+                                            {track.id && (
+                                                <a
+                                                    href={`/landing/track/${track.id}`}
+                                                    className="rounded-full px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.12em] transition-all border border-cyan-400/30 bg-cyan-400/10 text-cyan-300 hover:bg-cyan-400/20 hover:border-cyan-400 text-center"
+                                                >
+                                                    Info
+                                                </a>
+                                            )}
                                         </div>
                                     </div>
                                 </article>
@@ -766,6 +993,45 @@ function LandingApp({ data }) {
                 playsInline
                 controls={false}
             />
+
+            {/* ========================================
+                FOOTER
+                ======================================== */}
+            <footer className="relative z-10 border-t border-white/10 bg-slate-950/80 backdrop-blur-lg">
+                <div className="mx-auto max-w-6xl px-6 py-12 md:px-10">
+                    <div className="flex flex-col items-center gap-6 text-center">
+                        {/* Logo/Name */}
+                        <h3 className="font-display text-3xl text-white">
+                            Galante <span className="text-amber-400">El Emperador</span>
+                        </h3>
+                        
+                        {/* Social Links */}
+                        <div className="flex items-center gap-4">
+                            <a href="https://instagram.com/galantealx" target="_blank" rel="noopener noreferrer" 
+                               className="flex h-12 w-12 items-center justify-center rounded-full border border-white/20 bg-white/5 text-white transition-all hover:border-pink-500 hover:bg-pink-500/20 hover:text-pink-400 hover:scale-110">
+                                <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>
+                            </a>
+                            <a href="https://twitter.com/galantealx" target="_blank" rel="noopener noreferrer"
+                               className="flex h-12 w-12 items-center justify-center rounded-full border border-white/20 bg-white/5 text-white transition-all hover:border-sky-500 hover:bg-sky-500/20 hover:text-sky-400 hover:scale-110">
+                                <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+                            </a>
+                            <a href="https://youtube.com/@galantealx" target="_blank" rel="noopener noreferrer"
+                               className="flex h-12 w-12 items-center justify-center rounded-full border border-white/20 bg-white/5 text-white transition-all hover:border-red-500 hover:bg-red-500/20 hover:text-red-400 hover:scale-110">
+                                <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+                            </a>
+                            <a href="https://tiktok.com/@galantealx" target="_blank" rel="noopener noreferrer"
+                               className="flex h-12 w-12 items-center justify-center rounded-full border border-white/20 bg-white/5 text-white transition-all hover:border-cyan-400 hover:bg-cyan-400/20 hover:text-cyan-300 hover:scale-110">
+                                <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/></svg>
+                            </a>
+                        </div>
+
+                        {/* Copyright */}
+                        <p className="text-sm text-slate-500">
+                            © {new Date().getFullYear()} Galante El Emperador. Todos los derechos reservados.
+                        </p>
+                    </div>
+                </div>
+            </footer>
         </main>
     );
 }

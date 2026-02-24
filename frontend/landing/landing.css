@@ -12,6 +12,8 @@
     --landing-fire: #f97316;
     --landing-gold: #facc15;
     --landing-ice: #0ea5e9;
+    --landing-cyan: #22d3ee;
+    --landing-neon-green: #4ade80;
 }
 
 html,
@@ -40,26 +42,457 @@ body {
     backdrop-filter: blur(8px);
 }
 
-.hero-aurora {
-    position: absolute;
-    inset: -25% auto auto -10%;
-    width: 360px;
-    height: 360px;
-    border-radius: 9999px;
-    background: radial-gradient(circle, rgba(249, 115, 22, 0.42) 0%, rgba(249, 115, 22, 0) 68%);
-    filter: blur(2px);
+/* ========================================
+   AUDIO WAVES BACKGROUND ANIMATION
+   ======================================== */
+.audio-waves-container {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    overflow: hidden;
     pointer-events: none;
 }
 
-.hero-aurora::after {
+.audio-waves {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 40%;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 3px;
+    padding: 0 5%;
+    opacity: 0.6;
+}
+
+.audio-bar {
+    flex: 1;
+    max-width: 8px;
+    background: linear-gradient(to top, var(--landing-gold), var(--landing-cyan));
+    border-radius: 4px 4px 0 0;
+    transform-origin: bottom;
+    animation: audio-pulse var(--duration, 1s) ease-in-out infinite;
+    animation-delay: var(--delay, 0s);
+}
+
+@keyframes audio-pulse {
+    0%, 100% {
+        height: var(--min-height, 20px);
+        opacity: 0.4;
+    }
+    50% {
+        height: var(--max-height, 100px);
+        opacity: 0.8;
+    }
+}
+
+/* Glow effect behind waves */
+.audio-waves::before {
     content: '';
     position: absolute;
-    width: 300px;
-    height: 300px;
-    right: -220px;
-    top: 160px;
-    border-radius: 9999px;
-    background: radial-gradient(circle, rgba(14, 165, 233, 0.34) 0%, rgba(14, 165, 233, 0) 70%);
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 80%;
+    height: 200px;
+    background: radial-gradient(ellipse at bottom, rgba(250, 204, 21, 0.15), transparent 70%);
+    pointer-events: none;
+}
+
+/* ========================================
+   HERO SECTION - FULLSCREEN
+   ======================================== */
+.hero-fullscreen {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    z-index: 1;
+    padding: 2rem;
+    text-align: center;
+}
+
+/* Aurora/Gradient overlay */
+.hero-aurora {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background: 
+        radial-gradient(ellipse at 20% 20%, rgba(250, 204, 21, 0.12) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 80%, rgba(34, 211, 238, 0.1) 0%, transparent 50%),
+        radial-gradient(ellipse at 50% 50%, rgba(74, 222, 128, 0.05) 0%, transparent 60%);
+    animation: aurora-shift 15s ease-in-out infinite;
+}
+
+@keyframes aurora-shift {
+    0%, 100% {
+        opacity: 1;
+        filter: hue-rotate(0deg);
+    }
+    50% {
+        opacity: 0.8;
+        filter: hue-rotate(15deg);
+    }
+}
+
+/* ========================================
+   3D TILT COVER EFFECT
+   ======================================== */
+.cover-3d-container {
+    perspective: 1000px;
+    display: inline-block;
+}
+
+.cover-3d {
+    position: relative;
+    transform-style: preserve-3d;
+    transition: transform 0.3s ease-out;
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: 
+        0 25px 50px rgba(0, 0, 0, 0.5),
+        0 0 60px rgba(250, 204, 21, 0.2);
+}
+
+.cover-3d:hover {
+    box-shadow: 
+        0 35px 70px rgba(0, 0, 0, 0.6),
+        0 0 80px rgba(250, 204, 21, 0.3);
+}
+
+.cover-3d img {
+    display: block;
+    width: 100%;
+    height: auto;
+    max-width: 350px;
+}
+
+/* Shine effect on hover */
+.cover-3d::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+        135deg,
+        rgba(255, 255, 255, 0) 0%,
+        rgba(255, 255, 255, 0.1) 50%,
+        rgba(255, 255, 255, 0) 100%
+    );
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: none;
+}
+
+.cover-3d:hover::after {
+    opacity: 1;
+}
+
+/* ========================================
+   TYPING EFFECT
+   ======================================== */
+.typing-text {
+    display: inline-block;
+    overflow: hidden;
+    white-space: nowrap;
+    border-right: 3px solid var(--landing-gold);
+    animation: 
+        typing 2s steps(20, end) forwards,
+        blink-caret 0.75s step-end infinite;
+}
+
+@keyframes typing {
+    from { width: 0; }
+    to { width: 100%; }
+}
+
+@keyframes blink-caret {
+    from, to { border-color: transparent; }
+    50% { border-color: var(--landing-gold); }
+}
+
+/* ========================================
+   GLITCH TEXT EFFECT
+   ======================================== */
+.glitch-text {
+    position: relative;
+    animation: glitch-skew 4s infinite linear alternate-reverse;
+}
+
+.glitch-text::before,
+.glitch-text::after {
+    content: attr(data-text);
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+}
+
+.glitch-text::before {
+    left: 2px;
+    text-shadow: -2px 0 var(--landing-cyan);
+    clip: rect(44px, 450px, 56px, 0);
+    animation: glitch-anim 5s infinite linear alternate-reverse;
+}
+
+.glitch-text::after {
+    left: -2px;
+    text-shadow: -2px 0 var(--landing-fire);
+    clip: rect(44px, 450px, 56px, 0);
+    animation: glitch-anim2 5s infinite linear alternate-reverse;
+}
+
+@keyframes glitch-anim {
+    0% { clip: rect(31px, 9999px, 94px, 0); }
+    5% { clip: rect(70px, 9999px, 71px, 0); }
+    10% { clip: rect(29px, 9999px, 24px, 0); }
+    15% { clip: rect(69px, 9999px, 64px, 0); }
+    20% { clip: rect(14px, 9999px, 1px, 0); }
+    25% { clip: rect(22px, 9999px, 98px, 0); }
+    30% { clip: rect(52px, 9999px, 15px, 0); }
+    35% { clip: rect(16px, 9999px, 19px, 0); }
+    40% { clip: rect(75px, 9999px, 33px, 0); }
+    45% { clip: rect(55px, 9999px, 88px, 0); }
+    50% { clip: rect(72px, 9999px, 6px, 0); }
+    55% { clip: rect(42px, 9999px, 68px, 0); }
+    60% { clip: rect(85px, 9999px, 100px, 0); }
+    65% { clip: rect(91px, 9999px, 43px, 0); }
+    70% { clip: rect(12px, 9999px, 52px, 0); }
+    75% { clip: rect(67px, 9999px, 27px, 0); }
+    80% { clip: rect(48px, 9999px, 73px, 0); }
+    85% { clip: rect(36px, 9999px, 11px, 0); }
+    90% { clip: rect(83px, 9999px, 39px, 0); }
+    95% { clip: rect(5px, 9999px, 81px, 0); }
+    100% { clip: rect(59px, 9999px, 46px, 0); }
+}
+
+@keyframes glitch-anim2 {
+    0% { clip: rect(65px, 9999px, 100px, 0); }
+    5% { clip: rect(52px, 9999px, 74px, 0); }
+    10% { clip: rect(79px, 9999px, 85px, 0); }
+    15% { clip: rect(75px, 9999px, 5px, 0); }
+    20% { clip: rect(67px, 9999px, 61px, 0); }
+    25% { clip: rect(14px, 9999px, 79px, 0); }
+    30% { clip: rect(1px, 9999px, 66px, 0); }
+    35% { clip: rect(86px, 9999px, 30px, 0); }
+    40% { clip: rect(23px, 9999px, 98px, 0); }
+    45% { clip: rect(85px, 9999px, 72px, 0); }
+    50% { clip: rect(71px, 9999px, 75px, 0); }
+    55% { clip: rect(2px, 9999px, 48px, 0); }
+    60% { clip: rect(30px, 9999px, 16px, 0); }
+    65% { clip: rect(59px, 9999px, 50px, 0); }
+    70% { clip: rect(41px, 9999px, 62px, 0); }
+    75% { clip: rect(2px, 9999px, 82px, 0); }
+    80% { clip: rect(47px, 9999px, 73px, 0); }
+    85% { clip: rect(3px, 9999px, 27px, 0); }
+    90% { clip: rect(26px, 9999px, 55px, 0); }
+    95% { clip: rect(42px, 9999px, 97px, 0); }
+    100% { clip: rect(38px, 9999px, 49px, 0); }
+}
+
+@keyframes glitch-skew {
+    0% { transform: skew(0deg); }
+    20% { transform: skew(0deg); }
+    21% { transform: skew(1deg); }
+    22% { transform: skew(-1deg); }
+    23% { transform: skew(0deg); }
+    100% { transform: skew(0deg); }
+}
+
+/* ========================================
+   NEON GLOW BUTTONS
+   ======================================== */
+.btn-neon {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 16px 32px;
+    font-weight: 700;
+    font-size: 1rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    border: 2px solid var(--landing-gold);
+    background: transparent;
+    color: var(--landing-gold);
+    border-radius: 50px;
+    cursor: pointer;
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.btn-neon::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: var(--landing-gold);
+    transform: scaleX(0);
+    transform-origin: right;
+    transition: transform 0.3s ease;
+    z-index: -1;
+}
+
+.btn-neon:hover {
+    color: var(--landing-night);
+    box-shadow: 
+        0 0 20px rgba(250, 204, 21, 0.5),
+        0 0 40px rgba(250, 204, 21, 0.3),
+        0 0 60px rgba(250, 204, 21, 0.1);
+}
+
+.btn-neon:hover::before {
+    transform: scaleX(1);
+    transform-origin: left;
+}
+
+.btn-neon-cyan {
+    border-color: var(--landing-cyan);
+    color: var(--landing-cyan);
+}
+
+.btn-neon-cyan::before {
+    background: var(--landing-cyan);
+}
+
+.btn-neon-cyan:hover {
+    box-shadow: 
+        0 0 20px rgba(34, 211, 238, 0.5),
+        0 0 40px rgba(34, 211, 238, 0.3),
+        0 0 60px rgba(34, 211, 238, 0.1);
+}
+
+/* ========================================
+   STREAMING PLATFORM BUTTONS
+   ======================================== */
+.streaming-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    position: relative;
+}
+
+.streaming-btn:hover {
+    transform: translateY(-5px) scale(1.1);
+}
+
+.streaming-btn::after {
+    content: '';
+    position: absolute;
+    inset: -4px;
+    border-radius: 50%;
+    background: inherit;
+    opacity: 0;
+    filter: blur(10px);
+    z-index: -1;
+    transition: opacity 0.3s ease;
+}
+
+.streaming-btn:hover::after {
+    opacity: 0.6;
+}
+
+/* ========================================
+   STATS COUNTER ANIMATION
+   ======================================== */
+.stat-number {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 3.5rem;
+    background: linear-gradient(135deg, var(--landing-gold), var(--landing-cyan));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+/* ========================================
+   SCROLL INDICATOR
+   ======================================== */
+.scroll-indicator {
+    position: absolute;
+    bottom: 2rem;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    animation: bounce-down 2s ease-in-out infinite;
+}
+
+.scroll-indicator svg {
+    width: 24px;
+    height: 24px;
+    animation: bounce-down 2s ease-in-out infinite;
+}
+
+@keyframes bounce-down {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(10px); }
+}
+
+/* ========================================
+   GLASSMORPHISM ENHANCED
+   ======================================== */
+.glass-panel-enhanced {
+    background: rgba(15, 23, 42, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-radius: 24px;
+    box-shadow: 
+        0 8px 32px rgba(0, 0, 0, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+/* ========================================
+   PARTICLE FLOAT (subtle background particles)
+   ======================================== */
+.particles-container {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+.particle {
+    position: absolute;
+    width: 4px;
+    height: 4px;
+    background: var(--landing-gold);
+    border-radius: 50%;
+    opacity: 0.3;
+    animation: float-particle var(--duration, 10s) linear infinite;
+}
+
+@keyframes float-particle {
+    0% {
+        transform: translateY(100vh) rotate(0deg);
+        opacity: 0;
+    }
+    10% {
+        opacity: 0.3;
+    }
+    90% {
+        opacity: 0.3;
+    }
+    100% {
+        transform: translateY(-100vh) rotate(720deg);
+        opacity: 0;
+    }
 }
 
 .reveal {

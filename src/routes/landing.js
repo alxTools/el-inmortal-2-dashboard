@@ -282,9 +282,9 @@ router.post('/subscribe', async (req, res) => {
         console.log('[Landing Subscribe] Email result:', emailResult.status === 'fulfilled' ? emailResult.value : emailResult.reason);
         console.log('[Landing Subscribe] Webhook result:', webhookResult.status === 'fulfilled' ? webhookResult.value : webhookResult.reason);
 
-        // Establecer cookie de acceso para fans verificados (válida por 30 días)
+        // Establecer cookie de acceso para fans verificados (válida por 7 días)
         res.cookie('landing_el_inmortal_unlock', '1', {
-            maxAge: 30 * 24 * 60 * 60 * 1000, // 30 días
+            maxAge: 7 * 24 * 60 * 60 * 1000, // 7 días (1 semana)
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
             sameSite: 'lax'

@@ -146,6 +146,7 @@
 
                     <div class="tool-actions">
                         <button id="generateBtn" class="btn">Generar Thumbnail</button>
+                        <button id="forceServerBtn" class="btn btn-secondary" type="button">Forzar Servidor (FFmpeg)</button>
                         <button id="downloadBtn" class="btn btn-secondary" disabled>Descargar Thumbnail</button>
                     </div>
 
@@ -188,6 +189,7 @@
         const videoUrlInput = document.getElementById('videoUrl');
         const loadUrlBtn = document.getElementById('loadUrlBtn');
         const generateBtn = document.getElementById('generateBtn');
+        const forceServerBtn = document.getElementById('forceServerBtn');
         const downloadBtn = document.getElementById('downloadBtn');
         const generateSizesBtn = document.getElementById('generateSizesBtn');
         const downloadAllBtn = document.getElementById('downloadAllBtn');
@@ -341,41 +343,45 @@
             ctx.restore();
         }
 
-        async function generateThumbnail() {
-            const file = videoFileInput.files[0];
-            
-            // Si ya hay un thumbnail base cargado (ej: desde YouTube), no procesar video
-            if (baseImage && !file && !remoteVideoSourceUrl) {
-                setStatus('Thumbnail ya esta listo (cargado desde YouTube). Puedes generar los sizes de social media.', true);
-                return;
-            }
-            
-            if (!file && !remoteVideoSourceUrl) {
-                setStatus('Selecciona un video o carga un link primero.', true);
-                return;
+        async function generateThumbnailServerSide(file, time, format) {
+            const formData = new FormData();
+            formData.append('video', file);
+            formData.append('time', time);
+            formData.append('format', format === 'image/jpeg' ? 'jpg' : 'png');
+
+            setStatus('Enviando video al servidor...');
+
+            const response = await fetch('/tools/generate-thumbnail', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({ error: 'Error desconocido' }));
+                throw new Error(errorData.error || `Error del servidor: ${response.status}`);
             }
 
-            generateBtn.disabled = true;
-            downloadBtn.disabled = true;
-            generateSizesBtn.disabled = true;
-            downloadAllBtn.disabled = true;
-            generatedSizes = [];
-            sizesGrid.innerHTML = '';
-            setStatus('Procesando video...');
-            setSizesStatus('Esperando thumbnail base...');
+            const blob = await response.blob();
+            const width = response.headers.get('X-Thumbnail-Width') || 1280;
+            const height = response.headers.get('X-Thumbnail-Height') || 720;
+            const validTime = parseFloat(response.headers.get('X-Thumbnail-Time')) || time;
+
+            return { blob, width, height, validTime };
+        }
+
+        async function generateThumbnailBrowser(file, time, format) {
+            const localVideoUrl = URL.createObjectURL(file);
+            videoElement.src = localVideoUrl;
 
             try {
-                const localVideoUrl = file ? URL.createObjectURL(file) : null;
-                videoElement.src = remoteVideoSourceUrl || localVideoUrl;
-
                 await waitForEvent(videoElement, 'loadedmetadata', 15000);
 
-                const requestedTime = Number(captureTimeInput.value || 0);
                 const duration = Number(videoElement.duration);
                 const safeDuration = Number.isFinite(duration) && duration > 0 ? duration : 0;
                 const validTime = safeDuration > 0
-                    ? Math.max(0, Math.min(requestedTime, Math.max(safeDuration - 0.1, 0)))
+                    ? Math.max(0, Math.min(time, Math.max(safeDuration - 0.1, 0)))
                     : 0;
+
                 videoElement.currentTime = validTime;
                 await waitForEvent(videoElement, 'seeked', 15000);
                 await waitForEvent(videoElement, 'loadeddata', 15000).catch(() => {});
@@ -387,8 +393,113 @@
                 const ctx = canvasElement.getContext('2d');
                 ctx.drawImage(videoElement, 0, 0, width, height);
 
+                return new Promise((resolve, reject) => {
+                    canvasElement.toBlob((blob) => {
+                        if (!blob) {
+                            reject(new Error('No se pudo generar el thumbnail'));
+                            return;
+                        }
+                        resolve({ blob, width, height, validTime });
+                    }, format, 0.92);
+                });
+            } finally {
+                URL.revokeObjectURL(localVideoUrl);
+            }
+        }
+
+        async function generateThumbnail(forceServer = false) {
+            const file = videoFileInput.files[0];
+
+            // Si ya hay un thumbnail base cargado (ej: desde YouTube), no procesar video
+            if (baseImage && !file && !remoteVideoSourceUrl) {
+                setStatus('Thumbnail ya esta listo (cargado desde YouTube). Puedes generar los sizes de social media.', true);
+                return;
+            }
+
+            if (!file && !remoteVideoSourceUrl) {
+                setStatus('Selecciona un video o carga un link primero.', true);
+                return;
+            }
+
+            generateBtn.disabled = true;
+            forceServerBtn.disabled = true;
+            downloadBtn.disabled = true;
+            generateSizesBtn.disabled = true;
+            downloadAllBtn.disabled = true;
+            generatedSizes = [];
+            sizesGrid.innerHTML = '';
+            setStatus('Procesando video...');
+            setSizesStatus('Esperando thumbnail base...');
+
+            try {
+                const requestedTime = Number(captureTimeInput.value || 0);
                 const format = outputFormatSelect.value;
                 const extension = format === 'image/jpeg' ? 'jpg' : 'png';
+
+                let result;
+
+                if (file) {
+                    if (forceServer) {
+                        // Usar servidor directamente
+                        setStatus('Usando servidor (FFmpeg)...');
+                        result = await generateThumbnailServerSide(file, requestedTime, format);
+                    } else {
+                        // Intentar primero con el navegador (mas rapido para codecs soportados)
+                        setStatus('Intentando procesar en el navegador...');
+
+                        try {
+                            result = await Promise.race([
+                                generateThumbnailBrowser(file, requestedTime, format),
+                                new Promise((_, reject) =>
+                                    setTimeout(() => reject(new Error('Timeout')), 10000)
+                                )
+                            ]);
+                            setStatus('Procesado en navegador exitosamente');
+                        } catch (browserError) {
+                            // Si falla el navegador, usar servidor
+                            console.log('Browser processing failed, using server-side:', browserError.message);
+                            setStatus('Navegador no puede decodificar el video, usando servidor...');
+                            result = await generateThumbnailServerSide(file, requestedTime, format);
+                        }
+                    }
+                } else {
+                    // Para videos remotos, usar el metodo anterior
+                    const localVideoUrl = URL.createObjectURL(await fetch(remoteVideoSourceUrl).then(r => r.blob()));
+                    videoElement.src = localVideoUrl;
+
+                    await waitForEvent(videoElement, 'loadedmetadata', 15000);
+
+                    const duration = Number(videoElement.duration);
+                    const safeDuration = Number.isFinite(duration) && duration > 0 ? duration : 0;
+                    const validTime = safeDuration > 0
+                        ? Math.max(0, Math.min(requestedTime, Math.max(safeDuration - 0.1, 0)))
+                        : 0;
+
+                    videoElement.currentTime = validTime;
+                    await waitForEvent(videoElement, 'seeked', 15000);
+                    await waitForEvent(videoElement, 'loadeddata', 15000).catch(() => {});
+
+                    const width = videoElement.videoWidth || 1280;
+                    const height = videoElement.videoHeight || 720;
+                    canvasElement.width = width;
+                    canvasElement.height = height;
+                    const ctx = canvasElement.getContext('2d');
+                    ctx.drawImage(videoElement, 0, 0, width, height);
+
+                    result = await new Promise((resolve, reject) => {
+                        canvasElement.toBlob((blob) => {
+                            if (!blob) {
+                                reject(new Error('No se pudo generar el thumbnail'));
+                                return;
+                            }
+                            resolve({ blob, width, height, validTime });
+                        }, format, 0.92);
+                    });
+
+                    URL.revokeObjectURL(localVideoUrl);
+                }
+
+                // Guardar el resultado
                 let fileBase;
                 if (file) {
                     fileBase = file.name.replace(/\.[^/.]+$/, '');
@@ -399,36 +510,34 @@
                 } else {
                     fileBase = 'video';
                 }
-                currentFilename = `${fileBase}_thumb_${validTime.toFixed(1)}s.${extension}`;
+                currentFilename = `${fileBase}_thumb_${result.validTime.toFixed(1)}s.${extension}`;
 
-                canvasElement.toBlob((blob) => {
-                    if (!blob) {
-                        setStatus('No se pudo generar el thumbnail.', true);
-                        generateBtn.disabled = false;
-                        return;
-                    }
+                if (currentBlobUrl) URL.revokeObjectURL(currentBlobUrl);
+                currentBlobUrl = URL.createObjectURL(result.blob);
 
-                    if (currentBlobUrl) URL.revokeObjectURL(currentBlobUrl);
-                    currentBlobUrl = URL.createObjectURL(blob);
+                const img = new Image();
+                img.onload = () => {
+                    baseImage = img;
+                    previewBox.innerHTML = `<img src="${currentBlobUrl}" alt="Thumbnail preview">`;
+                    setStatus(`Thumbnail listo (${result.width}x${result.height}) a ${result.validTime.toFixed(1)}s.`);
+                    setSizesStatus('Thumbnail base listo. Ahora puedes generar todos los sizes.');
+                    downloadBtn.disabled = false;
+                    generateBtn.disabled = false;
+                    forceServerBtn.disabled = false;
+                    generateSizesBtn.disabled = false;
+                };
+                img.onerror = () => {
+                    setStatus('Error cargando la imagen generada', true);
+                    generateBtn.disabled = false;
+                    forceServerBtn.disabled = false;
+                };
+                img.src = currentBlobUrl;
 
-                    const img = new Image();
-                    img.onload = () => {
-                        baseImage = img;
-                        previewBox.innerHTML = `<img src="${currentBlobUrl}" alt="Thumbnail preview">`;
-                        setStatus(`Thumbnail listo (${width}x${height}) a ${validTime.toFixed(1)}s.`);
-                        setSizesStatus('Thumbnail base listo. Ahora puedes generar todos los sizes.');
-                        downloadBtn.disabled = false;
-                        generateBtn.disabled = false;
-                        generateSizesBtn.disabled = false;
-                    };
-                    img.src = currentBlobUrl;
-                }, format, 0.92);
-
-                if (localVideoUrl) URL.revokeObjectURL(localVideoUrl);
             } catch (error) {
-                console.error(error);
-                setStatus('Error generando thumbnail: ' + (error.message || 'Verifica el archivo.'), true);
+                console.error('Thumbnail generation error:', error);
+                setStatus('Error: ' + (error.message || 'Verifica el archivo.'), true);
                 generateBtn.disabled = false;
+                forceServerBtn.disabled = false;
             }
         }
 
@@ -608,7 +717,8 @@
             });
         }
 
-        generateBtn.addEventListener('click', generateThumbnail);
+        generateBtn.addEventListener('click', () => generateThumbnail(false));
+        forceServerBtn.addEventListener('click', () => generateThumbnail(true));
         loadUrlBtn.addEventListener('click', loadFromUrl);
         generateSizesBtn.addEventListener('click', generateSocialSizes);
         downloadAllBtn.addEventListener('click', downloadAllSizes);
@@ -619,6 +729,7 @@
                 videoUrlInput.value = '';
                 setStatus('Video local seleccionado.');
                 generateBtn.disabled = false;
+                forceServerBtn.disabled = false;
             }
         });
 

@@ -351,7 +351,7 @@
                         </td>
                         <td>
                             <% if (track.audio_file_path) { %>
-                                <button onclick='playTrack("<%= track.id %>", "<%= track.title.replace(/"/g, '\\"') %>", "<%= track.audio_file_path %>")' class="btn-small" style="margin-right: 5px; background: linear-gradient(45deg, #28a745, #20c997); border: none;">▶️ Play</button>
+                                <button class="btn-small play-track-btn" data-track-id="<%= track.id %>" data-track-title="<%= track.title.replace(/"/g, '&quot;') %>" data-track-path="<%= track.audio_file_path %>" style="margin-right: 5px; background: linear-gradient(45deg, #28a745, #20c997); border: none;">▶️ Play</button>
                             <% } %>
                             <a href="/tracks/<%= track.id %>/edit" class="btn-small">Editar</a>
                         </td>
@@ -379,23 +379,23 @@
     <div id="globalPlayer" style="display: none; position: fixed; bottom: 0; left: 0; right: 0; background: linear-gradient(90deg, #1a1a2e, #0f0f1e); border-top: 3px solid #ffd700; padding: 15px 30px; z-index: 1000; box-shadow: 0 -5px 20px rgba(0,0,0,0.5);">
         <div style="max-width: 1400px; margin: 0 auto; display: flex; align-items: center; gap: 20px;">
             <div style="flex: 0 0 50px;">
-                <button onclick="togglePlay()" id="playPauseBtn" style="width: 50px; height: 50px; border-radius: 50%; background: linear-gradient(45deg, #ffd700, #ffed4e); border: none; color: #1a1a2e; font-size: 1.2em; cursor: pointer; display: flex; align-items: center; justify-content: center;">▶️</button>
+                <button id="playPauseBtn" style="width: 50px; height: 50px; border-radius: 50%; background: linear-gradient(45deg, #ffd700, #ffed4e); border: none; color: #1a1a2e; font-size: 1.2em; cursor: pointer; display: flex; align-items: center; justify-content: center;">▶️</button>
             </div>
             <div style="flex: 1;">
                 <div id="nowPlaying" style="color: #ffd700; font-weight: bold; margin-bottom: 5px;">Selecciona un tema</div>
                 <div style="display: flex; align-items: center; gap: 10px;">
                     <span id="currentTime" style="color: #888; font-size: 0.85em; font-variant-numeric: tabular-nums;">0:00</span>
-                    <div style="flex: 1; height: 6px; background: rgba(255, 255, 255, 0.1); border-radius: 3px; cursor: pointer;" onclick="seekAudio(event)">
+                    <div id="progressBarContainer" style="flex: 1; height: 6px; background: rgba(255, 255, 255, 0.1); border-radius: 3px; cursor: pointer;">
                         <div id="progressBar" style="height: 100%; width: 0%; background: linear-gradient(90deg, #ffd700, #ffed4e); border-radius: 3px; transition: width 0.1s;"></div>
                     </div>
                     <span id="totalTime" style="color: #888; font-size: 0.85em; font-variant-numeric: tabular-nums;">0:00</span>
                 </div>
             </div>
             <div style="flex: 0 0 150px;">
-                <input type="range" id="volumeSlider" min="0" max="100" value="100" onchange="setVolume(this.value)" style="width: 100%; accent-color: #ffd700;">
+                <input type="range" id="volumeSlider" min="0" max="100" value="100" style="width: 100%; accent-color: #ffd700;">
             </div>
             <div style="flex: 0 0 30px;">
-                <button onclick="closePlayer()" style="background: none; border: none; color: #888; font-size: 1.5em; cursor: pointer;">✕</button>
+                <button id="closePlayerBtn" style="background: none; border: none; color: #888; font-size: 1.5em; cursor: pointer;">✕</button>
             </div>
         </div>
         <audio id="audioElement" preload="metadata"></audio>
@@ -449,9 +449,9 @@
             audio.volume = value / 100;
         }
 
-        function seekAudio(event) {
-            const rect = event.currentTarget.getBoundingClientRect();
-            const percent = (event.clientX - rect.left) / rect.width;
+        function seekAudio(e) {
+            const rect = e.currentTarget.getBoundingClientRect();
+            const percent = (e.clientX - rect.left) / rect.width;
             audio.currentTime = percent * audio.duration;
         }
 
@@ -497,25 +497,44 @@
             console.log('[Audio] Loading audio:', audio.src);
         });
 
-        // Keyboard shortcuts
-        document.addEventListener('keydown', (e) => {
-            if (e.code === 'Space' && currentTrackId) {
-                e.preventDefault();
-                togglePlay();
+        // Attach event listeners to play buttons (fixes CSP issue with inline onclick)
+        document.addEventListener('DOMContentLoaded', function() {
+            // Play track buttons
+            document.querySelectorAll('.play-track-btn').forEach(button => {
+                button.addEventListener('click', function() {
+                    const id = this.getAttribute('data-track-id');
+                    const title = this.getAttribute('data-track-title');
+                    const filePath = this.getAttribute('data-track-path');
+                    playTrack(id, title, filePath);
+                });
+            });
+
+            // Play/Pause button
+            const playPauseBtn = document.getElementById('playPauseBtn');
+            if (playPauseBtn) {
+                playPauseBtn.addEventListener('click', togglePlay);
+            }
+
+            // Progress bar click
+            const progressContainer = document.getElementById('progressBarContainer');
+            if (progressContainer) {
+                progressContainer.addEventListener('click', seekAudio);
+            }
+
+            // Volume slider
+            const volumeSlider = document.getElementById('volumeSlider');
+            if (volumeSlider) {
+                volumeSlider.addEventListener('change', function() {
+                    setVolume(this.value);
+                });
+            }
+
+            // Close player button
+            const closeBtn = document.getElementById('closePlayerBtn');
+            if (closeBtn) {
+                closeBtn.addEventListener('click', closePlayer);
             }
         });
-
-        // Detect current port and update notice
-        const currentPort = window.location.port || '80';
-        const currentHost = window.location.hostname;
-        const fullUrl = `${currentHost}:${currentPort}`;
-        document.getElementById('currentPort').textContent = fullUrl;
-        
-        // Test uploads endpoint
-        fetch('/uploads/test')
-            .then(r => r.json())
-            .then(data => console.log('✅ Uploads endpoint test:', data))
-            .catch(err => console.error('❌ Uploads endpoint test failed:', err));
     </script>
 </body>
 </html>

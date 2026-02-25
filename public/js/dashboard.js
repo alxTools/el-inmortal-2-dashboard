@@ -14,8 +14,8 @@ document.addEventListener('DOMContentLoaded', function() {
     // Initial load
     updateStats();
     
-    // Setup 30-minute reminder alert
-    setupThirtyMinuteAlert();
+    // Setup hourly reminder alert
+    setupHourlyAlert();
     
     // Add keyboard shortcuts
     setupKeyboardShortcuts();
@@ -182,11 +182,11 @@ function closeAllModals() {
     });
 }
 
-// Setup voice alert every 30 minutes
-function setupThirtyMinuteAlert() {
-    const THIRTY_MINUTES = 30 * 60 * 1000; // 30 minutes in milliseconds
+// Setup voice alert every hour (hora por hora)
+function setupHourlyAlert() {
+    const ONE_HOUR = 60 * 60 * 1000; // 1 hour in milliseconds
     
-    console.log('🔔 Alerta de voz cada 30 minutos activada');
+    console.log('🔔 Alerta de voz cada hora activada (hora por hora)');
     
     // Check if speech synthesis is available
     if (!('speechSynthesis' in window)) {
@@ -194,10 +194,22 @@ function setupThirtyMinuteAlert() {
         return;
     }
     
-    // Set interval for every 30 minutes
-    setInterval(function() {
+    // Calculate time until next hour
+    const now = new Date();
+    const nextHour = new Date(now);
+    nextHour.setHours(now.getHours() + 1, 0, 0, 0);
+    const timeUntilNextHour = nextHour - now;
+    
+    console.log(`⏰ Próximo anuncio en: ${Math.round(timeUntilNextHour / 1000 / 60)} minutos`);
+    
+    // First announcement at the next exact hour
+    setTimeout(function() {
         speakStatusUpdate();
-    }, THIRTY_MINUTES);
+        // Then every hour after that
+        setInterval(function() {
+            speakStatusUpdate();
+        }, ONE_HOUR);
+    }, timeUntilNextHour);
 }
 
 // Speak current time using Web Speech API (12-hour format)

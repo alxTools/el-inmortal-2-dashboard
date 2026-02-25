@@ -118,7 +118,7 @@
                             <td>
                                 <a href="/settings/users/<%= user.id %>/edit" class="action-btn" title="Editar">✏️</a>
                                 <% if (user.id !== 1 && user.role !== 'super_admin') { %>
-                                    <button class="action-btn" style="color: #dc3545;" title="Eliminar" onclick="deleteUser(<%= user.id %>)">🗑️</button>
+                                    <button class="action-btn delete-user-btn" style="color: #dc3545;" title="Eliminar" data-user-id="<%= user.id %>">🗑️</button>
                                 <% } %>
                             </td>
                         </tr>
@@ -132,27 +132,32 @@
     <%- include('../partials/footer') %>
 
     <script>
-        async function deleteUser(id) {
-            if (confirm('¿Estás seguro de eliminar este usuario? Esta acción no se puede deshacer.')) {
-                try {
-                    const response = await fetch('/settings/users/' + id, {
-                        method: 'DELETE',
-                        headers: { 'Accept': 'application/json' }
-                    });
-                    
-                    const result = await response.json();
-                    
-                    if (result.success) {
-                        alert('Usuario eliminado');
-                        window.location.reload();
-                    } else {
-                        alert('Error: ' + result.error);
+        document.addEventListener('DOMContentLoaded', function() {
+            document.querySelectorAll('.delete-user-btn').forEach(button => {
+                button.addEventListener('click', async function() {
+                    const id = this.getAttribute('data-user-id');
+                    if (confirm('¿Estás seguro de eliminar este usuario? Esta acción no se puede deshacer.')) {
+                        try {
+                            const response = await fetch('/settings/users/' + id, {
+                                method: 'DELETE',
+                                headers: { 'Accept': 'application/json' }
+                            });
+                            
+                            const result = await response.json();
+                            
+                            if (result.success) {
+                                alert('Usuario eliminado');
+                                window.location.reload();
+                            } else {
+                                alert('Error: ' + result.error);
+                            }
+                        } catch (error) {
+                            alert('Error al eliminar');
+                        }
                     }
-                } catch (error) {
-                    alert('Error al eliminar');
-                }
-            }
-        }
+                });
+            });
+        });
     </script>
 </body>
 </html>

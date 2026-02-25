@@ -10,6 +10,7 @@ Dashboard operativo + API para gestionar lanzamientos de musica urbana (tracks, 
 - Endpoints de uploads y bulk upload disponibles tambien via API Key
 - Transcripcion de letras con OpenAI Whisper y batch generation
 - Tool YouTube Metadata Audit (inspeccion de canal + update masivo)
+- **Remotion Studio** integrado para edicion de video
 - Deploy via Docker / Docker Hub
 
 ## Stack

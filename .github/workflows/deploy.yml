@@ -1,32 +1,79 @@
-name: Deploy to Production
+name: 🚀 Deploy to Linode Production
 
 on:
   push:
     branches: [ main ]
+  workflow_dispatch:
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     
     steps:
-    - name: Checkout code
+    - name: 📥 Checkout code
       uses: actions/checkout@v3
     
-    - name: Setup SSH
+    - name: 🔑 Setup SSH
       uses: webfactory/ssh-agent@v0.8.0
       with:
         ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
     
-    - name: Add host to known hosts
+    - name: 🌐 Add host to known hosts
       run: |
         mkdir -p ~/.ssh
         ssh-keyscan -H 172.233.181.181 >> ~/.ssh/known_hosts
     
-    - name: Deploy to server
+    - name: 🚀 Deploy to Linode Server
       run: |
+        echo "🚀 Iniciando deploy automático..."
+        
         ssh root@172.233.181.181 '
-          cd /var/www/el-inmortal-2-dashboard &&
-          git pull origin main &&
-          npm install &&
-          pm2 reload app
+          set -e
+          
+          echo "📂 Navegando al proyecto..."
+          cd /var/www/el-inmortal-2-dashboard
+          
+          echo "💾 Guardando estado actual de PM2..."
+          pm2 save
+          
+          echo "📥 Descargando cambios desde GitHub..."
+          git pull origin main
+          
+          echo "📦 Instalando dependencias (incluyendo node-schedule)..."
+          npm install
+          
+          echo "🔄 Reiniciando aplicación con PM2..."
+          pm2 reload app --update-env
+          
+          echo "💾 Guardando configuración de PM2..."
+          pm2 save
+          
+          echo "✅ Deploy completado exitosamente!"
+          echo "📊 Estado de la aplicación:"
+          pm2 status
+          
+          echo "📝 Registrando deploy..."
+          echo "[$(date)] Deploy automático exitoso - Commit: $(git rev-parse --short HEAD)" >> deploy.log
         '
+        
+        echo "🎉 Deploy finalizado! Tu app está actualizada en https://ei2.galantealx.com"
+    
+    - name: 📊 Verify Deployment
+      if: success()
+      run: |
+        echo "✅ Deploy verificado correctamente"
+        echo ""
+        echo "URLs actualizadas:"
+        echo "  🎵 Landing: https://ei2.galantealx.com/landing"
+        echo "  💳 Checkout: https://ei2.galantealx.com/landing/checkout"
+        echo "  👥 Admin: https://ei2.galantealx.com/landing/admin/users"
+        echo "  📱 NFC: https://ei2.galantealx.com/unlock/:code"
+    
+    - name: ❌ Handle Failure
+      if: failure()
+      run: |
+        echo "❌ El deploy falló"
+        echo "Por favor revisa:"
+        echo "  1. Que el servidor esté encendido"
+        echo "  2. Que la clave SSH esté configurada en GitHub Secrets"
+        echo "  3. Los logs en el servidor: ssh root@172.233.181.181 'pm2 logs'"

@@ -1,10 +1,11 @@
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
-const { exec } = require('child_process');
+const { exec, spawn } = require('child_process');
 const { promisify } = require('util');
 const router = express.Router();
 const ytdl = require('youtube-dl-exec');
+const multer = require('multer');
 const execAsync = promisify(exec);
 
 const {
@@ -35,6 +36,27 @@ function normalizeDropboxUrl(rawUrl) {
 
     return parsed.toString();
 }
+
+// Configure multer for video uploads
+const uploadDir = path.join(__dirname, '../../temp');
+if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+const videoUpload = multer({
+    dest: uploadDir,
+    limits: {
+        fileSize: 500 * 1024 * 1024 // 500MB limit
+    },
+    fileFilter: (req, file, cb) => {
+        const allowedTypes = ['video/mp4', 'video/quicktime', 'video/webm', 'video/x-msvideo', 'video/mpeg'];
+        if (allowedTypes.includes(file.mimetype)) {
+            cb(null, true);
+        } else {
+            cb(new Error('Tipo de archivo no soportado. Use MP4, MOV, WebM, AVI o MPEG.'), false);
+        }
+    }
+});
 
 router.get('/', (req, res) => {
     res.render('tools/index', {
@@ -528,6 +550,256 @@ router.get('/gpu-info', async (req, res) => {
             error: 'Failed to get GPU info',
             acceleration: 'not available'
         });
+    }
+});
+
+// Server-side thumbnail generation from uploaded video
+router.post('/generate-thumbnail', videoUpload.single('video'), async (req, res) => {
+    let videoPath = null;
+    
+    try {
+        if (!req.file) {
+            return res.status(400).json({ error: 'No se subió ningún video' });
+        }
+
+        videoPath = req.file.path;
+        const time = Number(req.body.time || 0);
+        const format = req.body.format || 'png';
+        
+        if (isNaN(time) || time < 0) {
+            fs.unlinkSync(videoPath);
+            return res.status(400).json({ error: 'Tiempo inválido' });
+        }
+
+        const timestamp = Date.now();
+        const outputPath = path.join(uploadDir, `thumb_${timestamp}.${format}`);
+
+        // Get video duration first
+        const { stdout: durationOutput } = await execAsync(
+            `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${videoPath}"`,
+            { timeout: 10000 }
+        ).catch(() => ({ stdout: '0' }));
+        
+        const duration = parseFloat(durationOutput) || 0;
+        const validTime = duration > 0 ? Math.min(time, duration - 0.1) : time;
+
+        // Build ffmpeg command
+        let ffmpegCmd = `ffmpeg -ss ${validTime} -i "${videoPath}" -vframes 1`;
+        
+        // Add format-specific options
+        if (format === 'jpg' || format === 'jpeg') {
+            ffmpegCmd += ' -q:v 2';
+        } else {
+            ffmpegCmd += ' -compression_level 3';
+        }
+        
+        ffmpegCmd += ` -y "${outputPath}"`;
+
+        console.log('[THUMBNAIL] Generating with ffmpeg:', ffmpegCmd);
+        await execAsync(ffmpegCmd, { timeout: 30000 });
+
+        if (!fs.existsSync(outputPath)) {
+            throw new Error('No se pudo generar el thumbnail');
+        }
+
+        // Get dimensions
+        const { stdout: dimsOutput } = await execAsync(
+            `ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=s=x:p=0 "${outputPath}"`,
+            { timeout: 10000 }
+        ).catch(() => ({ stdout: '1280x720' }));
+
+        const [width, height] = dimsOutput.trim().split('x').map(Number);
+
+        // Send response
+        const stat = fs.statSync(outputPath);
+        const contentType = format === 'jpg' || format === 'jpeg' ? 'image/jpeg' : 'image/png';
+        
+        res.setHeader('Content-Type', contentType);
+        res.setHeader('Content-Length', stat.size);
+        res.setHeader('X-Thumbnail-Width', width || 1280);
+        res.setHeader('X-Thumbnail-Height', height || 720);
+        res.setHeader('X-Thumbnail-Time', validTime.toFixed(1));
+        res.setHeader('Cache-Control', 'no-store');
+
+        const stream = fs.createReadStream(outputPath);
+        stream.pipe(res);
+
+        // Cleanup
+        stream.on('close', () => {
+            try {
+                fs.unlinkSync(outputPath);
+                if (videoPath && fs.existsSync(videoPath)) {
+                    fs.unlinkSync(videoPath);
+                }
+            } catch (e) {
+                console.error('[THUMBNAIL] Cleanup error:', e);
+            }
+        });
+
+        stream.on('error', (err) => {
+            console.error('[THUMBNAIL] Stream error:', err);
+            if (!res.headersSent) {
+                res.status(500).json({ error: 'Error enviando thumbnail' });
+            }
+            cleanupFiles(outputPath, videoPath);
+        });
+
+    } catch (error) {
+        console.error('[THUMBNAIL] Generation error:', error);
+        cleanupFiles(null, videoPath);
+        
+        if (!res.headersSent) {
+            res.status(500).json({ 
+                error: 'Error generando thumbnail: ' + error.message,
+                details: error.stderr || ''
+            });
+        }
+    }
+});
+
+function cleanupFiles(outputPath, videoPath) {
+    try {
+        if (outputPath && fs.existsSync(outputPath)) {
+            fs.unlinkSync(outputPath);
+        }
+        if (videoPath && fs.existsSync(videoPath)) {
+            fs.unlinkSync(videoPath);
+        }
+    } catch (e) {
+        // ignore cleanup errors
+    }
+}
+
+// Remotion Studio Routes
+let remotionProcess = null;
+let remotionPort = 3003;
+
+// Helper to find an available port
+async function findAvailablePort(startPort) {
+    const net = require('net');
+    return new Promise((resolve, reject) => {
+        const server = net.createServer();
+        server.listen(startPort, () => {
+            const port = server.address().port;
+            server.close(() => resolve(port));
+        });
+        server.on('error', () => {
+            findAvailablePort(startPort + 1).then(resolve).catch(reject);
+        });
+    });
+}
+
+router.get('/remotion-studio', async (req, res) => {
+    const projectPath = path.join(__dirname, '../../remotion');
+    const packageJsonPath = path.join(__dirname, '../../package.json');
+    
+    // Check if remotion directory exists
+    if (!fs.existsSync(projectPath)) {
+        return res.status(404).render('error', {
+            title: 'Remotion No Encontrado',
+            message: 'El proyecto Remotion no existe. Ejecuta "npx remotion init" primero.'
+        });
+    }
+    
+    // Start Remotion Studio if not already running
+    if (!remotionProcess) {
+        try {
+            remotionPort = await findAvailablePort(3003);
+            
+            remotionProcess = spawn('npx', ['remotion', 'studio', '--port', remotionPort.toString()], {
+                cwd: path.join(__dirname, '../..'),
+                detached: false,
+                stdio: ['ignore', 'pipe', 'pipe']
+            });
+            
+            remotionProcess.stdout.on('data', (data) => {
+                console.log(`[Remotion Studio] ${data}`);
+            });
+            
+            remotionProcess.stderr.on('data', (data) => {
+                console.error(`[Remotion Studio Error] ${data}`);
+            });
+            
+            remotionProcess.on('close', (code) => {
+                console.log(`[Remotion Studio] Process exited with code ${code}`);
+                remotionProcess = null;
+            });
+            
+            // Wait a bit for the server to start
+            await new Promise(resolve => setTimeout(resolve, 3000));
+            
+        } catch (error) {
+            console.error('Error starting Remotion Studio:', error);
+            return res.status(500).render('error', {
+                title: 'Error al Iniciar Remotion',
+                message: 'No se pudo iniciar Remotion Studio: ' + error.message
+            });
+        }
+    }
+    
+    const studioUrl = `http://localhost:${remotionPort}`;
+    
+    res.render('tools/remotion-studio', {
+        title: 'Remotion Studio - El Inmortal 2 Dashboard',
+        studioUrl,
+        projectPath: 'remotion/',
+        flash: String(req.query.flash || '')
+    });
+});
+
+router.post('/remotion-studio/render', async (req, res) => {
+    const { composition, output, props } = req.body;
+    
+    if (!composition) {
+        return res.status(400).json({ error: 'Composition name is required' });
+    }
+    
+    const outputDir = path.join(__dirname, '../../exports');
+    if (!fs.existsSync(outputDir)) {
+        fs.mkdirSync(outputDir, { recursive: true });
+    }
+    
+    const outputPath = output || `exports/${composition}_${Date.now()}.mp4`;
+    const fullOutputPath = path.join(__dirname, '../..', outputPath);
+    
+    try {
+        const args = ['remotion', 'render', composition, fullOutputPath];
+        
+        if (props) {
+            args.push('--props', JSON.stringify(props));
+        }
+        
+        const { stdout, stderr } = await execAsync(`npx ${args.join(' ')}`, {
+            cwd: path.join(__dirname, '../..'),
+            timeout: 300000 // 5 minutes timeout
+        });
+        
+        if (fs.existsSync(fullOutputPath)) {
+            res.json({
+                success: true,
+                outputPath: outputPath,
+                message: 'Video rendered successfully'
+            });
+        } else {
+            throw new Error('Output file was not created');
+        }
+        
+    } catch (error) {
+        console.error('Render error:', error);
+        res.status(500).json({
+            error: 'Render failed: ' + error.message,
+            details: error.stderr || ''
+        });
+    }
+});
+
+router.post('/remotion-studio/stop', (req, res) => {
+    if (remotionProcess) {
+        remotionProcess.kill();
+        remotionProcess = null;
+        res.json({ success: true, message: 'Remotion Studio stopped' });
+    } else {
+        res.json({ success: true, message: 'Remotion Studio was not running' });
     }
 });
 

@@ -40,6 +40,8 @@
     "node": ">=16.0.0"
   },
   "dependencies": {
+    "@remotion/cli": "^4.0.428",
+    "@remotion/player": "^4.0.428",
     "bcryptjs": "^2.4.3",
     "connect-sqlite3": "^0.9.13",
     "cookie-parser": "^1.4.7",
@@ -65,6 +67,7 @@
     "playwright-core": "^1.58.2",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
+    "remotion": "^4.0.428",
     "sqlite3": "^5.1.6",
     "winston": "^3.11.0",
     "youtube-dl-exec": "^3.1.2"

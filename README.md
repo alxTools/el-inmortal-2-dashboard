@@ -230,3 +230,4 @@ uninstall_db_backup_hourly_schedule.bat
 ## Nota para expansion MCP multi-artista
 
 La API `v1` ya soporta API keys y separacion por empresa en el modelo de keys. Para hard multitenancy total, el siguiente paso es agregar `company_id` en todas las tablas operativas y aplicar filtros por tenant en cada query.
+# Deploy test - Tue Feb 24 20:47:59 SAWST 2026

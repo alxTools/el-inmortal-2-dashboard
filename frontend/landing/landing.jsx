@@ -433,13 +433,41 @@ function CartModal({ isOpen, onClose, cartItems, setCartItems, isCheckingOut, se
         }
         
         setIsCheckingOut(true);
-        // Aquí iría la integración con Stripe/PayPal
-        // Por ahora simulamos el proceso
+        
+        // Verificar si hay un usuario registrado (debería estar guardado en localStorage o cookie)
+        // Por ahora, redirigimos a la página de checkout con un mensaje
+        
+        // Guardar el carrito en localStorage para el checkout
+        localStorage.setItem('ei2_cart', JSON.stringify(cartItems));
+        
+        // Mostrar modal de información
         setTimeout(() => {
-            alert('🎉 Redirigiendo a checkout seguro...\n\nEn producción esto conectaría con Stripe/PayPal');
             setIsCheckingOut(false);
-            onClose();
-        }, 1500);
+            
+            // Verificar si el usuario ya está registrado
+            const hasRegistered = localStorage.getItem('ei2_registered');
+            
+            if (hasRegistered) {
+                // Si ya está registrado, redirigir al checkout
+                const userEmail = localStorage.getItem('ei2_email');
+                if (userEmail) {
+                    window.location.href = `/landing/checkout?email=${encodeURIComponent(userEmail)}&token=demo`;
+                } else {
+                    alert('Por favor regístrate primero para completar tu compra');
+                }
+            } else {
+                // Si no está registrado, cerrar modal y mostrar el de registro
+                onClose();
+                // Abrir el modal de suscripción
+                setTimeout(() => {
+                    if (window.openSubscribeModal) {
+                        window.openSubscribeModal();
+                    } else {
+                        alert('Por favor regístrate primero para acceder al checkout seguro');
+                    }
+                }, 100);
+            }
+        }, 500);
     };
     
     if (!isOpen) return null;
@@ -848,6 +876,17 @@ function LandingApp({ data }) {
         return () => clearInterval(timer);
     }, [data.releaseDate]);
 
+    // Exponer función global para abrir modal desde el carrito
+    useEffect(() => {
+        window.openSubscribeModal = () => {
+            setIsModalOpen(true);
+        };
+
+        return () => {
+            delete window.openSubscribeModal;
+        };
+    }, []);
+
     useEffect(() => {
         if (!isUnlocked) return;
         const fetchStats = async () => {
@@ -1057,6 +1096,9 @@ function LandingApp({ data }) {
             console.log('[Landing] Éxito:', data);
 
             localStorage.setItem('landing_el_inmortal_unlock', '1');
+            localStorage.setItem('ei2_registered', 'true');
+            localStorage.setItem('ei2_email', email);
+            localStorage.setItem('ei2_name', fullName);
             setIsUnlocked(true);
             setIsModalOpen(false);
             setSubmitError('');

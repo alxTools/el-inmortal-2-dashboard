@@ -2,8 +2,11 @@ const express = require('express');
 const path = require('path');
 const fs = require('fs');
 const { getAll, getOne, query, run } = require('../config/database');
-const { sendWelcomeEmail, sendWebhookToN8N } = require('../utils/emailHelper');
-const { ensureLandingLeadsTable, syncToWordPress, getUnifiedStats } = require('../utils/landingDb');
+const { sendWelcomeEmail, sendMiniDiscConfirmationEmail, sendWebhookToN8N } = require('../utils/emailHelper');
+const { ensureLandingLeadsTable, saveNFCCode, syncToWordPress, getUnifiedStats } = require('../utils/landingDb');
+const { createPayPalOrder, capturePayPalOrder, getPayPalConfig } = require('../utils/paypalHelper');
+const { scheduleMiniDiscEmail } = require('../utils/scheduledEmails');
+const { syncUserToNotion, isNotionConfigured, syncAllUsersToNotion, getNotionStats } = require('../utils/notionHelper');
 
 const router = express.Router();
 
@@ -72,13 +75,72 @@ function toPublicImagePath(rawPath) {
     return `/uploads/images/${path.basename(normalized)}`;
 }
 
-function toPublicMediaPath(rawPath) {
+// Cache para archivos de audio disponibles
+let audioFilesCache = null;
+let audioFilesCacheTime = 0;
+const CACHE_DURATION = 60000; // 1 minuto
+
+function getAvailableAudioFiles() {
+    const now = Date.now();
+    if (audioFilesCache && (now - audioFilesCacheTime) < CACHE_DURATION) {
+        return audioFilesCache;
+    }
+    
+    try {
+        const audioDir = path.join(__dirname, '../../public/uploads/audio');
+        if (fs.existsSync(audioDir)) {
+            audioFilesCache = fs.readdirSync(audioDir)
+                .filter(f => f.toLowerCase().endsWith('.wav') || f.toLowerCase().endsWith('.mp3'))
+                .map(f => ({
+                    filename: f,
+                    path: `/uploads/audio/${f}`,
+                    // Extraer número de track del nombre (ej: "177188..._01_..." -> "01")
+                    trackNum: f.match(/_(\d+)_/)?.[1] || null,
+                    // Extraer nombre limpio para matching
+                    cleanName: f.toLowerCase()
+                        .replace(/^\d+_/, '')
+                        .replace(/\.wav$|\.mp3$/i, '')
+                        .replace(/[^a-z0-9]/g, '')
+                }));
+            audioFilesCacheTime = now;
+            return audioFilesCache;
+        }
+    } catch (err) {
+        console.error('Error reading audio directory:', err.message);
+    }
+    return [];
+}
+
+function findAudioFileByTrackNumber(trackNumber) {
+    const files = getAvailableAudioFiles();
+    const targetNum = String(trackNumber).padStart(2, '0');
+    
+    // Buscar por número de track en el nombre del archivo
+    const match = files.find(f => f.trackNum === targetNum);
+    if (match) {
+        console.log(`[Audio] Found match for track ${trackNumber}: ${match.filename}`);
+        return match.path;
+    }
+    
+    return null;
+}
+
+function toPublicMediaPath(rawPath, trackNumber = null) {
     const source = String(rawPath || '').trim();
+    
+    // Si no hay path pero hay número de track, buscar en uploads/audio
+    if (!source && trackNumber) {
+        const found = findAudioFileByTrackNumber(trackNumber);
+        if (found) return found;
+    }
+    
     if (!source) return '';
 
     if (/^https?:\/\//i.test(source)) return source;
 
     const normalized = source.replace(/\\/g, '/');
+    
+    // Si es ruta local de uploads, usarla
     const uploadsIdx = normalized.toLowerCase().indexOf('/uploads/');
     if (uploadsIdx >= 0) {
         return normalized.slice(uploadsIdx);
@@ -86,6 +148,12 @@ function toPublicMediaPath(rawPath) {
 
     if (normalized.startsWith('/uploads/')) return normalized;
     if (normalized.startsWith('uploads/')) return `/${normalized}`;
+
+    // Si es ruta de Dropbox/local pero tenemos el track number, buscar archivo
+    if (trackNumber) {
+        const found = findAudioFileByTrackNumber(trackNumber);
+        if (found) return found;
+    }
 
     return '';
 }
@@ -140,7 +208,7 @@ async function renderLandingPage(res) {
             producer: fallback.producer,
             features: fallback.features,
             duration: String(dbTrack?.duration || fallback.duration || '').trim(),
-            audioUrl: toPublicMediaPath(dbTrack?.audio_file_path)
+            audioUrl: toPublicMediaPath(dbTrack?.audio_file_path, trackNum)
         };
     });
 
@@ -283,6 +351,48 @@ router.post('/subscribe', async (req, res) => {
         console.log('[Landing Subscribe] Email result:', emailResult.status === 'fulfilled' ? emailResult.value : emailResult.reason);
         console.log('[Landing Subscribe] Webhook result:', webhookResult.status === 'fulfilled' ? webhookResult.value : webhookResult.reason);
 
+        // Programar email de Mini-Disc para 30 minutos después
+        if (result.lastID) {
+            console.log('[Landing Subscribe] Paso 5: Programando email de Mini-Disc para 30 min después...');
+            try {
+                await scheduleMiniDiscEmail(result.lastID, email, {
+                    fullName,
+                    country,
+                    sourceLabel
+                });
+                console.log('[Landing Subscribe] ✅ Email de Mini-Disc programado');
+            } catch (scheduleError) {
+                console.error('[Landing Subscribe] ⚠️ Error programando email Mini-Disc:', scheduleError.message);
+                // No fallamos si esto falla
+            }
+        }
+
+        // Sincronizar con Notion (en tiempo real)
+        if (process.env.NOTION_SYNC_ENABLED === 'true' && process.env.NOTION_SYNC_ON_REGISTER === 'true') {
+            console.log('[Landing Subscribe] Paso 6: Sincronizando con Notion...');
+            try {
+                const userData = {
+                    id: result.lastID,
+                    email,
+                    full_name: fullName,
+                    country,
+                    created_at: new Date().toISOString(),
+                    minidisc_email_sent: 0,
+                    interested_in_minidisc: 0,
+                    paypal_order_id: null,
+                    paypal_payment_status: null,
+                    nfc_unique_code: null,
+                    package_shipped: 0,
+                    tracking_number: null
+                };
+                const notionResult = await syncUserToNotion(userData);
+                console.log('[Landing Subscribe] ✅ Notion sync:', notionResult.success ? 'OK' : 'Skipped');
+            } catch (notionError) {
+                console.error('[Landing Subscribe] ⚠️ Error sincronizando con Notion:', notionError.message);
+                // No fallamos si esto falla
+            }
+        }
+
         // Establecer cookie de acceso para fans verificados (válida por 7 días)
         res.cookie('landing_el_inmortal_unlock', '1', {
             maxAge: 7 * 24 * 60 * 60 * 1000, // 7 días (1 semana)
@@ -415,6 +525,303 @@ router.get('/track/:id', async (req, res) => {
     }
 });
 
+// ==================== PAYPAL ROUTES ====================
+
+// Obtener configuración de PayPal para el frontend
+router.get('/paypal-config', (_req, res) => {
+    const config = getPayPalConfig();
+    res.json({
+        clientId: config.clientId,
+        mode: config.mode,
+        currency: config.currency
+    });
+});
+
+// Crear orden de PayPal
+router.post('/create-paypal-order', async (req, res) => {
+    try {
+        const { packageId, email, fullName } = req.body;
+        
+        if (!packageId || !email) {
+            return res.status(400).json({ 
+                success: false, 
+                error: 'Missing required fields' 
+            });
+        }
+        
+        const result = await createPayPalOrder({
+            packageId,
+            customerEmail: email,
+            customerName: fullName
+        });
+        
+        if (result.success) {
+            // Guardar el orderId en la sesión o DB temporalmente
+            // Esto ayuda a trackear la orden después
+            res.json({
+                success: true,
+                orderId: result.orderId,
+                approvalUrl: result.approvalUrl
+            });
+        } else {
+            res.status(500).json({
+                success: false,
+                error: result.error
+            });
+        }
+    } catch (error) {
+        console.error('[PayPal] Error creating order:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+// Capturar orden de PayPal (después de que el usuario apruebe)
+router.post('/capture-paypal-order', async (req, res) => {
+    try {
+        const { orderId, userId } = req.body;
+        
+        if (!orderId) {
+            return res.status(400).json({
+                success: false,
+                error: 'Order ID required'
+            });
+        }
+        
+        const result = await capturePayPalOrder(orderId);
+        
+        if (result.success) {
+            // Actualizar la base de datos con la información del pago
+            await run(
+                `UPDATE landing_email_leads 
+                 SET paypal_order_id = ?, 
+                     paypal_payment_status = ?,
+                     paypal_payer_email = ?,
+                     interested_in_minidisc = 1
+                 WHERE id = ?`,
+                [result.orderId, 'captured', result.payerEmail, userId]
+            );
+            
+            // Generar código NFC para el usuario
+            const nfcData = await saveNFCCode(userId);
+            
+            // Obtener datos del usuario para el email
+            const userData = await getOne(
+                'SELECT email, full_name, country FROM landing_email_leads WHERE id = ?',
+                [userId]
+            );
+            
+            // Enviar email de confirmación
+            await sendMiniDiscConfirmationEmail({
+                to: userData.email,
+                name: userData.full_name,
+                orderId: result.orderId,
+                amount: result.amount,
+                nfcCode: nfcData.code,
+                nfcLink: nfcData.link
+            });
+            
+            // Sincronizar con Notion (actualizar a "Comprado")
+            if (process.env.NOTION_SYNC_ENABLED === 'true' && process.env.NOTION_SYNC_ON_PURCHASE === 'true') {
+                console.log('[PayPal] Sincronizando compra con Notion...');
+                try {
+                    const fullUserData = await getOne(
+                        'SELECT * FROM landing_email_leads WHERE id = ?',
+                        [userId]
+                    );
+                    if (fullUserData) {
+                        await syncUserToNotion(fullUserData);
+                        console.log('[PayPal] ✅ Notion actualizado con compra');
+                    }
+                } catch (notionError) {
+                    console.error('[PayPal] ⚠️ Error sincronizando con Notion:', notionError.message);
+                    // No fallamos si esto falla
+                }
+            }
+            
+            res.json({
+                success: true,
+                orderId: result.orderId,
+                status: result.status,
+                amount: result.amount,
+                nfcCode: nfcData.code,
+                nfcLink: nfcData.link
+            });
+        } else {
+            res.status(500).json({
+                success: false,
+                error: result.error
+            });
+        }
+    } catch (error) {
+        console.error('[PayPal] Error capturing order:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+// Página de checkout dedicada (para usuarios que vienen del email)
+router.get('/checkout', async (req, res) => {
+    try {
+        const { email, token } = req.query;
+        
+        if (!email || !token) {
+            return res.redirect('/ei2');
+        }
+        
+        // Buscar al usuario
+        const user = await getOne(
+            'SELECT id, email, full_name, country FROM landing_email_leads WHERE email = ?',
+            [email]
+        );
+        
+        if (!user) {
+            return res.redirect('/ei2');
+        }
+        
+        // Verificar si ya compró
+        const existingOrder = await getOne(
+            'SELECT paypal_order_id FROM landing_email_leads WHERE id = ? AND paypal_payment_status = "captured"',
+            [user.id]
+        );
+        
+        const alreadyPurchased = !!existingOrder;
+        
+        res.render('landing/checkout', {
+            title: 'Checkout - Mini-Disc El Inmortal 2',
+            user: user,
+            alreadyPurchased: alreadyPurchased,
+            paypalClientId: process.env.PAYPAL_CLIENT_ID,
+            paypalMode: process.env.PAYPAL_MODE || 'sandbox'
+        });
+    } catch (error) {
+        console.error('[Checkout] Error:', error);
+        res.redirect('/ei2');
+    }
+});
+
+// Página de éxito después del checkout
+router.get('/checkout-success', (req, res) => {
+    res.render('landing/checkout-success', {
+        title: '¡Gracias por tu compra! - El Inmortal 2'
+    });
+});
+
+// Página de cancelación
+router.get('/checkout-cancel', (req, res) => {
+    res.render('landing/checkout-cancel', {
+        title: 'Checkout Cancelado - El Inmortal 2'
+    });
+});
+
+// ==================== NFC / LINKTREE ROUTES ====================
+
+// Página de desbloqueo NFC (cuando escanean el disco)
+router.get('/unlock/:code', async (req, res) => {
+    try {
+        const { code } = req.params;
+        
+        // Buscar el usuario por código NFC
+        const user = await getOne(
+            'SELECT id, email, full_name, nfc_link, package_shipped, tracking_number FROM landing_email_leads WHERE nfc_unique_code = ?',
+            [code]
+        );
+        
+        if (!user) {
+            return res.status(404).render('error', {
+                title: 'Código no válido',
+                message: 'Este código NFC no es válido o ha expirado.',
+                error: {}
+            });
+        }
+        
+        res.render('landing/nfc-landing', {
+            title: 'Contenido Exclusivo - El Inmortal 2',
+            user: user,
+            code: code,
+            links: {
+                spotify: 'https://open.spotify.com/artist/5SYAaCKEVYhN3RDSDKUTJn?si=DjzkUy8MQU2BK9L0zdwE5A',
+                appleMusic: 'https://music.apple.com/us/artist/galante-el-emperador/415956668',
+                youtubeMusic: 'https://music.youtube.com/channel/UC-9-kyTW8ZkZNDHQJ6FgpwQ',
+                instagram: 'https://instagram.com/galanteddm',
+                tiktok: 'https://tiktok.com/@galante_elemperador',
+                youtube: 'https://youtube.com/@galante',
+                merch: 'https://galantealx.com/merch',
+                website: 'https://galantealx.com',
+                amazonMusic: 'https://music.amazon.com/artists/B004K77DXQ/galante-el-emperador',
+                twitter: 'https://twitter.com/galantealx'
+            }
+        });
+    } catch (error) {
+        console.error('[NFC] Error:', error);
+        res.status(500).render('error', {
+            title: 'Error',
+            message: 'Error cargando contenido exclusivo.',
+            error: process.env.NODE_ENV === 'development' ? error : {}
+        });
+    }
+});
+
+// ==================== ADMIN ROUTES ====================
+
+// Panel de configuración del landing
+router.get('/admin/config', async (req, res) => {
+    // Verificar si es admin
+    if (!req.session.user) {
+        return res.redirect('/login');
+    }
+    
+    try {
+        const stats = await getUnifiedStats();
+        
+        res.render('landing/admin-config', {
+            title: 'Configuración Landing - El Inmortal 2',
+            stats: stats,
+            config: {
+                paypalMode: process.env.PAYPAL_MODE || 'sandbox',
+                fakeStockCount: 47,
+                stockDisplayMode: 'fake'
+            }
+        });
+    } catch (error) {
+        console.error('[Admin] Error:', error);
+        res.status(500).render('error', {
+            title: 'Error',
+            message: 'Error cargando configuración.',
+            error: process.env.NODE_ENV === 'development' ? error : {}
+        });
+    }
+});
+
+// Actualizar configuración
+router.post('/admin/config/update', async (req, res) => {
+    if (!req.session.user) {
+        return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
+    
+    try {
+        const { stockDisplayMode, fakeStockCount, notificationsEnabled, notificationFrequency } = req.body;
+        
+        // Aquí podrías guardar en DB, por ahora solo log
+        console.log('[Admin] Configuración actualizada:', {
+            stockDisplayMode,
+            fakeStockCount,
+            notificationsEnabled,
+            notificationFrequency
+        });
+        
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// ==================== DEBUG ROUTES ====================
+
 // Endpoint de diagnóstico temporal
 router.get('/debug', async (req, res) => {
     try {
@@ -424,6 +831,8 @@ router.get('/debug', async (req, res) => {
             env_vars: {
                 DB_HOST: process.env.DB_HOST ? '✅ Configurado' : '❌ No configurado',
                 DB_NAME: process.env.DB_NAME ? '✅ Configurado' : '❌ No configurado',
+                PAYPAL_CLIENT_ID: process.env.PAYPAL_CLIENT_ID ? '✅ Configurado' : '❌ No configurado',
+                PAYPAL_SECRET: process.env.PAYPAL_SECRET ? '✅ Configurado' : '❌ No configurado',
                 MS_GRAPH_TENANT_ID: process.env.MS_GRAPH_TENANT_ID ? '✅ Configurado' : '⚠️ No configurado (email opcional)',
                 N8N_WEBHOOK_URL: process.env.N8N_WEBHOOK_URL ? '✅ Configurado' : '⚠️ No configurado (webhook opcional)'
             }
@@ -445,9 +854,243 @@ router.get('/debug', async (req, res) => {
             diagnostics.email_helper = `❌ Error: ${helperError.message}`;
         }
         
+        // Probar PayPal helper
+        try {
+            const paypalHelper = require('../utils/paypalHelper');
+            diagnostics.paypal_helper = '✅ Cargado correctamente';
+            diagnostics.paypal_mode = process.env.PAYPAL_MODE || 'sandbox';
+        } catch (helperError) {
+            diagnostics.paypal_helper = `❌ Error: ${helperError.message}`;
+        }
+        
         res.json(diagnostics);
     } catch (error) {
         res.status(500).json({ error: error.message, stack: error.stack });
+    }
+});
+
+// ==================== EXPORT ROUTES ====================
+
+// Vista de admin para ver usuarios (HTML)
+router.get('/admin/users', async (req, res) => {
+    if (!req.session.user) {
+        return res.redirect('/login');
+    }
+    
+    try {
+        const { getFunnelStep } = require('../utils/exportUsers');
+        
+        const users = await getAll(`
+            SELECT 
+                id, email, full_name, country, created_at,
+                interested_in_minidisc, paypal_order_id, paypal_payment_status,
+                minidisc_email_sent, minidisc_email_sent_at,
+                nfc_unique_code, package_shipped, tracking_number
+            FROM landing_email_leads
+            ORDER BY created_at DESC
+            LIMIT 100
+        `);
+        
+        const usersWithFunnel = users.map(user => ({
+            ...user,
+            funnel: getFunnelStep(user)
+        }));
+        
+        // Calculate stats
+        const stats = {
+            total: users.length,
+            registered: users.length,
+            emailSent: users.filter(u => u.minidisc_email_sent).length,
+            interested: users.filter(u => u.interested_in_minidisc).length,
+            checkoutStarted: users.filter(u => u.paypal_order_id && !u.paypal_payment_status).length,
+            purchased: users.filter(u => u.paypal_payment_status === 'captured').length,
+            shipped: users.filter(u => u.package_shipped).length
+        };
+        
+        res.render('landing/admin-users', {
+            title: 'Usuarios - El Inmortal 2',
+            users: usersWithFunnel,
+            stats
+        });
+    } catch (error) {
+        console.error('[Admin Users] Error:', error);
+        res.status(500).render('error', {
+            title: 'Error',
+            message: 'Error cargando usuarios.',
+            error: process.env.NODE_ENV === 'development' ? error : {}
+        });
+    }
+});
+
+// Exportar a CSV
+router.get('/admin/export/csv', async (req, res) => {
+    if (!req.session.user) {
+        return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
+    
+    try {
+        const { exportToCSV } = require('../utils/exportUsers');
+        const result = await exportToCSV();
+        
+        if (result.success) {
+            res.download(result.filepath, result.filename);
+        } else {
+            res.status(500).json(result);
+        }
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Exportar a JSON
+router.get('/admin/export/json', async (req, res) => {
+    if (!req.session.user) {
+        return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
+    
+    try {
+        const { exportToJSON } = require('../utils/exportUsers');
+        const result = await exportToJSON();
+        
+        if (result.success) {
+            res.download(result.filepath, result.filename);
+        } else {
+            res.status(500).json(result);
+        }
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// API para obtener usuarios (JSON)
+router.get('/admin/api/users', async (req, res) => {
+    if (!req.session.user) {
+        return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
+    
+    try {
+        const { getFunnelStep } = require('../utils/exportUsers');
+        
+        const users = await getAll(`
+            SELECT 
+                id, email, full_name, country, created_at,
+                interested_in_minidisc, paypal_order_id, paypal_payment_status,
+                minidisc_email_sent, minidisc_email_sent_at,
+                nfc_unique_code, package_shipped, tracking_number
+            FROM landing_email_leads
+            ORDER BY created_at DESC
+        `);
+        
+        const usersWithFunnel = users.map(user => ({
+            ...user,
+            funnel: getFunnelStep(user)
+        }));
+        
+        res.json({
+            success: true,
+            count: users.length,
+            users: usersWithFunnel
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// ==================== NOTION INTEGRATION ROUTES ====================
+
+// Verificar estado de integración con Notion
+router.get('/admin/notion/status', async (req, res) => {
+    if (!req.session.user) {
+        return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
+    
+    try {
+        const configured = isNotionConfigured();
+        let stats = null;
+        
+        if (configured) {
+            const notionStats = await getNotionStats();
+            if (notionStats.success) {
+                stats = notionStats.stats;
+            }
+        }
+        
+        res.json({
+            success: true,
+            configured: configured,
+            syncEnabled: process.env.NOTION_SYNC_ENABLED === 'true',
+            syncOnRegister: process.env.NOTION_SYNC_ON_REGISTER === 'true',
+            syncOnPurchase: process.env.NOTION_SYNC_ON_PURCHASE === 'true',
+            stats: stats
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Sincronizar un usuario específico con Notion
+router.post('/admin/notion/sync-user', async (req, res) => {
+    if (!req.session.user) {
+        return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
+    
+    try {
+        const { userId } = req.body;
+        
+        if (!userId) {
+            return res.status(400).json({ success: false, error: 'User ID required' });
+        }
+        
+        const userData = await getOne(
+            'SELECT * FROM landing_email_leads WHERE id = ?',
+            [userId]
+        );
+        
+        if (!userData) {
+            return res.status(404).json({ success: false, error: 'User not found' });
+        }
+        
+        const result = await syncUserToNotion(userData);
+        
+        if (result.success) {
+            res.json({
+                success: true,
+                message: `User ${userData.email} synchronized successfully`,
+                pageId: result.pageId,
+                action: result.action,
+                url: result.url
+            });
+        } else {
+            res.status(500).json(result);
+        }
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Sincronizar TODOS los usuarios con Notion (bulk)
+router.post('/admin/notion/sync-all', async (req, res) => {
+    if (!req.session.user) {
+        return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
+    
+    try {
+        const result = await syncAllUsersToNotion();
+        
+        if (result.success) {
+            res.json({
+                success: true,
+                message: 'All users synchronized successfully',
+                total: result.total,
+                created: result.created,
+                updated: result.updated,
+                errors: result.errors
+            });
+        } else {
+            res.status(500).json(result);
+        }
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
     }
 });
 

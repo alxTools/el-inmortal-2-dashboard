@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %></title>
+    <script src="https://www.paypal.com/sdk/js?client-id=<%= paypalClientId %>&currency=USD&intent=capture"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #060b15 0%, #0f172a 100%);
+            min-height: 100vh;
+            color: #e2e8f0;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        
+        .header h1 {
+            color: #facc15;
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+        
+        .header p {
+            color: #94a3b8;
+            font-size: 1.1rem;
+        }
+        
+        .urgency-banner {
+            background: rgba(239, 68, 68, 0.15);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            border-radius: 12px;
+            padding: 15px 20px;
+            text-align: center;
+            margin-bottom: 30px;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.8; }
+        }
+        
+        .urgency-banner p {
+            color: #fca5a5;
+            font-weight: bold;
+            margin: 0;
+        }
+        
+        .product-card {
+            background: rgba(15, 23, 42, 0.8);
+            border: 2px solid rgba(250, 204, 21, 0.3);
+            border-radius: 20px;
+            padding: 40px;
+            margin-bottom: 30px;
+        }
+        
+        .product-header {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .product-icon {
+            font-size: 64px;
+        }
+        
+        .product-info h2 {
+            color: #facc15;
+            font-size: 1.8rem;
+            margin-bottom: 5px;
+        }
+        
+        .product-info .price {
+            color: #22c55e;
+            font-size: 2rem;
+            font-weight: bold;
+        }
+        
+        .features-list {
+            list-style: none;
+            margin: 25px 0;
+        }
+        
+        .features-list li {
+            padding: 10px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .features-list li:last-child {
+            border-bottom: none;
+        }
+        
+        .features-list .icon {
+            font-size: 20px;
+        }
+        
+        .customer-info {
+            background: rgba(15, 23, 42, 0.6);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .customer-info h3 {
+            color: #facc15;
+            margin-bottom: 15px;
+        }
+        
+        .customer-info p {
+            color: #94a3b8;
+            margin: 5px 0;
+        }
+        
+        .paypal-container {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 30px;
+            margin-top: 30px;
+        }
+        
+        .paypal-container h3 {
+            text-align: center;
+            color: #e2e8f0;
+            margin-bottom: 20px;
+        }
+        
+        .security-badges {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #64748b;
+            font-size: 0.9rem;
+        }
+        
+        .testimonials {
+            margin-top: 40px;
+            padding: 30px;
+            background: rgba(34, 197, 94, 0.1);
+            border-radius: 12px;
+            border-left: 4px solid #22c55e;
+        }
+        
+        .testimonials p {
+            color: #86efac;
+            font-style: italic;
+            line-height: 1.6;
+        }
+        
+        .testimonials .author {
+            color: #64748b;
+            margin-top: 10px;
+            font-style: normal;
+            font-size: 0.9rem;
+        }
+        
+        .guarantee {
+            text-align: center;
+            margin-top: 30px;
+            padding: 20px;
+            background: rgba(15, 23, 42, 0.6);
+            border-radius: 12px;
+        }
+        
+        .guarantee p {
+            color: #94a3b8;
+        }
+        
+        .already-purchased {
+            text-align: center;
+            padding: 60px 40px;
+            background: rgba(34, 197, 94, 0.1);
+            border: 2px solid rgba(34, 197, 94, 0.3);
+            border-radius: 20px;
+        }
+        
+        .already-purchased h2 {
+            color: #22c55e;
+            margin-bottom: 20px;
+        }
+        
+        .already-purchased p {
+            color: #94a3b8;
+            margin-bottom: 30px;
+        }
+        
+        .btn-back {
+            display: inline-block;
+            background: linear-gradient(135deg, #facc15, #fbbf24);
+            color: #0f172a;
+            text-decoration: none;
+            padding: 15px 30px;
+            border-radius: 50px;
+            font-weight: bold;
+            transition: transform 0.2s;
+        }
+        
+        .btn-back:hover {
+            transform: scale(1.05);
+        }
+        
+        .live-stats {
+            background: rgba(15, 23, 42, 0.6);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        
+        .live-stats p {
+            color: #94a3b8;
+            margin: 5px 0;
+        }
+        
+        .live-stats .highlight {
+            color: #facc15;
+            font-weight: bold;
+        }
+        
+        @media (max-width: 600px) {
+            .header h1 {
+                font-size: 1.8rem;
+            }
+            
+            .product-card {
+                padding: 25px;
+            }
+            
+            .product-header {
+                flex-direction: column;
+                text-align: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div style="font-size: 64px; margin-bottom: 20px;">💿</div>
+            <h1>Mini-Disc de Colección</h1>
+            <p>El Inmortal 2 - Edición Limitada Firmada</p>
+        </div>
+        
+        <% if (alreadyPurchased) { %>
+            <div class="already-purchased">
+                <div style="font-size: 48px; margin-bottom: 20px;">🎉</div>
+                <h2>¡Ya tienes tu Mini-Disc!</h2>
+                <p>Hemos registrado tu compra anterior. Pronto recibirás un email con el número de tracking.</p>
+                <a href="/ei2" class="btn-back">Volver al Álbum</a>
+            </div>
+        <% } else { %>
+            <div class="urgency-banner">
+                <p>⚠️ Solo quedan 38 unidades de 500 disponibles - Edición limitada, no habrá reimpresión</p>
+            </div>
+            
+            <div class="live-stats">
+                <p>🔥 <span class="highlight">12 personas</span> compraron hoy</p>
+                <p>👥 <span class="highlight">3 personas</span> están viendo esto ahora</p>
+            </div>
+            
+            <div class="product-card">
+                <div class="product-header">
+                    <div class="product-icon">💿</div>
+                    <div class="product-info">
+                        <h2>Mini-Disc Firmado</h2>
+                        <div class="price">$15.00 USD</div>
+                    </div>
+                </div>
+                
+                <ul class="features-list">
+                    <li>
+                        <span class="icon">✨</span>
+                        <span>Firmado personalmente por Galante el Emperador</span>
+                    </li>
+                    <li>
+                        <span class="icon">📱</span>
+                        <span><strong>Tecnología NFC</strong> - Toca con tu celular para desbloquear contenido exclusivo</span>
+                    </li>
+                    <li>
+                        <span class="icon">🎁</span>
+                        <span>Sticker exclusivo de El Inmortal 2 incluido</span>
+                    </li>
+                    <li>
+                        <span class="icon">📦</span>
+                        <span>Envío gratis a <%= user.country || 'tu país' %></span>
+                    </li>
+                    <li>
+                        <span class="icon">🔒</span>
+                        <span>Numerado del 1 al 500 - Cada uno es único</span>
+                    </li>
+                    <li>
+                        <span class="icon">🚀</span>
+                        <span>Entrega en 3-5 días hábiles</span>
+                    </li>
+                </ul>
+                
+                <div class="customer-info">
+                    <h3>📋 Información de Envío</h3>
+                    <p><strong>Nombre:</strong> <%= user.full_name %></p>
+                    <p><strong>Email:</strong> <%= user.email %></p>
+                    <p><strong>País:</strong> <%= user.country || 'Por confirmar' %></p>
+                </div>
+                
+                <div class="paypal-container">
+                    <h3>🔒 Pago Seguro con PayPal</h3>
+                    <div id="paypal-button-container"></div>
+                </div>
+                
+                <div class="security-badges">
+                    <div class="badge">
+                        <span>🔒</span>
+                        <span>SSL Seguro</span>
+                    </div>
+                    <div class="badge">
+                        <span>✓</span>
+                        <span>PayPal Protegido</span>
+                    </div>
+                    <div class="badge">
+                        <span>🛡️</span>
+                        <span>Garantía de Devolución</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="testimonials">
+                <p>"No pensé que un minidisc pudiera significar tanto. Tocarlo y escuchar la música es otra experiencia completamente diferente. Además, el NFC es mágico - toco con el celular y aparece contenido exclusivo." </p>
+                <p class="author">— Carlos M., México 🇲🇽</p>
+            </div>
+            
+            <div class="guarantee">
+                <p>✅ <strong>Garantía de Devolución:</strong> Si no quedas 100% satisfecho con tu Mini-Disc, te devolvemos tu dinero. Sin preguntas, sin complicaciones.</p>
+            </div>
+        <% } %>
+    </div>
+    
+    <script>
+        const userId = <%= user.id %>;
+        const userEmail = '<%= user.email %>';
+        const userName = '<%= user.full_name %>';
+        
+        // Inicializar PayPal Buttons
+        paypal.Buttons({
+            style: {
+                layout: 'vertical',
+                color: 'gold',
+                shape: 'rect',
+                label: 'pay'
+            },
+            
+            createOrder: async function(data, actions) {
+                try {
+                    const response = await fetch('/landing/create-paypal-order', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            packageId: 'cd',
+                            email: userEmail,
+                            fullName: userName
+                        })
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        return result.orderId;
+                    } else {
+                        throw new Error(result.error);
+                    }
+                } catch (error) {
+                    console.error('Error creating order:', error);
+                    alert('Error al crear la orden. Por favor intenta de nuevo.');
+                }
+            },
+            
+            onApprove: async function(data, actions) {
+                try {
+                    const response = await fetch('/landing/capture-paypal-order', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            orderId: data.orderID,
+                            userId: userId
+                        })
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        window.location.href = '/landing/checkout-success';
+                    } else {
+                        throw new Error(result.error);
+                    }
+                } catch (error) {
+                    console.error('Error capturing order:', error);
+                    alert('Error al procesar el pago. Por favor intenta de nuevo.');
+                }
+            },
+            
+            onCancel: function(data) {
+                console.log('Payment cancelled');
+            },
+            
+            onError: function(err) {
+                console.error('PayPal error:', err);
+                alert('Error en el procesamiento de pago. Por favor intenta de nuevo.');
+            }
+        }).render('#paypal-button-container');
+    </script>
+</body>
+</html>

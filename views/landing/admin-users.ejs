@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %></title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #060b15 0%, #0f172a 100%);
+            color: #e2e8f0;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            color: #facc15;
+            margin-bottom: 10px;
+            font-size: 2rem;
+        }
+        
+        .subtitle {
+            color: #94a3b8;
+            margin-bottom: 30px;
+        }
+        
+        /* Stats Cards */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+        
+        .stat-card {
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid rgba(250, 204, 21, 0.2);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .stat-card h3 {
+            color: #facc15;
+            font-size: 2rem;
+            margin-bottom: 5px;
+        }
+        
+        .stat-card p {
+            color: #94a3b8;
+            font-size: 0.9rem;
+        }
+        
+        /* Filters */
+        .filters {
+            background: rgba(15, 23, 42, 0.6);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 30px;
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        
+        .filter-group label {
+            color: #94a3b8;
+            font-size: 0.8rem;
+        }
+        
+        select, input {
+            padding: 10px 15px;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: rgba(15, 23, 42, 0.8);
+            color: #e2e8f0;
+            min-width: 150px;
+        }
+        
+        .btn {
+            padding: 10px 20px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #facc15, #fbbf24);
+            color: #0f172a;
+        }
+        
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: #e2e8f0;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.3);
+        }
+        
+        /* Table */
+        .table-container {
+            background: rgba(15, 23, 42, 0.6);
+            border-radius: 12px;
+            overflow: hidden;
+            overflow-x: auto;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        th {
+            background: rgba(250, 204, 21, 0.1);
+            color: #facc15;
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            white-space: nowrap;
+        }
+        
+        td {
+            padding: 15px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            font-size: 0.9rem;
+        }
+        
+        tr:hover {
+            background: rgba(255, 255, 255, 0.03);
+        }
+        
+        /* Badges */
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+        
+        .badge-new { background: rgba(59, 130, 246, 0.2); color: #60a5fa; }
+        .badge-waiting { background: rgba(234, 179, 8, 0.2); color: #facc15; }
+        .badge-hot { background: rgba(249, 115, 22, 0.2); color: #fb923c; }
+        .badge-processing { background: rgba(168, 85, 247, 0.2); color: #c084fc; }
+        .badge-paid { background: rgba(34, 197, 94, 0.2); color: #4ade80; }
+        .badge-shipped { background: rgba(100, 116, 139, 0.2); color: #94a3b8; }
+        
+        .step-indicator {
+            font-family: monospace;
+            font-size: 0.75rem;
+            opacity: 0.7;
+        }
+        
+        /* Email cell */
+        .email {
+            color: #60a5fa;
+            text-decoration: none;
+        }
+        
+        .email:hover {
+            text-decoration: underline;
+        }
+        
+        /* NFC Code */
+        .nfc-code {
+            font-family: monospace;
+            background: rgba(250, 204, 21, 0.1);
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+        }
+        
+        /* Checkbox */
+        .checkbox {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+        }
+        
+        .checkbox.checked {
+            background: #22c55e;
+            color: white;
+        }
+        
+        .checkbox.unchecked {
+            background: rgba(255, 255, 255, 0.1);
+            color: #64748b;
+        }
+        
+        /* Empty state */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #64748b;
+        }
+        
+        .empty-state-icon {
+            font-size: 48px;
+            margin-bottom: 20px;
+        }
+        
+        /* Actions */
+        .actions {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            th, td {
+                padding: 10px;
+                font-size: 0.8rem;
+            }
+            
+            .badge {
+                font-size: 0.7rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>👥 Usuarios Registrados</h1>
+            <p class="subtitle">Tracking completo del funnel de conversión</p>
+        </header>
+        
+        <!-- Stats -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <h3><%= stats.total %></h3>
+                <p>Total Registros</p>
+            </div>
+            
+            <div class="stat-card">
+                <h3><%= stats.emailSent %></h3>
+                <p>Emails Enviados</p>
+            </div>
+            
+            <div class="stat-card">
+                <h3><%= stats.interested %></h3>
+                <p>Interesados</p>
+            </div>
+            
+            <div class="stat-card">
+                <h3><%= stats.checkoutStarted %></h3>
+                <p>Checkout Iniciado</p>
+            </div>
+            
+            <div class="stat-card">
+                <h3><%= stats.purchased %></h3>
+                <p>Compras Confirmadas</p>
+            </div>
+            
+            <div class="stat-card">
+                <h3><%= stats.shipped %></h3>
+                <p>Enviados</p>
+            </div>
+        </div>
+        
+        <!-- Notion Status -->
+        <div id="notion-status" style="background: rgba(15, 23, 42, 0.6); border-radius: 12px; padding: 15px 20px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <span style="font-size: 20px;">📝</span>
+                <span style="color: #94a3b8;">Notion:</span>
+                <span id="notion-connection-status" style="color: #64748b;">Verificando...</span>
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <button onclick="syncToNotion()" class="btn btn-secondary" style="padding: 8px 16px; font-size: 0.85rem;">
+                    🔄 Sync Ahora
+                </button>
+                <a href="https://notion.so" target="_blank" class="btn btn-secondary" style="padding: 8px 16px; font-size: 0.85rem;">
+                    📋 Ver en Notion
+                </a>
+            </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="actions">
+            <a href="/landing/admin/export/csv" class="btn btn-secondary">
+                📥 Exportar CSV
+            </a>
+            <a href="/landing/admin/export/json" class="btn btn-secondary">
+                📥 Exportar JSON
+            </a>
+            <a href="/landing/admin/config" class="btn btn-secondary">
+                ⚙️ Configuración
+            </a>
+        </div>
+        
+        <!-- Filters -->
+        <div class="filters">
+            <div class="filter-group">
+                <label>Filtrar por paso:</label>
+                <select id="filter-step" onchange="filterTable()">
+                    <option value="all">Todos</option>
+                    <option value="1">1 - Registrado</option>
+                    <option value="2">2 - Email Enviado</option>
+                    <option value="3">3 - Interesado</option>
+                    <option value="4">4 - NFC Generado</option>
+                    <option value="5">5 - Checkout Iniciado</option>
+                    <option value="6">6 - Comprado</option>
+                    <option value="7">7 - Enviado</option>
+                </select>
+            </div>
+            
+            <div class="filter-group">
+                <label>Buscar:</label>
+                <input type="text" id="search-input" placeholder="Email o nombre..." onkeyup="filterTable()">
+            </div>
+        </div>
+        
+        <!-- Table -->
+        <div class="table-container">
+            <% if (users.length > 0) { %>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Email</th>
+                            <th>Nombre</th>
+                            <th>País</th>
+                            <th>Fecha</th>
+                            <th>Paso</th>
+                            <th>Email</th>
+                            <th>Interesado</th>
+                            <th>Pago</th>
+                            <th>NFC</th>
+                            <th>Enviado</th>
+                        </tr>
+                    </thead>
+                    <tbody id="users-table">
+                        <% users.forEach(user => { %>
+                            <tr data-step="<%= user.funnel.step.split(' ')[0] %>">
+                                <td>#<%= user.id %></td>
+                                <td>
+                                    <a href="mailto:<%= user.email %>" class="email">
+                                        <%= user.email %
+                                    </a>
+                                </td>
+                                <td><%= user.full_name || '-' %></td>
+                                <td><%= user.country || '-' %></td>
+                                <td><%= new Date(user.created_at).toLocaleDateString('es-ES') %></td>
+                                <td>
+                                    <span class="badge badge-<%=
+                                        user.funnel.status === 'Nuevo' ? 'new' :
+                                        user.funnel.status === 'Esperando' ? 'waiting' :
+                                        user.funnel.status === 'Hot Lead' ? 'hot' :
+                                        user.funnel.status === 'En Proceso' ? 'processing' :
+                                        user.funnel.status === 'Pago Confirmado' ? 'paid' : 'shipped'
+                                    %>">
+                                        <span class="step-indicator"><%= user.funnel.emoji %></span>
+                                        <%= user.funnel.step %>
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="checkbox <%= user.minidisc_email_sent ? 'checked' : 'unchecked' %>">
+                                        <%= user.minidisc_email_sent ? '✓' : '' %>
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="checkbox <%= user.interested_in_minidisc ? 'checked' : 'unchecked' %>">
+                                        <%= user.interested_in_minidisc ? '✓' : '' %>
+                                    </span>
+                                </td>
+                                <td><%= user.paypal_payment_status || '-' %></td>
+                                <td>
+                                    <% if (user.nfc_unique_code) { %>
+                                        <span class="nfc-code"><%= user.nfc_unique_code %></span>
+                                    <% } else { %
+                                        -
+                                    <% } %>
+                                </td>
+                                <td>
+                                    <span class="checkbox <%= user.package_shipped ? 'checked' : 'unchecked' %>">
+                                        <%= user.package_shipped ? '✓' : '' %>
+                                    </span>
+                                </td>
+                            </tr>
+                        <% }); %>
+                    </tbody>
+                </table>
+            <% } else { %>
+                <div class="empty-state">
+                    <div class="empty-state-icon">📭</div>
+                    <p>No hay usuarios registrados todavía.</p>
+                </div>
+            <% } %>
+        </div>
+    </div>
+    
+    <script>
+        // Verificar estado de Notion al cargar
+        async function checkNotionStatus() {
+            try {
+                const response = await fetch('/landing/admin/notion/status');
+                const data = await response.json();
+                
+                const statusEl = document.getElementById('notion-connection-status');
+                
+                if (data.configured) {
+                    statusEl.innerHTML = `<span style="color: #22c55e;">✅ Conectado (${data.stats?.total || 0} páginas)</span>`;
+                } else {
+                    statusEl.innerHTML = `<span style="color: #ef4444;">❌ No configurado</span>`;
+                }
+            } catch (error) {
+                document.getElementById('notion-connection-status').innerHTML = 
+                    `<span style="color: #ef4444;">❌ Error de conexión</span>`;
+            }
+        }
+        
+        // Sincronizar con Notion
+        async function syncToNotion() {
+            if (!confirm('¿Sincronizar TODOS los usuarios con Notion? Esto puede tardar unos minutos.')) {
+                return;
+            }
+            
+            const btn = document.querySelector('button[onclick="syncToNotion()"]');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '⏳ Sincronizando...';
+            btn.disabled = true;
+            
+            try {
+                const response = await fetch('/landing/admin/notion/sync-all', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert(`✅ Sincronización completada:\n• Total: ${data.total}\n• Creados: ${data.created}\n• Actualizados: ${data.updated}\n• Errores: ${data.errors}`);
+                    checkNotionStatus(); // Actualizar estado
+                } else {
+                    alert('❌ Error: ' + (data.error || 'Error desconocido'));
+                }
+            } catch (error) {
+                alert('❌ Error de conexión: ' + error.message);
+            } finally {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }
+        }
+        
+        function filterTable() {
+            const stepFilter = document.getElementById('filter-step').value;
+            const searchInput = document.getElementById('search-input').value.toLowerCase();
+            const rows = document.querySelectorAll('#users-table tr');
+            
+            rows.forEach(row => {
+                const step = row.getAttribute('data-step');
+                const text = row.textContent.toLowerCase();
+                
+                const matchesStep = stepFilter === 'all' || step === stepFilter;
+                const matchesSearch = text.includes(searchInput);
+                
+                row.style.display = matchesStep && matchesSearch ? '' : 'none';
+            });
+        }
+        
+        // Verificar estado al cargar
+        document.addEventListener('DOMContentLoaded', checkNotionStatus);
+    </script>
+</body>
+</html>

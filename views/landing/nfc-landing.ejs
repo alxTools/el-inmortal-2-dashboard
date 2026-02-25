@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#0f172a">
+    <title><%= title %></title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #0a0e1a 0%, #1a1f35 50%, #0f172a 100%);
+            min-height: 100vh;
+            color: #e2e8f0;
+            position: relative;
+            overflow-x: hidden;
+        }
+        
+        /* Background effect */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('https://ei2.galantealx.com/uploads/images/el_inmortal_2_cover_1771220102312.png') center/cover;
+            opacity: 0.15;
+            filter: blur(60px);
+            z-index: 0;
+            pointer-events: none;
+        }
+        
+        .container {
+            position: relative;
+            z-index: 1;
+            max-width: 500px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+        
+        /* Profile Section */
+        .profile {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        
+        .avatar {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #facc15, #fbbf24);
+            padding: 4px;
+            margin: 0 auto 20px;
+            box-shadow: 0 10px 40px rgba(250, 204, 21, 0.3);
+        }
+        
+        .avatar img {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 3px solid #0f172a;
+        }
+        
+        .verified-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            background: rgba(34, 197, 94, 0.2);
+            color: #22c55e;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            margin-bottom: 15px;
+        }
+        
+        .profile h1 {
+            font-size: 1.8rem;
+            color: #facc15;
+            margin-bottom: 5px;
+            font-weight: 700;
+        }
+        
+        .profile .subtitle {
+            color: #94a3b8;
+            font-size: 0.95rem;
+        }
+        
+        /* Unlock Badge */
+        .unlock-badge {
+            background: linear-gradient(135deg, rgba(250, 204, 21, 0.2), rgba(250, 204, 21, 0.1));
+            border: 2px solid rgba(250, 204, 21, 0.5);
+            border-radius: 16px;
+            padding: 20px;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .unlock-badge .icon {
+            font-size: 36px;
+            margin-bottom: 10px;
+        }
+        
+        .unlock-badge h3 {
+            color: #facc15;
+            font-size: 1.1rem;
+            margin-bottom: 5px;
+        }
+        
+        .unlock-badge p {
+            color: #94a3b8;
+            font-size: 0.85rem;
+        }
+        
+        /* Exclusive Content */
+        .exclusive-content {
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 25px;
+            margin-bottom: 30px;
+        }
+        
+        .exclusive-content h3 {
+            color: #facc15;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .content-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+        }
+        
+        .content-item {
+            text-align: center;
+            padding: 15px 10px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            transition: all 0.3s;
+        }
+        
+        .content-item:hover {
+            background: rgba(250, 204, 21, 0.1);
+            transform: translateY(-2px);
+        }
+        
+        .content-item .emoji {
+            font-size: 28px;
+            margin-bottom: 8px;
+        }
+        
+        .content-item p {
+            font-size: 0.75rem;
+            color: #94a3b8;
+        }
+        
+        /* Links Section */
+        .links-section {
+            margin-bottom: 30px;
+        }
+        
+        .links-section h3 {
+            color: #facc15;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .link-btn {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 16px 20px;
+            margin-bottom: 12px;
+            text-decoration: none;
+            color: #e2e8f0;
+            transition: all 0.3s;
+        }
+        
+        .link-btn:hover {
+            background: rgba(250, 204, 21, 0.1);
+            border-color: rgba(250, 204, 21, 0.3);
+            transform: translateX(5px);
+        }
+        
+        .link-btn .icon {
+            font-size: 24px;
+            width: 30px;
+            text-align: center;
+        }
+        
+        .link-btn .text {
+            flex: 1;
+        }
+        
+        .link-btn .text strong {
+            display: block;
+            font-size: 1rem;
+            margin-bottom: 2px;
+        }
+        
+        .link-btn .text span {
+            font-size: 0.8rem;
+            color: #64748b;
+        }
+        
+        .link-btn .arrow {
+            color: #64748b;
+            font-size: 1.2rem;
+        }
+        
+        /* Stream Now Section */
+        .stream-section {
+            background: linear-gradient(135deg, rgba(250, 204, 21, 0.15), rgba(250, 204, 21, 0.05));
+            border: 2px solid rgba(250, 204, 21, 0.3);
+            border-radius: 16px;
+            padding: 25px;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .stream-section h3 {
+            color: #facc15;
+            margin-bottom: 20px;
+        }
+        
+        .stream-buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        
+        .stream-btn {
+            flex: 1;
+            min-width: 140px;
+            padding: 12px 20px;
+            border-radius: 25px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 0.9rem;
+            transition: all 0.3s;
+            text-align: center;
+        }
+        
+        .stream-btn.spotify {
+            background: #1DB954;
+            color: white;
+        }
+        
+        .stream-btn.apple {
+            background: #FA243C;
+            color: white;
+        }
+        
+        .stream-btn.youtube {
+            background: #FF0000;
+            color: white;
+        }
+        
+        .stream-btn.amazon {
+            background: #FF9900;
+            color: white;
+        }
+        
+        .stream-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.3);
+        }
+        
+        /* Footer */
+        .footer {
+            text-align: center;
+            padding-top: 20px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .footer p {
+            color: #64748b;
+            font-size: 0.8rem;
+            margin-bottom: 10px;
+        }
+        
+        .footer .code {
+            font-family: monospace;
+            background: rgba(250, 204, 21, 0.1);
+            color: #facc15;
+            padding: 8px 16px;
+            border-radius: 8px;
+            display: inline-block;
+            font-size: 0.85rem;
+            letter-spacing: 2px;
+        }
+        
+        /* Animation for unlock */
+        @keyframes glow {
+            0%, 100% { box-shadow: 0 0 20px rgba(250, 204, 21, 0.3); }
+            50% { box-shadow: 0 0 40px rgba(250, 204, 21, 0.5); }
+        }
+        
+        .unlock-badge {
+            animation: glow 2s infinite;
+        }
+        
+        /* Responsive */
+        @media (max-width: 480px) {
+            .container {
+                padding: 20px 15px;
+            }
+            
+            .profile h1 {
+                font-size: 1.5rem;
+            }
+            
+            .avatar {
+                width: 100px;
+                height: 100px;
+            }
+            
+            .content-grid {
+                grid-template-columns: repeat(3, 1fr);
+                gap: 10px;
+            }
+            
+            .content-item {
+                padding: 12px 8px;
+            }
+            
+            .content-item .emoji {
+                font-size: 24px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Profile -->
+        <div class="profile">
+            <div class="avatar">
+                <img src="https://ei2.galantealx.com/uploads/images/el_inmortal_2_cover_1771220102312.png" alt="Galante el Emperador">
+            </div>
+            
+            <div class="verified-badge">
+                <span>✓</span>
+                <span>Verificado</span>
+            </div>
+            
+            <h1>Galante el Emperador</h1>
+            <p class="subtitle">El Inmortal 2 🎵</p>
+        </div>
+        
+        <!-- Unlock Badge -->
+        <div class="unlock-badge">
+            <div class="icon">🔓</div>
+            <h3>¡Contenido Exclusivo Desbloqueado!</h3>
+            <p>Gracias por tu Mini-Disc de colección</p>
+        </div>
+        
+        <!-- Exclusive Content -->
+        <div class="exclusive-content">
+            <h3>✨ Contenido Exclusivo</h3>
+            
+            <div class="content-grid">
+                <div class="content-item">
+                    <div class="emoji">🎵</div>
+                    <p>Demos</p>
+                </div>
+                
+                <div class="content-item">
+                    <div class="emoji">📸</div>
+                    <p>Fotos</p>
+                </div>
+                
+                <div class="content-item">
+                    <div class="emoji">🎬</div>
+                    <p>Videos</p>
+                </div>
+                
+                <div class="content-item">
+                    <div class="emoji">🎨</div>
+                    <p>Wallpapers</p>
+                </div>
+                
+                <div class="content-item">
+                    <div class="emoji">🎤</div>
+                    <p>Acústicos</p>
+                </div>
+                <div class="content-item">
+                    <div class="emoji">🎁</div>
+                    <p>Sorpresas</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Stream Now -->
+        <div class="stream-section">
+            <h3>🎧 Escuchar Ahora</h3>
+            
+            <div class="stream-buttons">
+                <a href="<%= links.spotify %>" class="stream-btn spotify" target="_blank">Spotify</a>
+                <a href="<%= links.appleMusic %>" class="stream-btn apple" target="_blank">Apple Music</a>
+                <a href="<%= links.youtubeMusic %>" class="stream-btn youtube" target="_blank">YouTube Music</a>
+                <a href="<%= links.amazonMusic %>" class="stream-btn amazon" target="_blank">Amazon Music</a>
+            </div>
+        </div>
+        
+        <!-- Links Section -->
+        <div class="links-section">
+            <h3>🔗 Links Oficiales</h3>
+            
+            <a href="<%= links.instagram %>" class="link-btn" target="_blank">
+                <span class="icon">📸</span>
+                <span class="text">
+                    <strong>Instagram</strong>
+                    <span>@galanteddm</span>
+                </span>
+                <span class="arrow">→</span>
+            </a>
+            
+            <a href="<%= links.tiktok %>" class="link-btn" target="_blank">
+                <span class="icon">🎵</span>
+                <span class="text">
+                    <strong>TikTok</strong>
+                    <span>@galante_elemperador</span>
+                </span>
+                <span class="arrow">→</span>
+            </a>
+            
+            <a href="<%= links.twitter %>" class="link-btn" target="_blank">
+                <span class="icon">🐦</span>
+                <span class="text">
+                    <strong>Twitter / X</strong>
+                    <span>@galantealx</span>
+                </span>
+                <span class="arrow">→</span>
+            </a>
+            
+            <a href="<%= links.youtube %>" class="link-btn" target="_blank">
+                <span class="icon">📺</span>
+                <span class="text">
+                    <strong>YouTube</strong>
+                    <span>Canal Oficial</span>
+                </span>
+                <span class="arrow">→</span>
+            </a>
+            
+            <a href="<%= links.merch %>" class="link-btn" target="_blank">
+                <span class="icon">👕</span>
+                <span class="text">
+                    <strong>Merch Oficial</strong>
+                    <span>Tienda oficial de productos</span>
+                </span>
+                <span class="arrow">→</span>
+            </a>
+            
+            <a href="<%= links.website %>" class="link-btn" target="_blank">
+                <span class="icon">🌐</span>
+                <span class="text">
+                    <strong>Sitio Web</strong>
+                    <span>galantealx.com</span>
+                </span>
+                <span class="arrow">→</span>
+            </a>
+        </div>
+        
+        <!-- Footer -->
+        <div class="footer">
+            <p>Código NFC único:</p>
+            <div class="code"><%= code %></div>
+            <p style="margin-top: 20px;">© 2026 Galante el Emperador. Todos los derechos reservados.</p>
+        </div>
+    </div>
+    
+    <script>
+        // Registrar visita (opcional - para analytics)
+        console.log('NFC Page visited:', '<%= code %>');
+        
+        // Agregar efecto de parallax sutil al fondo
+        document.addEventListener('mousemove', (e) => {
+            const x = e.clientX / window.innerWidth;
+            const y = e.clientY / window.innerHeight;
+            document.body.style.backgroundPosition = `${x * 20}px ${y * 20}px`;
+        });
+    </script>
+</body>
+</html>

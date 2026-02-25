@@ -31,7 +31,7 @@ jobs:
           set -e
           
           echo "📂 Navegando al proyecto..."
-          cd /var/www/el-inmortal-2-dashboard
+          cd /home/gtalx/el-inmortal-2-dashboard
           
           echo "💾 Guardando estado actual de PM2..."
           pm2 save
@@ -43,7 +43,7 @@ jobs:
           npm install
           
           echo "🔄 Reiniciando aplicación con PM2..."
-          pm2 reload app --update-env
+          pm2 reload el-inmortal-2 --update-env
           
           echo "💾 Guardando configuración de PM2..."
           pm2 save

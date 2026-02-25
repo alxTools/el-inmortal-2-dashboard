@@ -27,7 +27,7 @@ jobs:
       run: |
         echo "🚀 Iniciando deploy automático..."
         
-        ssh root@172.233.181.181 '
+        ssh gtalx@172.233.181.181 '
           set -e
           
           echo "📂 Navegando al proyecto..."
@@ -76,4 +76,4 @@ jobs:
         echo "Por favor revisa:"
         echo "  1. Que el servidor esté encendido"
         echo "  2. Que la clave SSH esté configurada en GitHub Secrets"
-        echo "  3. Los logs en el servidor: ssh root@172.233.181.181 'pm2 logs'"
+        echo "  3. Los logs en el servidor: ssh gtalx@172.233.181.181 'pm2 logs'"

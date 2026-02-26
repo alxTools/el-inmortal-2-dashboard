@@ -3,7 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const { getAll, getOne, query, run } = require('../config/database');
 const { sendWelcomeEmail, sendMiniDiscConfirmationEmail, sendWebhookToN8N } = require('../utils/emailHelper');
-const { ensureLandingLeadsTable, saveNFCCode, syncToWordPress, getUnifiedStats } = require('../utils/landingDb');
+const { ensureLandingLeadsTable, saveNFCCode, syncToWordPress, getUnifiedStats, registerOrUpdateLead, verifyMagicToken, markEmailAsVerified } = require('../utils/landingDb');
 const { createPayPalOrder, capturePayPalOrder, getPayPalConfig } = require('../utils/paypalHelper');
 const { scheduleMiniDiscEmail } = require('../utils/scheduledEmails');
 const { syncUserToNotion, isNotionConfigured, syncAllUsersToNotion, getNotionStats } = require('../utils/notionHelper');
@@ -294,32 +294,30 @@ router.post('/subscribe', async (req, res) => {
         console.log('[Landing Subscribe] Datos recibidos:', { email, fullName, country, sourceLabel });
         console.log('[Landing Subscribe] IP:', req.ip);
         
-        // Intentar guardar en DB, pero si falla, continuamos igual
-        let result = { lastID: null };
+        // PASO 1: Verificar tabla y registrar lead con magic token
+        let userResult;
         try {
             console.log('[Landing Subscribe] Paso 1: Verificando tabla...');
             await ensureLandingLeadsTable();
             console.log('[Landing Subscribe] ✅ Tabla verificada');
             
-            console.log('[Landing Subscribe] Paso 2: Insertando datos...');
-            result = await run(
-                `INSERT INTO landing_email_leads (email, full_name, country, source_label, ip_address, user_agent)
-                 VALUES (?, ?, ?, ?, ?, ?)`,
-                [
-                    email,
-                    fullName,
-                    country,
-                    sourceLabel,
-                    req.ip,
-                    String(req.headers['user-agent'] || '').slice(0, 255)
-                ]
-            );
-            console.log('[Landing Subscribe] ✅ Datos insertados, ID:', result.lastID);
+            console.log('[Landing Subscribe] Paso 2: Registrando/actualizando lead con magic token...');
+            userResult = await registerOrUpdateLead({
+                email,
+                fullName,
+                country,
+                ipAddress: req.ip,
+                userAgent: String(req.headers['user-agent'] || '').slice(0, 255),
+                sourceLabel
+            });
+            console.log('[Landing Subscribe] ✅ Lead registrado:', userResult);
         } catch (dbError) {
-            console.error('[Landing Subscribe] ⚠️ Error en DB (continuando igual):', dbError.message);
-            // No fallamos, continuamos para enviar email y webhook
+            console.error('[Landing Subscribe] ❌ Error en DB:', dbError.message);
+            if (!wantsJson) {
+                return res.redirect('/ei2?error=db_error');
+            }
+            return res.status(500).json({ success: false, error: 'db_error' });
         }
-        console.log('[Landing Subscribe] Table ready, inserting data...');
 
         // Sincronizar con tablas WordPress existentes (no bloqueante)
         console.log('[Landing Subscribe] Paso 3: Sincronizando con WordPress...');
@@ -331,11 +329,17 @@ router.post('/subscribe', async (req, res) => {
             console.log('[Landing Subscribe] ⚠️ Error sincronizando WordPress (continuando):', syncError.message);
         }
 
-        // Enviar email de bienvenida y webhook en paralelo (no bloqueantes)
-        console.log('[Landing Subscribe] Paso 4: Enviando email y webhook...');
+        // Enviar email con MAGIC LINK y webhook en paralelo
+        console.log('[Landing Subscribe] Paso 4: Enviando email con magic link...');
         
         const [emailResult, webhookResult] = await Promise.allSettled([
-            sendWelcomeEmail({ to: email, name: fullName, country: country }),
+            sendWelcomeEmail({ 
+                to: email, 
+                name: fullName, 
+                country: country,
+                magicToken: userResult.magicToken,
+                userId: userResult.userId
+            }),
             sendWebhookToN8N({
                 email,
                 fullName,
@@ -344,7 +348,9 @@ router.post('/subscribe', async (req, res) => {
                 ipAddress: req.ip,
                 userAgent: String(req.headers['user-agent'] || '').slice(0, 255),
                 registeredAt: new Date().toISOString(),
-                wordpressSync: syncResults
+                wordpressSync: syncResults,
+                isNewUser: userResult.isNew,
+                userId: userResult.userId
             })
         ]);
 
@@ -393,24 +399,21 @@ router.post('/subscribe', async (req, res) => {
             }
         }
 
-        // Establecer cookie de acceso para fans verificados (válida por 7 días)
-        res.cookie('landing_el_inmortal_unlock', '1', {
-            maxAge: 7 * 24 * 60 * 60 * 1000, // 7 días (1 semana)
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'lax'
-        });
-
+        // IMPORTANTE: NO establecer cookie todavía
+        // El usuario debe confirmar su email primero mediante el magic link
+        
         if (!wantsJson) {
-            return res.redirect('/ei2?unlock=1');
+            // Redirigir a página de "Revisa tu email"
+            return res.redirect('/ei2?check_email=1');
         }
 
         return res.json({ 
             success: true, 
-            id: result.lastID, 
+            id: userResult.userId, 
             emailSent: emailResult.status === 'fulfilled' ? emailResult.value?.success : false, 
             webhookSent: webhookResult.status === 'fulfilled' ? webhookResult.value?.success : false,
-            wordpressSync: syncResults
+            wordpressSync: syncResults,
+            message: 'Revisa tu email para verificar y desbloquear el acceso'
         });
     } catch (error) {
         console.error('[Landing Subscribe] ❌ ERROR CRÍTICO:', error);
@@ -426,6 +429,53 @@ router.post('/subscribe', async (req, res) => {
             error: 'server_error', 
             details: error.message,
             type: error.constructor.name 
+        });
+    }
+});
+
+// Ruta para verificar magic token y desbloquear acceso
+router.get('/unlock', async (req, res) => {
+    const { token } = req.query;
+    
+    if (!token) {
+        return res.status(400).render('error', {
+            title: 'Link Inválido',
+            message: 'El link de verificación no es válido o ha expirado.'
+        });
+    }
+    
+    try {
+        // Verificar el token
+        const user = await verifyMagicToken(token);
+        
+        if (!user) {
+            return res.status(400).render('error', {
+                title: 'Link Expirado',
+                message: 'Este link ha expirado o no es válido. Por favor regístrate de nuevo.'
+            });
+        }
+        
+        // Marcar email como verificado
+        await markEmailAsVerified(user.id);
+        
+        // AHORA sí crear la cookie de desbloqueo
+        res.cookie('landing_el_inmortal_unlock', '1', {
+            maxAge: 7 * 24 * 60 * 60 * 1000, // 7 días
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax'
+        });
+        
+        console.log(`[Landing Unlock] ✅ Usuario ${user.email} verificado y desbloqueado`);
+        
+        // Redirigir al landing con acceso completo
+        res.redirect('/ei2?verified=1');
+        
+    } catch (error) {
+        console.error('[Landing Unlock] Error:', error);
+        return res.status(500).render('error', {
+            title: 'Error',
+            message: 'Ocurrió un error al procesar tu solicitud. Por favor intenta de nuevo.'
         });
     }
 });

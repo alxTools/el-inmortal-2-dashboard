@@ -1,4 +1,12 @@
 const { getAll, getOne, query, run } = require('../config/database');
+const crypto = require('crypto');
+
+/**
+ * Genera un magic token único
+ */
+function generateMagicToken() {
+    return crypto.randomBytes(32).toString('hex');
+}
 
 /**
  * Verifica y crea la tabla central de leads si no existe
@@ -166,6 +174,16 @@ async function ensureLandingLeadsTable() {
             if (!columnSet.has('tracking_number')) {
                 await query('ALTER TABLE landing_email_leads ADD COLUMN tracking_number VARCHAR(100) NULL');
             }
+            // Columnas para magic links
+            if (!columnSet.has('magic_token')) {
+                await query('ALTER TABLE landing_email_leads ADD COLUMN magic_token VARCHAR(64) UNIQUE NULL');
+            }
+            if (!columnSet.has('email_verified')) {
+                await query('ALTER TABLE landing_email_leads ADD COLUMN email_verified TINYINT DEFAULT 0');
+            }
+            if (!columnSet.has('magic_token_expires_at')) {
+                await query('ALTER TABLE landing_email_leads ADD COLUMN magic_token_expires_at DATETIME NULL');
+            }
         }
         
         console.log('[Landing] ✅ Tabla landing_email_leads verificada/creada exitosamente');
@@ -331,9 +349,107 @@ async function getUnifiedStats() {
     }
 }
 
+/**
+ * Registra o actualiza un lead con magic token
+ */
+async function registerOrUpdateLead({ email, fullName, country, ipAddress, userAgent, sourceLabel = 'landing_el_inmortal_2' }) {
+    try {
+        // Buscar si el email ya existe
+        const existingUser = await getOne(
+            'SELECT id, email FROM landing_email_leads WHERE email = ?',
+            [email]
+        );
+        
+        const magicToken = generateMagicToken();
+        const expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + 30); // 30 días
+        const expiresAtFormatted = expiresAt.toISOString().slice(0, 19).replace('T', ' ');
+        
+        if (existingUser) {
+            // Usuario existente: actualizar magic token
+            await run(
+                `UPDATE landing_email_leads 
+                 SET magic_token = ?, 
+                     magic_token_expires_at = ?,
+                     full_name = COALESCE(?, full_name),
+                     country = COALESCE(?, country),
+                     updated_at = NOW()
+                 WHERE id = ?`,
+                [magicToken, expiresAtFormatted, fullName, country, existingUser.id]
+            );
+            
+            return {
+                userId: existingUser.id,
+                isNew: false,
+                magicToken,
+                email
+            };
+        } else {
+            // Nuevo usuario
+            const result = await run(
+                `INSERT INTO landing_email_leads 
+                 (email, full_name, country, source_label, ip_address, user_agent, 
+                  magic_token, magic_token_expires_at, email_verified)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)`,
+                [email, fullName, country, sourceLabel, ipAddress, userAgent, magicToken, expiresAtFormatted]
+            );
+            
+            return {
+                userId: result.lastID,
+                isNew: true,
+                magicToken,
+                email
+            };
+        }
+    } catch (error) {
+        console.error('[Landing] Error en registerOrUpdateLead:', error);
+        throw error;
+    }
+}
+
+/**
+ * Verifica un magic token
+ */
+async function verifyMagicToken(token) {
+    try {
+        const user = await getOne(
+            `SELECT id, email, full_name, country 
+             FROM landing_email_leads 
+             WHERE magic_token = ? AND magic_token_expires_at > NOW()`,
+            [token]
+        );
+        
+        return user || null;
+    } catch (error) {
+        console.error('[Landing] Error verificando magic token:', error);
+        return null;
+    }
+}
+
+/**
+ * Marca email como verificado
+ */
+async function markEmailAsVerified(userId) {
+    try {
+        await run(
+            `UPDATE landing_email_leads 
+             SET email_verified = 1
+             WHERE id = ?`,
+            [userId]
+        );
+        console.log(`[Landing] Email verificado para usuario ID: ${userId}`);
+    } catch (error) {
+        console.error('[Landing] Error marcando email verificado:', error);
+        throw error;
+    }
+}
+
 module.exports = {
     ensureLandingLeadsTable,
     saveNFCCode,
     syncToWordPress,
-    getUnifiedStats
+    getUnifiedStats,
+    registerOrUpdateLead,
+    verifyMagicToken,
+    markEmailAsVerified
 };

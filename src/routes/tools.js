@@ -706,14 +706,13 @@ router.get('/remotion-studio', async (req, res) => {
         try {
             remotionPort = await findAvailablePort(3003);
             
-            // Get server hostname for external access
-            const serverHost = req.headers.host ? req.headers.host.split(':')[0] : 'localhost';
-            
-            remotionProcess = spawn('npx', ['remotion', 'studio', '--port', remotionPort.toString(), '--host', '0.0.0.0'], {
+    // Use server hostname from environment or default to database host
+    const serverHost = process.env.REMOTION_HOST || 'db.artistaviral.com';
+    
+    remotionProcess = spawn('npx', ['remotion', 'studio', '--port', remotionPort.toString(), '--host', '0.0.0.0'], {
                 cwd: path.join(__dirname, '../..'),
                 detached: false,
-                stdio: ['ignore', 'pipe', 'pipe'],
-                env: { ...process.env, REMOTION_HOST: serverHost }
+                stdio: ['ignore', 'pipe', 'pipe']
             });
             
             remotionProcess.stdout.on('data', (data) => {
@@ -741,8 +740,8 @@ router.get('/remotion-studio', async (req, res) => {
         }
     }
     
-    // Get server hostname for external access
-    const serverHost = req.headers.host ? req.headers.host.split(':')[0] : 'localhost';
+    // Use server hostname from environment or default to database host
+    const serverHost = process.env.REMOTION_HOST || 'db.artistaviral.com';
     const studioUrl = `http://${serverHost}:${remotionPort}`;
     
     res.render('tools/remotion-studio', {

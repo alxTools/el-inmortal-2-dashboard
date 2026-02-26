@@ -193,6 +193,7 @@ const toolsRouter = require('./routes/tools');
 const landingRouter = require('./routes/landing');
 const landingApiRouter = require('./api/landing');
 const apiV1Router = require('./routes/api-v1');
+const fanGeneratorRouter = require('./routes/fan-generator');
 const { apiKeyAuth } = require('./middleware/apiKeyAuth');
 
 // Middleware para verificar si es admin o fan verificado (vía cookie de landing)
@@ -272,6 +273,9 @@ app.use('/splitsheets', requireFanOrAdmin, splitsheetsRouter);
 app.use('/checklist', requireFanOrAdmin, checklistRouter);
 app.use('/albums', requireFanOrAdmin, albumsRouter);
 app.use('/', requireAuth, indexRouter);
+
+// Fan Generator routes
+app.use('/fan-generator', requireFanOrAdmin, fanGeneratorRouter);
 
 // Tools routes - protect dangerous ones
 const publicToolsPaths = ['/proxy', '/download', '/extract-frame', '/gpu-info'];

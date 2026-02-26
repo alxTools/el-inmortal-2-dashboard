@@ -812,6 +812,15 @@ function LandingApp({ data }) {
     const [commentError, setCommentError] = useState('');
     const [lastCommentTime, setLastCommentTime] = useState(null);
     const [currentUserEmail, setCurrentUserEmail] = useState('');
+    
+    // Fan Generator states
+    const [showFanGenerator, setShowFanGenerator] = useState(false);
+    const [loops, setLoops] = useState([]);
+    const [selectedLoop, setSelectedLoop] = useState(null);
+    const [userPhoto, setUserPhoto] = useState(null);
+    const [isGeneratingVideo, setIsGeneratingVideo] = useState(false);
+    const [generatedVideo, setGeneratedVideo] = useState(null);
+    
     const [currentTrack, setCurrentTrack] = useState(null);
     const [isPlaying, setIsPlaying] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
@@ -996,6 +1005,21 @@ function LandingApp({ data }) {
         fetchStats();
         fetchTopTracks();
         fetchComments();
+        
+        // Fetch available loops for fan generator
+        const fetchLoops = async () => {
+            try {
+                const response = await fetch('/fan-generator/loops');
+                if (!response.ok) return;
+                const payload = await response.json();
+                if (payload.success && Array.isArray(payload.loops)) {
+                    setLoops(payload.loops);
+                }
+            } catch (error) {
+                console.error('Loops fetch error', error);
+            }
+        };
+        fetchLoops();
     }, [isUnlocked]);
 
     // Rotate comments every 5 seconds
@@ -1364,6 +1388,90 @@ function LandingApp({ data }) {
         }
     };
 
+    // Fan Generator functions
+    const handlePhotoUpload = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        try {
+            const response = await fetch('/api/v1/uploads', {
+                method: 'POST',
+                body: formData
+            });
+            
+            const result = await response.json();
+            
+            if (response.ok && result.url) {
+                setUserPhoto(result.url);
+            } else {
+                alert('Error subiendo foto');
+            }
+        } catch (error) {
+            console.error('Error uploading photo:', error);
+            alert('Error subiendo foto');
+        }
+    };
+
+    const handleGenerateVideo = async () => {
+        if (!selectedLoop || !userPhoto) {
+            alert('Selecciona un loop y sube tu foto');
+            return;
+        }
+        
+        setIsGeneratingVideo(true);
+        
+        try {
+            const response = await fetch('/fan-generator/generate-video', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    loop_id: selectedLoop,
+                    user_photo_path: userPhoto
+                })
+            });
+            
+            const result = await response.json();
+            
+            if (response.ok && result.success) {
+                // Poll for video status
+                const checkStatus = setInterval(async () => {
+                    const statusResponse = await fetch(`/fan-generator/video/${result.video_id}`);
+                    const statusResult = await statusResponse.json();
+                    
+                    if (statusResult.success) {
+                        if (statusResult.video.status === 'completed') {
+                            setGeneratedVideo(statusResult.video);
+                            setIsGeneratingVideo(false);
+                            clearInterval(checkStatus);
+                        } else if (statusResult.video.status === 'failed') {
+                            alert('Error generando video');
+                            setIsGeneratingVideo(false);
+                            clearInterval(checkStatus);
+                        }
+                    }
+                }, 3000);
+                
+                // Timeout after 2 minutes
+                setTimeout(() => {
+                    clearInterval(checkStatus);
+                    setIsGeneratingVideo(false);
+                }, 120000);
+            } else {
+                alert(result.error || 'Error creando video');
+                setIsGeneratingVideo(false);
+            }
+        } catch (error) {
+            console.error('Error generating video:', error);
+            alert('Error generando video');
+            setIsGeneratingVideo(false);
+        }
+    };
+
     return (
         <main className="relative overflow-hidden text-slate-100">
             {/* Background Effects */}
@@ -1522,6 +1630,162 @@ function LandingApp({ data }) {
             </section>
 
             {/* Stats cards section removed - now integrated in hero */}
+
+            {/* ========================================
+                FAN GENERATOR SECTION
+                ======================================== */}
+            {isUnlocked && (
+                <section id="fan-generator" className="relative z-10 py-16 px-6">
+                    <div className="mx-auto max-w-4xl">
+                        <div className="text-center mb-8">
+                            <h2 className="font-display text-3xl text-white md:text-4xl mb-4 reveal">
+                                🎨 Crea tu Video
+                            </h2>
+                            <p className="text-slate-300 reveal reveal-delay-1">
+                                Sube tu foto, elige un loop y genera un video único con el álbum
+                            </p>
+                        </div>
+
+                        {!showFanGenerator ? (
+                            <div className="text-center reveal reveal-delay-2">
+                                <button
+                                    onClick={() => setShowFanGenerator(true)}
+                                    className="btn-neon btn-neon-cyan"
+                                >
+                                    <span>🎬</span>
+                                    <span>Comenzar</span>
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="glass-panel-enhanced rounded-3xl p-6 md:p-10 reveal">
+                                {/* Step 1: Upload Photo */}
+                                <div className="mb-8">
+                                    <h3 className="text-xl text-white mb-4">1. Sube tu foto</h3>
+                                    <div className="flex flex-col items-center gap-4">
+                                        {userPhoto ? (
+                                            <div className="relative">
+                                                <img
+                                                    src={userPhoto}
+                                                    alt="Tu foto"
+                                                    className="w-48 h-48 object-cover rounded-2xl"
+                                                />
+                                                <button
+                                                    onClick={() => setUserPhoto(null)}
+                                                    className="absolute -top-2 -right-2 w-8 h-8 bg-red-500 rounded-full text-white flex items-center justify-center"
+                                                >
+                                                    ×
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <label className="cursor-pointer">
+                                                <div className="w-48 h-48 border-2 border-dashed border-slate-600 rounded-2xl flex flex-col items-center justify-center text-slate-400 hover:border-amber-400 hover:text-amber-400 transition-colors">
+                                                    <span className="text-4xl mb-2">📷</span>
+                                                    <span className="text-sm">Click para subir foto</span>
+                                                </div>
+                                                <input
+                                                    type="file"
+                                                    accept="image/*"
+                                                    onChange={handlePhotoUpload}
+                                                    className="hidden"
+                                                />
+                                            </label>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Step 2: Select Loop */}
+                                {userPhoto && (
+                                    <div className="mb-8">
+                                        <h3 className="text-xl text-white mb-4">2. Elige un loop</h3>
+                                        {loops.length > 0 ? (
+                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                                {loops.map((loop) => (
+                                                    <button
+                                                        key={loop.id}
+                                                        onClick={() => setSelectedLoop(loop.id)}
+                                                        className={`p-4 rounded-xl border-2 transition-all ${
+                                                            selectedLoop === loop.id
+                                                                ? 'border-amber-400 bg-amber-400/20'
+                                                                : 'border-slate-600 hover:border-slate-400'
+                                                        }`}
+                                                    >
+                                                        <div className="text-3xl mb-2">🎵</div>
+                                                        <div className="text-sm text-white truncate">
+                                                            {loop.name}
+                                                        </div>
+                                                        <div className="text-xs text-slate-400">
+                                                            {loop.duration}s
+                                                        </div>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <p className="text-slate-400 text-center">
+                                                No hay loops disponibles aún
+                                            </p>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* Step 3: Generate */}
+                                {userPhoto && selectedLoop && (
+                                    <div className="text-center">
+                                        <button
+                                            onClick={handleGenerateVideo}
+                                            disabled={isGeneratingVideo}
+                                            className="btn-neon"
+                                        >
+                                            {isGeneratingVideo ? (
+                                                <>
+                                                    <span className="animate-spin">⏳</span>
+                                                    <span>Generando...</span>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <span>✨</span>
+                                                    <span>Generar Video</span>
+                                                </>
+                                            )}
+                                        </button>
+                                    </div>
+                                )}
+
+                                {/* Result */}
+                                {generatedVideo && (
+                                    <div className="mt-8 text-center">
+                                        <h3 className="text-xl text-white mb-4">¡Tu video está listo!</h3>
+                                        <video
+                                            src={generatedVideo.video_path}
+                                            controls
+                                            className="w-full max-w-md mx-auto rounded-2xl"
+                                        />
+                                        <div className="mt-4 flex gap-4 justify-center">
+                                            <a
+                                                href={generatedVideo.video_path}
+                                                download
+                                                className="btn-neon btn-neon-cyan"
+                                            >
+                                                <span>⬇️</span>
+                                                <span>Descargar</span>
+                                            </a>
+                                            <button
+                                                onClick={() => {
+                                                    setGeneratedVideo(null);
+                                                    setUserPhoto(null);
+                                                    setSelectedLoop(null);
+                                                }}
+                                                className="btn-small"
+                                            >
+                                                Crear otro
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                </section>
+            )}
 
             {/* ========================================
                 TRACKLIST SECTION

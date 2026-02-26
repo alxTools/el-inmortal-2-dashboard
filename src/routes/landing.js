@@ -357,11 +357,11 @@ router.post('/subscribe', async (req, res) => {
         console.log('[Landing Subscribe] Email result:', emailResult.status === 'fulfilled' ? emailResult.value : emailResult.reason);
         console.log('[Landing Subscribe] Webhook result:', webhookResult.status === 'fulfilled' ? webhookResult.value : webhookResult.reason);
 
-        // Programar email de Mini-Disc para 30 minutos después
-        if (result.lastID) {
+        // Programar email de Mini-Disc para 30 minutos después (solo si es usuario nuevo)
+        if (userResult.isNew && userResult.userId) {
             console.log('[Landing Subscribe] Paso 5: Programando email de Mini-Disc para 30 min después...');
             try {
-                await scheduleMiniDiscEmail(result.lastID, email, {
+                await scheduleMiniDiscEmail(userResult.userId, email, {
                     fullName,
                     country,
                     sourceLabel
@@ -374,11 +374,11 @@ router.post('/subscribe', async (req, res) => {
         }
 
         // Sincronizar con Notion (en tiempo real)
-        if (process.env.NOTION_SYNC_ENABLED === 'true' && process.env.NOTION_SYNC_ON_REGISTER === 'true') {
+        if (process.env.NOTION_SYNC_ENABLED === 'true' && process.env.NOTION_SYNC_ON_REGISTER === 'true' && userResult.userId) {
             console.log('[Landing Subscribe] Paso 6: Sincronizando con Notion...');
             try {
                 const userData = {
-                    id: result.lastID,
+                    id: userResult.userId,
                     email,
                     full_name: fullName,
                     country,
@@ -389,7 +389,9 @@ router.post('/subscribe', async (req, res) => {
                     paypal_payment_status: null,
                     nfc_unique_code: null,
                     package_shipped: 0,
-                    tracking_number: null
+                    tracking_number: null,
+                    magic_token: userResult.magicToken,
+                    email_verified: 0
                 };
                 const notionResult = await syncUserToNotion(userData);
                 console.log('[Landing Subscribe] ✅ Notion sync:', notionResult.success ? 'OK' : 'Skipped');

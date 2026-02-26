@@ -559,6 +559,42 @@ router.get('/stats', async (_req, res) => {
     }
 });
 
+// POST track play (registrar reproducción)
+router.post('/track-play', async (req, res) => {
+    try {
+        const { track_id, track_number } = req.body;
+        
+        if (!track_id) {
+            return res.status(400).json({ error: 'Track ID required' });
+        }
+        
+        // Obtener user info si está logueado
+        let userId = null;
+        let leadId = null;
+        
+        if (req.session?.user) {
+            userId = req.session.user.id;
+        } else {
+            const leadEmail = req.cookies?.landing_email;
+            if (leadEmail) {
+                const lead = await getOne('SELECT id FROM landing_email_leads WHERE email = ?', [leadEmail]);
+                if (lead) leadId = lead.id;
+            }
+        }
+        
+        // Insertar play
+        await run(
+            'INSERT INTO track_plays (track_id, user_id, lead_id, played_at) VALUES (?, ?, ?, NOW())',
+            [track_id, userId, leadId]
+        );
+        
+        return res.json({ success: true });
+    } catch (error) {
+        console.error('[Track Play] Error:', error);
+        return res.status(500).json({ error: 'Error registering play' });
+    }
+});
+
 // GET Top 10 tracks más escuchados
 router.get('/top-tracks', async (req, res) => {
     try {

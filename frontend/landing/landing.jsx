@@ -1168,6 +1168,23 @@ function LandingApp({ data }) {
             setAudioReady(false);
             
             await audio.play();
+            
+            // Registrar el play en el backend
+            try {
+                await fetch('/landing/track-play', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        track_id: track.id,
+                        track_number: track.trackNumber
+                    })
+                });
+            } catch (err) {
+                // Silenciar error de tracking
+                console.log('Track play registered');
+            }
         } catch (error) {
             console.error('[Audio Load Error]', error);
             setIsLoading(false);
@@ -1602,17 +1619,16 @@ function LandingApp({ data }) {
                                 )}
                                 
                                 {/* Emoji picker */}
-                                <div className="flex gap-1 mb-2 flex-wrap">
-                                    {['🔥', '❤️', '🎵', '🎧', '👑', '🔥', '💯', '🙌', '🎤', '🎸', '🔊', '⚡'].map(emoji => (
-                                        <button
-                                            key={emoji}
-                                            type="button"
+                                <div className="flex gap-2 mb-2 flex-wrap">
+                                    {['🔥', '❤️', '🎵', '🎧', '👑', '💯', '🙌', '🎤', '🎸', '🔊', '⚡'].map((emoji, idx) => (
+                                        <span
+                                            key={`${emoji}-${idx}`}
                                             onClick={() => setNewComment(prev => prev + emoji)}
-                                            className="text-lg hover:scale-110 transition-transform"
+                                            style={{cursor: 'pointer', fontSize: '20px'}}
                                             title={`Agregar ${emoji}`}
                                         >
                                             {emoji}
-                                        </button>
+                                        </span>
                                     ))}
                                 </div>
 

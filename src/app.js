@@ -33,10 +33,11 @@ app.use(helmet({
         directives: {
             defaultSrc: ["'self'"],
             styleSrc: ["'self'", "'unsafe-inline'", "https:"],
-            scriptSrc: ["'self'", "'unsafe-inline'"],
+            scriptSrc: ["'self'", "'unsafe-inline'", "https://www.googletagmanager.com", "https://static.cloudflareinsights.com"],
+            scriptSrcAttr: ["'unsafe-inline'"],
             imgSrc: ["'self'", "data:", "blob:", "https:"],
             fontSrc: ["'self'", "data:", "https:"],
-            connectSrc: ["'self'", "data:", "https:", "blob:"],
+            connectSrc: ["'self'", "data:", "https:", "blob:", "https://www.googletagmanager.com"],
             mediaSrc: ["'self'", "data:", "blob:"],
         },
     },

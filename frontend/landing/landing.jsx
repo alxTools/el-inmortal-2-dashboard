@@ -847,24 +847,30 @@ function LandingApp({ data }) {
         detectCountry();
     }, []);
 
-    // Verificar si está desbloqueado (siempre iniciar bloqueado)
+    // Verificar si está desbloqueado
     useEffect(() => {
-        // El desbloqueo solo ocurre después de registro exitoso
-        // La cookie httpOnly no es accesible desde JS, así que siempre mostramos bloqueado inicialmente
-        // El backend redirige a /ei2?unlock=1 después del registro
         const urlParams = new URLSearchParams(window.location.search);
-        const shouldUnlock = urlParams.get('unlock') === '1';
+        
+        // Check for unlock (old flow) or verified (magic link flow)
+        const shouldUnlock = urlParams.get('unlock') === '1' || urlParams.get('verified') === '1';
         
         if (shouldUnlock) {
             setIsUnlocked(true);
+            localStorage.setItem('landing_el_inmortal_unlock', '1');
             // Limpiar URL
             window.history.replaceState({}, document.title, window.location.pathname);
         } else {
-            // Mostrar modal después de 2 segundos
-            const timer = setTimeout(() => {
-                setIsModalOpen(true);
-            }, 2000);
-            return () => clearTimeout(timer);
+            // Check localStorage as fallback (for returning users)
+            const storedUnlock = localStorage.getItem('landing_el_inmortal_unlock');
+            if (storedUnlock === '1') {
+                setIsUnlocked(true);
+            } else {
+                // Mostrar modal después de 2 segundos
+                const timer = setTimeout(() => {
+                    setIsModalOpen(true);
+                }, 2000);
+                return () => clearTimeout(timer);
+            }
         }
     }, []);
 

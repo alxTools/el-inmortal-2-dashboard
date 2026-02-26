@@ -22417,8 +22417,12 @@ var AlbumLandingApp = (() => {
     const [fanStats, setFanStats] = (0, import_react.useState)({ totalLeads: 0, topCountries: [] });
     const [topTracks, setTopTracks] = (0, import_react.useState)([]);
     const [comments, setComments] = (0, import_react.useState)([]);
+    const [visibleComments, setVisibleComments] = (0, import_react.useState)([]);
+    const [commentRotationIndex, setCommentRotationIndex] = (0, import_react.useState)(0);
     const [newComment, setNewComment] = (0, import_react.useState)("");
     const [isSubmittingComment, setIsSubmittingComment] = (0, import_react.useState)(false);
+    const [commentError, setCommentError] = (0, import_react.useState)("");
+    const [lastCommentTime, setLastCommentTime] = (0, import_react.useState)(null);
     const [currentTrack, setCurrentTrack] = (0, import_react.useState)(null);
     const [isPlaying, setIsPlaying] = (0, import_react.useState)(false);
     const [isLoading, setIsLoading] = (0, import_react.useState)(false);
@@ -22558,6 +22562,23 @@ var AlbumLandingApp = (() => {
       fetchTopTracks();
       fetchComments();
     }, [isUnlocked]);
+    (0, import_react.useEffect)(() => {
+      if (!isUnlocked || comments.length === 0) return;
+      const interval = setInterval(() => {
+        setCommentRotationIndex((prev) => (prev + 1) % Math.max(1, comments.length - 4));
+      }, 5e3);
+      return () => clearInterval(interval);
+    }, [isUnlocked, comments.length]);
+    (0, import_react.useEffect)(() => {
+      if (comments.length === 0) return;
+      const start = commentRotationIndex;
+      const visible = [];
+      for (let i = 0; i < 5; i++) {
+        const index = (start + i) % comments.length;
+        visible.push(comments[index]);
+      }
+      setVisibleComments(visible);
+    }, [comments, commentRotationIndex]);
     (0, import_react.useEffect)(() => {
       const audio = audioRef.current;
       if (!audio) return void 0;
@@ -22777,7 +22798,14 @@ var AlbumLandingApp = (() => {
       if (!newComment.trim() || newComment.trim().length < 3) {
         return;
       }
+      if (lastCommentTime && Date.now() - lastCommentTime < 3e4) {
+        const secondsLeft = Math.ceil((3e4 - (Date.now() - lastCommentTime)) / 1e3);
+        setCommentError(`Espera ${secondsLeft} segundos para comentar de nuevo`);
+        setTimeout(() => setCommentError(""), 3e3);
+        return;
+      }
       setIsSubmittingComment(true);
+      setCommentError("");
       try {
         const response = await fetch("/landing/comments", {
           method: "POST",
@@ -22791,14 +22819,35 @@ var AlbumLandingApp = (() => {
         if (response.ok && result.success) {
           setComments((prev) => [result.comment, ...prev]);
           setNewComment("");
+          setLastCommentTime(Date.now());
         } else {
-          alert(result.error || "Error al publicar comentario");
+          setCommentError(result.error || "Error al publicar comentario");
+          setTimeout(() => setCommentError(""), 3e3);
         }
       } catch (error) {
         console.error("Error posting comment:", error);
-        alert("Error al publicar comentario");
+        setCommentError("Error al publicar comentario");
+        setTimeout(() => setCommentError(""), 3e3);
       } finally {
         setIsSubmittingComment(false);
+      }
+    };
+    const handleDeleteComment = async (commentId) => {
+      if (!confirm("\xBFEliminar este comentario?")) return;
+      try {
+        const response = await fetch(`/landing/comments/${commentId}`, {
+          method: "DELETE",
+          headers: { "Accept": "application/json" }
+        });
+        const result = await response.json();
+        if (response.ok && result.success) {
+          setComments((prev) => prev.filter((c) => c.id !== commentId));
+        } else {
+          alert(result.error || "Error al eliminar comentario");
+        }
+      } catch (error) {
+        console.error("Error deleting comment:", error);
+        alert("Error al eliminar comentario");
       }
     };
     return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("main", { className: "relative overflow-hidden text-slate-100", children: [
@@ -23011,6 +23060,7 @@ var AlbumLandingApp = (() => {
           /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "mb-5 grid gap-3 md:grid-cols-2", children: [
             /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "glass-panel rounded-2xl p-4 flex flex-col", children: [
               /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-xs uppercase tracking-[0.2em] text-slate-300 mb-3", children: "\u{1F4AC} Comentarios de Fans" }),
+              commentError && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "mb-2 px-3 py-2 bg-red-500/20 border border-red-500/50 rounded-lg text-xs text-red-300", children: commentError }),
               /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("form", { onSubmit: handleCommentSubmit, className: "mb-3", children: [
                 /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
                   "textarea",
@@ -23020,7 +23070,7 @@ var AlbumLandingApp = (() => {
                     placeholder: "Deja tu comentario...",
                     maxLength: 500,
                     rows: 2,
-                    className: "w-full px-3 py-2 bg-slate-800/50 border border-slate-600 rounded-lg text-sm text-white placeholder-slate-400 focus:outline-none focus:border-amber-400 resize-none"
+                    className: "w-full px-3 py-2 bg-slate-800/50 border border-slate-600 rounded-lg text-sm text-black placeholder-slate-400 focus:outline-none focus:border-amber-400 resize-none"
                   }
                 ),
                 /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex justify-between items-center mt-2", children: [
@@ -23039,10 +23089,28 @@ var AlbumLandingApp = (() => {
                   )
                 ] })
               ] }),
-              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "flex-1 overflow-y-auto max-h-40 space-y-2", children: comments.length > 0 ? comments.map((comment) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "bg-slate-800/30 rounded-lg p-2 text-sm", children: [
+              comments.length > 5 && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "flex justify-center gap-1 mb-2", children: Array.from({ length: Math.min(5, Math.ceil(comments.length / 5)) }).map((_, idx) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+                "div",
+                {
+                  className: `w-2 h-2 rounded-full transition-colors ${idx === Math.floor(commentRotationIndex / 5) % Math.min(5, Math.ceil(comments.length / 5)) ? "bg-amber-400" : "bg-slate-600"}`
+                },
+                idx
+              )) }),
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "flex-1 overflow-hidden space-y-2", children: visibleComments.length > 0 ? visibleComments.map((comment) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "bg-slate-800/30 rounded-lg p-2 text-sm", children: [
                 /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex justify-between items-start mb-1", children: [
                   /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "font-semibold text-amber-300 text-xs", children: comment.user_name }),
-                  /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "text-xs text-slate-500", children: new Date(comment.created_at).toLocaleDateString("es-ES", { month: "short", day: "numeric" }) })
+                  /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex items-center gap-2", children: [
+                    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "text-xs text-slate-500", children: new Date(comment.created_at).toLocaleDateString("es-ES", { month: "short", day: "numeric" }) }),
+                    !comment.id.toString().startsWith("sample_") && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+                      "button",
+                      {
+                        onClick: () => handleDeleteComment(comment.id),
+                        className: "text-xs text-red-400 hover:text-red-300 transition-colors",
+                        title: "Borrar comentario",
+                        children: "\u{1F5D1}\uFE0F"
+                      }
+                    )
+                  ] })
                 ] }),
                 /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-slate-200 text-xs leading-relaxed", children: comment.comment })
               ] }, comment.id)) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-slate-400 text-xs text-center py-4", children: "S\xE9 el primero en comentar \u{1F3B5}" }) })

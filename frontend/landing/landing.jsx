@@ -805,8 +805,12 @@ function LandingApp({ data }) {
     const [fanStats, setFanStats] = useState({ totalLeads: 0, topCountries: [] });
     const [topTracks, setTopTracks] = useState([]);
     const [comments, setComments] = useState([]);
+    const [visibleComments, setVisibleComments] = useState([]);
+    const [commentRotationIndex, setCommentRotationIndex] = useState(0);
     const [newComment, setNewComment] = useState('');
     const [isSubmittingComment, setIsSubmittingComment] = useState(false);
+    const [commentError, setCommentError] = useState('');
+    const [lastCommentTime, setLastCommentTime] = useState(null);
     const [currentTrack, setCurrentTrack] = useState(null);
     const [isPlaying, setIsPlaying] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
@@ -982,6 +986,31 @@ function LandingApp({ data }) {
         fetchTopTracks();
         fetchComments();
     }, [isUnlocked]);
+
+    // Rotate comments every 5 seconds
+    useEffect(() => {
+        if (!isUnlocked || comments.length === 0) return;
+
+        const interval = setInterval(() => {
+            setCommentRotationIndex(prev => (prev + 1) % Math.max(1, comments.length - 4));
+        }, 5000);
+
+        return () => clearInterval(interval);
+    }, [isUnlocked, comments.length]);
+
+    // Update visible comments when comments or rotation changes
+    useEffect(() => {
+        if (comments.length === 0) return;
+
+        // Show 5 comments starting from rotation index
+        const start = commentRotationIndex;
+        const visible = [];
+        for (let i = 0; i < 5; i++) {
+            const index = (start + i) % comments.length;
+            visible.push(comments[index]);
+        }
+        setVisibleComments(visible);
+    }, [comments, commentRotationIndex]);
 
     useEffect(() => {
         const audio = audioRef.current;
@@ -1240,7 +1269,16 @@ function LandingApp({ data }) {
             return;
         }
         
+        // Check rate limiting (30 seconds between comments)
+        if (lastCommentTime && Date.now() - lastCommentTime < 30000) {
+            const secondsLeft = Math.ceil((30000 - (Date.now() - lastCommentTime)) / 1000);
+            setCommentError(`Espera ${secondsLeft} segundos para comentar de nuevo`);
+            setTimeout(() => setCommentError(''), 3000);
+            return;
+        }
+        
         setIsSubmittingComment(true);
+        setCommentError('');
         
         try {
             const response = await fetch('/landing/comments', {
@@ -1258,14 +1296,39 @@ function LandingApp({ data }) {
                 // Add new comment to list
                 setComments(prev => [result.comment, ...prev]);
                 setNewComment('');
+                setLastCommentTime(Date.now());
             } else {
-                alert(result.error || 'Error al publicar comentario');
+                setCommentError(result.error || 'Error al publicar comentario');
+                setTimeout(() => setCommentError(''), 3000);
             }
         } catch (error) {
             console.error('Error posting comment:', error);
-            alert('Error al publicar comentario');
+            setCommentError('Error al publicar comentario');
+            setTimeout(() => setCommentError(''), 3000);
         } finally {
             setIsSubmittingComment(false);
+        }
+    };
+
+    const handleDeleteComment = async (commentId) => {
+        if (!confirm('¿Eliminar este comentario?')) return;
+        
+        try {
+            const response = await fetch(`/landing/comments/${commentId}`, {
+                method: 'DELETE',
+                headers: { 'Accept': 'application/json' }
+            });
+            
+            const result = await response.json();
+            
+            if (response.ok && result.success) {
+                setComments(prev => prev.filter(c => c.id !== commentId));
+            } else {
+                alert(result.error || 'Error al eliminar comentario');
+            }
+        } catch (error) {
+            console.error('Error deleting comment:', error);
+            alert('Error al eliminar comentario');
         }
     };
 
@@ -1516,6 +1579,13 @@ function LandingApp({ data }) {
                             <div className="glass-panel rounded-2xl p-4 flex flex-col">
                                 <p className="text-xs uppercase tracking-[0.2em] text-slate-300 mb-3">💬 Comentarios de Fans</p>
                                 
+                                {/* Error de rate limiting */}
+                                {commentError && (
+                                    <div className="mb-2 px-3 py-2 bg-red-500/20 border border-red-500/50 rounded-lg text-xs text-red-300">
+                                        {commentError}
+                                    </div>
+                                )}
+                                
                                 {/* Formulario de comentario */}
                                 <form onSubmit={handleCommentSubmit} className="mb-3">
                                     <textarea
@@ -1524,7 +1594,7 @@ function LandingApp({ data }) {
                                         placeholder="Deja tu comentario..."
                                         maxLength={500}
                                         rows={2}
-                                        className="w-full px-3 py-2 bg-slate-800/50 border border-slate-600 rounded-lg text-sm text-white placeholder-slate-400 focus:outline-none focus:border-amber-400 resize-none"
+                                        className="w-full px-3 py-2 bg-slate-800/50 border border-slate-600 rounded-lg text-sm text-black placeholder-slate-400 focus:outline-none focus:border-amber-400 resize-none"
                                     />
                                     <div className="flex justify-between items-center mt-2">
                                         <span className="text-xs text-slate-400">{newComment.length}/500</span>
@@ -1538,16 +1608,44 @@ function LandingApp({ data }) {
                                     </div>
                                 </form>
                                 
-                                {/* Lista de comentarios */}
-                                <div className="flex-1 overflow-y-auto max-h-40 space-y-2">
-                                    {comments.length > 0 ? (
-                                        comments.map((comment) => (
+                                {/* Indicador de rotación */}
+                                {comments.length > 5 && (
+                                    <div className="flex justify-center gap-1 mb-2">
+                                        {Array.from({ length: Math.min(5, Math.ceil(comments.length / 5)) }).map((_, idx) => (
+                                            <div
+                                                key={idx}
+                                                className={`w-2 h-2 rounded-full transition-colors ${
+                                                    idx === Math.floor(commentRotationIndex / 5) % Math.min(5, Math.ceil(comments.length / 5))
+                                                        ? 'bg-amber-400'
+                                                        : 'bg-slate-600'
+                                                }`}
+                                            />
+                                        ))}
+                                    </div>
+                                )}
+                                
+                                {/* Lista de comentarios (máximo 5 visibles) */}
+                                <div className="flex-1 overflow-hidden space-y-2">
+                                    {visibleComments.length > 0 ? (
+                                        visibleComments.map((comment) => (
                                             <div key={comment.id} className="bg-slate-800/30 rounded-lg p-2 text-sm">
                                                 <div className="flex justify-between items-start mb-1">
                                                     <span className="font-semibold text-amber-300 text-xs">{comment.user_name}</span>
-                                                    <span className="text-xs text-slate-500">
-                                                        {new Date(comment.created_at).toLocaleDateString('es-ES', { month: 'short', day: 'numeric' })}
-                                                    </span>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-xs text-slate-500">
+                                                            {new Date(comment.created_at).toLocaleDateString('es-ES', { month: 'short', day: 'numeric' })}
+                                                        </span>
+                                                        {/* Botón borrar solo si es comentario del usuario */}
+                                                        {!comment.id.toString().startsWith('sample_') && (
+                                                            <button
+                                                                onClick={() => handleDeleteComment(comment.id)}
+                                                                className="text-xs text-red-400 hover:text-red-300 transition-colors"
+                                                                title="Borrar comentario"
+                                                            >
+                                                                🗑️
+                                                            </button>
+                                                        )}
+                                                    </div>
                                                 </div>
                                                 <p className="text-slate-200 text-xs leading-relaxed">{comment.comment}</p>
                                             </div>

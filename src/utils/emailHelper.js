@@ -35,15 +35,18 @@ async function sendWelcomeEmail({ to, name, country, magicToken, userId }) {
 
         // Obtener token de acceso
         const tokenUrl = `https://login.microsoftonline.com/${encodeURIComponent(tenantId)}/oauth2/v2.0/token`;
-        const form = new FormData();
-        form.append('grant_type', 'client_credentials');
-        form.append('client_id', clientId);
-        form.append('client_secret', clientSecret);
-        form.append('scope', 'https://graph.microsoft.com/.default');
+        const params = new URLSearchParams();
+        params.append('grant_type', 'client_credentials');
+        params.append('client_id', clientId);
+        params.append('client_secret', clientSecret);
+        params.append('scope', 'https://graph.microsoft.com/.default');
 
         const tokenRes = await fetch(tokenUrl, {
             method: 'POST',
-            body: form
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: params
         });
 
         if (!tokenRes.ok) {
@@ -252,15 +255,18 @@ async function sendMiniDiscOfferEmail({ to, name, country, userId }) {
 
         // Obtener token de acceso
         const tokenUrl = `https://login.microsoftonline.com/${encodeURIComponent(tenantId)}/oauth2/v2.0/token`;
-        const form = new FormData();
-        form.append('grant_type', 'client_credentials');
-        form.append('client_id', clientId);
-        form.append('client_secret', clientSecret);
-        form.append('scope', 'https://graph.microsoft.com/.default');
+        const params = new URLSearchParams();
+        params.append('grant_type', 'client_credentials');
+        params.append('client_id', clientId);
+        params.append('client_secret', clientSecret);
+        params.append('scope', 'https://graph.microsoft.com/.default');
 
         const tokenRes = await fetch(tokenUrl, {
             method: 'POST',
-            body: form
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: params
         });
 
         if (!tokenRes.ok) {
@@ -488,13 +494,19 @@ async function sendMiniDiscConfirmationEmail({ to, name, orderId, amount, nfcCod
 
         // Obtener token
         const tokenUrl = `https://login.microsoftonline.com/${encodeURIComponent(tenantId)}/oauth2/v2.0/token`;
-        const form = new FormData();
-        form.append('grant_type', 'client_credentials');
-        form.append('client_id', clientId);
-        form.append('client_secret', clientSecret);
-        form.append('scope', 'https://graph.microsoft.com/.default');
+        const params = new URLSearchParams();
+        params.append('grant_type', 'client_credentials');
+        params.append('client_id', clientId);
+        params.append('client_secret', clientSecret);
+        params.append('scope', 'https://graph.microsoft.com/.default');
 
-        const tokenRes = await fetch(tokenUrl, { method: 'POST', body: form });
+        const tokenRes = await fetch(tokenUrl, { 
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: params 
+        });
         const tokenData = await tokenRes.json();
         const accessToken = tokenData.access_token;
 

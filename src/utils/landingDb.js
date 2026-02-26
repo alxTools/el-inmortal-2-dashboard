@@ -1,120 +1,4 @@
 const { getAll, getOne, query, run } = require('../config/database');
-const crypto = require('crypto');
-
-/**
- * Genera un magic token único de 64 caracteres
- */
-function generateMagicToken() {
-    return crypto.randomBytes(32).toString('hex');
-}
-
-/**
- * Registra un nuevo lead o actualiza uno existente con nuevo magic token
- * @param {Object} leadData - Datos del lead
- * @returns {Object} - Resultado con userId, isNew, y magicToken
- */
-async function registerOrUpdateLead(leadData) {
-    const { email, fullName, country, ipAddress, userAgent, sourceLabel = 'landing_el_inmortal_2' } = leadData;
-    
-    try {
-        // Buscar si el email ya existe
-        const existingUser = await getOne(
-            'SELECT id, email FROM landing_email_leads WHERE email = ?',
-            [email]
-        );
-        
-        const magicToken = generateMagicToken();
-        const expiresAt = new Date();
-        expiresAt.setDate(expiresAt.getDate() + 30); // 30 días de expiración
-        const expiresAtFormatted = expiresAt.toISOString().slice(0, 19).replace('T', ' '); // Formato MySQL: YYYY-MM-DD HH:MM:SS
-        
-        if (existingUser) {
-            // Usuario existente: actualizar magic token y fecha de expiración
-            await run(
-                `UPDATE landing_email_leads 
-                 SET magic_token = ?, 
-                     magic_token_expires_at = ?,
-                     full_name = COALESCE(?, full_name),
-                     country = COALESCE(?, country),
-                     updated_at = NOW()
-                 WHERE id = ?`,
-                [magicToken, expiresAtFormatted, fullName, country, existingUser.id]
-            );
-            
-            console.log(`[Landing] Usuario existente actualizado: ${email}, ID: ${existingUser.id}`);
-            
-            return {
-                userId: existingUser.id,
-                isNew: false,
-                magicToken,
-                email
-            };
-        } else {
-            // Nuevo usuario: crear registro
-            const result = await run(
-                `INSERT INTO landing_email_leads 
-                 (email, full_name, country, source_label, ip_address, user_agent, 
-                  magic_token, magic_token_expires_at, email_verified, unlock_cookie_set)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 0)`,
-                [email, fullName, country, sourceLabel, ipAddress, userAgent, magicToken, expiresAtFormatted]
-            );
-            
-            console.log(`[Landing] Nuevo usuario registrado: ${email}, ID: ${result.lastID}`);
-            
-            return {
-                userId: result.lastID,
-                isNew: true,
-                magicToken,
-                email
-            };
-        }
-    } catch (error) {
-        console.error('[Landing] Error en registerOrUpdateLead:', error);
-        throw error;
-    }
-}
-
-/**
- * Verifica un magic token y retorna el usuario si es válido
- * @param {string} token - Magic token a verificar
- * @returns {Object|null} - Datos del usuario o null si no es válido
- */
-async function verifyMagicToken(token) {
-    try {
-        const user = await getOne(
-            `SELECT id, email, full_name, country, magic_token_expires_at, email_verified 
-             FROM landing_email_leads 
-             WHERE magic_token = ? AND magic_token_expires_at > NOW()`,
-            [token]
-        );
-        
-        return user || null;
-    } catch (error) {
-        console.error('[Landing] Error verificando magic token:', error);
-        return null;
-    }
-}
-
-/**
- * Marca el email como verificado y actualiza el estado
- * @param {number} userId - ID del usuario
- */
-async function markEmailAsVerified(userId) {
-    try {
-        await run(
-            `UPDATE landing_email_leads 
-             SET email_verified = 1, 
-                 email_verified_at = NOW(),
-                 unlock_cookie_set = 1
-             WHERE id = ?`,
-            [userId]
-        );
-        console.log(`[Landing] Email verificado para usuario ID: ${userId}`);
-    } catch (error) {
-        console.error('[Landing] Error marcando email como verificado:', error);
-        throw error;
-    }
-}
 
 /**
  * Verifica y crea la tabla central de leads si no existe
@@ -199,25 +83,6 @@ async function ensureLandingLeadsTable() {
             if (!columnSet.has('tracking_number')) {
                 await query('ALTER TABLE landing_email_leads ADD COLUMN tracking_number TEXT');
             }
-            // Magic token columns
-            if (!columnSet.has('magic_token')) {
-                await query('ALTER TABLE landing_email_leads ADD COLUMN magic_token VARCHAR(64) UNIQUE');
-            }
-            if (!columnSet.has('magic_token_expires_at')) {
-                await query('ALTER TABLE landing_email_leads ADD COLUMN magic_token_expires_at DATETIME');
-            }
-            if (!columnSet.has('email_verified')) {
-                await query('ALTER TABLE landing_email_leads ADD COLUMN email_verified INTEGER DEFAULT 0');
-            }
-            if (!columnSet.has('email_verified_at')) {
-                await query('ALTER TABLE landing_email_leads ADD COLUMN email_verified_at DATETIME');
-            }
-            if (!columnSet.has('unlock_cookie_set')) {
-                await query('ALTER TABLE landing_email_leads ADD COLUMN unlock_cookie_set INTEGER DEFAULT 0');
-            }
-            if (!columnSet.has('updated_at')) {
-                await query('ALTER TABLE landing_email_leads ADD COLUMN updated_at DATETIME DEFAULT CURRENT_TIMESTAMP');
-            }
         } else {
             // MySQL syntax
             await query(
@@ -241,21 +106,14 @@ async function ensureLandingLeadsTable() {
                     nfc_link VARCHAR(255) NULL,
                     package_shipped TINYINT DEFAULT 0,
                     tracking_number VARCHAR(100) NULL,
-                    magic_token VARCHAR(64) UNIQUE NULL,
-                    magic_token_expires_at DATETIME NULL,
-                    email_verified TINYINT DEFAULT 0,
-                    email_verified_at DATETIME NULL,
-                    unlock_cookie_set TINYINT DEFAULT 0,
                     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                     PRIMARY KEY (id),
                     KEY idx_email (email),
                     KEY idx_country (country),
                     KEY idx_source (source_label),
                     KEY idx_site (source_site),
                     KEY idx_paypal_order (paypal_order_id),
-                    KEY idx_nfc_code (nfc_unique_code),
-                    KEY idx_magic_token (magic_token)
+                    KEY idx_nfc_code (nfc_unique_code)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`
             );
 
@@ -263,44 +121,51 @@ async function ensureLandingLeadsTable() {
                 `SELECT column_name FROM information_schema.columns
                  WHERE table_schema = DATABASE() AND table_name = 'landing_email_leads'`
             );
-            const columnSet = new Set(columns.map((row) => (row.column_name || row.COLUMN_NAME).toLowerCase()));
+            const columnSet = new Set(columns.map((row) => row.column_name));
 
-            // Helper para agregar columna ignorando errores de duplicado
-            async function addColumnIfNotExists(columnName, definition) {
-                if (!columnSet.has(columnName.toLowerCase())) {
-                    try {
-                        await query(`ALTER TABLE landing_email_leads ADD COLUMN ${columnName} ${definition}`);
-                        console.log(`[Landing] ✅ Columna ${columnName} agregada`);
-                    } catch (err) {
-                        if (err.code === 'ER_DUP_FIELDNAME') {
-                            console.log(`[Landing] ℹ️ Columna ${columnName} ya existe, ignorando`);
-                        } else {
-                            throw err;
-                        }
-                    }
-                }
+            if (!columnSet.has('full_name')) {
+                await query('ALTER TABLE landing_email_leads ADD COLUMN full_name VARCHAR(255) NULL');
             }
-
-            await addColumnIfNotExists('full_name', 'VARCHAR(255) NULL');
-            await addColumnIfNotExists('country', 'VARCHAR(120) NULL');
-            await addColumnIfNotExists('source_site', 'VARCHAR(100) DEFAULT "el_inmortal_2"');
-            await addColumnIfNotExists('synced_to_wordpress', 'TINYINT DEFAULT 0');
-            await addColumnIfNotExists('interested_in_minidisc', 'TINYINT DEFAULT 0');
-            await addColumnIfNotExists('paypal_order_id', 'VARCHAR(255) NULL');
-            await addColumnIfNotExists('paypal_payment_status', 'VARCHAR(50) NULL');
-            await addColumnIfNotExists('paypal_payer_email', 'VARCHAR(255) NULL');
-            await addColumnIfNotExists('minidisc_email_sent_at', 'DATETIME NULL');
-            await addColumnIfNotExists('minidisc_email_sent', 'TINYINT DEFAULT 0');
-            await addColumnIfNotExists('nfc_unique_code', 'VARCHAR(20) UNIQUE NULL');
-            await addColumnIfNotExists('nfc_link', 'VARCHAR(255) NULL');
-            await addColumnIfNotExists('package_shipped', 'TINYINT DEFAULT 0');
-            await addColumnIfNotExists('tracking_number', 'VARCHAR(100) NULL');
-            await addColumnIfNotExists('magic_token', 'VARCHAR(64) UNIQUE NULL');
-            await addColumnIfNotExists('magic_token_expires_at', 'DATETIME NULL');
-            await addColumnIfNotExists('email_verified', 'TINYINT DEFAULT 0');
-            await addColumnIfNotExists('email_verified_at', 'DATETIME NULL');
-            await addColumnIfNotExists('unlock_cookie_set', 'TINYINT DEFAULT 0');
-            await addColumnIfNotExists('updated_at', 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP');
+            if (!columnSet.has('country')) {
+                await query('ALTER TABLE landing_email_leads ADD COLUMN country VARCHAR(120) NULL');
+            }
+            if (!columnSet.has('source_site')) {
+                await query('ALTER TABLE landing_email_leads ADD COLUMN source_site VARCHAR(100) DEFAULT "el_inmortal_2"');
+            }
+            if (!columnSet.has('synced_to_wordpress')) {
+                await query('ALTER TABLE landing_email_leads ADD COLUMN synced_to_wordpress TINYINT DEFAULT 0');
+            }
+            // Nuevas columnas para Mini-Disc
+            if (!columnSet.has('interested_in_minidisc')) {
+                await query('ALTER TABLE landing_email_leads ADD COLUMN interested_in_minidisc TINYINT DEFAULT 0');
+            }
+            if (!columnSet.has('paypal_order_id')) {
+                await query('ALTER TABLE landing_email_leads ADD COLUMN paypal_order_id VARCHAR(255) NULL');
+            }
+            if (!columnSet.has('paypal_payment_status')) {
+                await query('ALTER TABLE landing_email_leads ADD COLUMN paypal_payment_status VARCHAR(50) NULL');
+            }
+            if (!columnSet.has('paypal_payer_email')) {
+                await query('ALTER TABLE landing_email_leads ADD COLUMN paypal_payer_email VARCHAR(255) NULL');
+            }
+            if (!columnSet.has('minidisc_email_sent_at')) {
+                await query('ALTER TABLE landing_email_leads ADD COLUMN minidisc_email_sent_at DATETIME NULL');
+            }
+            if (!columnSet.has('minidisc_email_sent')) {
+                await query('ALTER TABLE landing_email_leads ADD COLUMN minidisc_email_sent TINYINT DEFAULT 0');
+            }
+            if (!columnSet.has('nfc_unique_code')) {
+                await query('ALTER TABLE landing_email_leads ADD COLUMN nfc_unique_code VARCHAR(20) UNIQUE NULL');
+            }
+            if (!columnSet.has('nfc_link')) {
+                await query('ALTER TABLE landing_email_leads ADD COLUMN nfc_link VARCHAR(255) NULL');
+            }
+            if (!columnSet.has('package_shipped')) {
+                await query('ALTER TABLE landing_email_leads ADD COLUMN package_shipped TINYINT DEFAULT 0');
+            }
+            if (!columnSet.has('tracking_number')) {
+                await query('ALTER TABLE landing_email_leads ADD COLUMN tracking_number VARCHAR(100) NULL');
+            }
         }
         
         console.log('[Landing] ✅ Tabla landing_email_leads verificada/creada exitosamente');
@@ -470,9 +335,5 @@ module.exports = {
     ensureLandingLeadsTable,
     saveNFCCode,
     syncToWordPress,
-    getUnifiedStats,
-    generateMagicToken,
-    registerOrUpdateLead,
-    verifyMagicToken,
-    markEmailAsVerified
+    getUnifiedStats
 };

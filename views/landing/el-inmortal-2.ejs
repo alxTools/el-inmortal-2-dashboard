@@ -175,30 +175,10 @@
                 </p>
             </div>
             
-            <!-- Botón para desbloquear (visible inicialmente) -->
-            <div id="unlockCTA" class="form-section" style="text-align: center;">
+            <div class="form-section">
                 <h2 class="form-title">🔓 Desbloquea el Álbum Completo</h2>
                 <p class="form-subtitle">
                     Sé el primero en escuchar "El Inmortal 2" antes que nadie
-                </p>
-                
-                <ul class="benefits" style="text-align: left; max-width: 400px; margin: 20px auto;">
-                    <li>Escucha todas las 21 canciones</li>
-                    <li>Acceso exclusivo al reproductor</li>
-                    <li>Contenido exclusivo y noticias</li>
-                    <li>🎁 Tu información está segura</li>
-                </ul>
-                
-                <button type="button" id="showFormBtn" style="margin-top: 20px; padding: 16px 32px; font-size: 1.1rem;">
-                    🔓 Desbloquear Acceso Ahora
-                </button>
-            </div>
-            
-            <!-- Formulario (oculto inicialmente) -->
-            <div id="subscribeFormContainer" class="form-section" style="display: none;">
-                <h2 class="form-title">📝 Completa tu Registro</h2>
-                <p class="form-subtitle">
-                    Ingresa tus datos para recibir el acceso exclusivo
                 </p>
                 
                 <form method="post" action="/landing/subscribe" id="subscribeForm">
@@ -214,134 +194,46 @@
                     <input type="hidden" name="source" value="landing_el_inmortal_2" />
                     
                     <button type="submit" id="submitBtn">
-                        🚀 Enviar y Recibir Acceso
+                        🔓 Desbloquear Acceso Ahora
                     </button>
                 </form>
                 
-                <p style="color: #64748b; font-size: 0.85rem; margin-top: 15px; text-align: center;">
-                    🔒 Tu información está segura. Nunca compartimos tus datos.
-                </p>
+                <ul class="benefits">
+                    <li>Escucha todas las 21 canciones</li>
+                    <li>Acceso exclusivo al reproductor</li>
+                    <li>Contenido exclusivo y noticias</li>
+                    <li>🎁 Tu información está segura. Nunca compartimos tus datos.</li>
+                </ul>
             </div>
         </div>
     </div>
 
-    <!-- Track Modal -->
-    <%- include('track-modal') %>
-    
     <script>
         window.__ALBUM_LANDING_DATA__ = <%- landingDataJson %>;
-        
-        // Check for URL parameters
-        const urlParams = new URLSearchParams(window.location.search);
-        if (urlParams.get('check_email') === '1') {
-            alert('🎵 ¡Registro exitoso! Revisa tu email y haz clic en el enlace de verificación para desbloquear el acceso.');
-        }
-        if (urlParams.get('verified') === '1') {
-            alert('✅ ¡Email verificado! Ahora tienes acceso completo a El Inmortal 2.');
-        }
         
         // GA4 Event Tracking
         document.addEventListener('DOMContentLoaded', function() {
             const form = document.getElementById('subscribeForm');
-            const submitBtn = document.getElementById('submitBtn');
-            const showFormBtn = document.getElementById('showFormBtn');
-            const unlockCTA = document.getElementById('unlockCTA');
-            const formContainer = document.getElementById('subscribeFormContainer');
+            const btn = document.getElementById('submitBtn');
             
-            // Mostrar formulario al hacer clic en "Desbloquear"
-            if (showFormBtn && unlockCTA && formContainer) {
-                showFormBtn.addEventListener('click', function() {
-                    unlockCTA.style.display = 'none';
-                    formContainer.style.display = 'block';
-                    formContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    
-                    gtag('event', 'begin_checkout', {
-                        'event_category': 'engagement',
-                        'event_label': 'unlock_button_click'
-                    });
+            btn.addEventListener('click', function() {
+                gtag('event', 'begin_checkout', {
+                    'event_category': 'engagement',
+                    'event_label': 'unlock_button_click'
                 });
-            }
-            
-            if (submitBtn) {
-                submitBtn.addEventListener('click', function() {
-                    gtag('event', 'begin_checkout', {
-                        'event_category': 'engagement',
-                        'event_label': 'submit_form_click'
-                    });
-                });
-            }
-            
-            if (form) {
-                form.addEventListener('submit', async function(e) {
-                    e.preventDefault();
-                    
-                    const formData = new FormData(form);
-                    const submitBtn = document.getElementById('submitBtn');
-                    const originalText = submitBtn.textContent;
-                    
-                    // Deshabilitar botón mientras se envía
-                    submitBtn.disabled = true;
-                    submitBtn.textContent = '⏳ Enviando...';
-                    
-                    try {
-                        const response = await fetch('/landing/subscribe', {
-                            method: 'POST',
-                            body: formData
-                        });
-                        
-                        if (response.redirected) {
-                            // Si redirige, seguir la redirección
-                            window.location.href = response.url;
-                        } else {
-                            const result = await response.json();
-                            
-                            if (result.success) {
-                                // Éxito - mostrar mensaje
-                                alert('🎵 ¡Registro exitoso! Revisa tu email y haz clic en el enlace de verificación para desbloquear el acceso.');
-                                form.reset();
-                            } else {
-                                // Error del servidor
-                                alert('❌ Error: ' + (result.error || 'No se pudo completar el registro'));
-                            }
-                        }
-                    } catch (error) {
-                        console.error('Error:', error);
-                        alert('❌ Error de conexión. Por favor intenta de nuevo.');
-                    } finally {
-                        submitBtn.disabled = false;
-                        submitBtn.textContent = originalText;
-                    }
-                    
-                    const email = form.querySelector('input[type="email"]')?.value;
-                    gtag('event', 'generate_lead', {
-                        'event_category': 'conversion',
-                        'event_label': 'email_submitted',
-                        'value': 1
-                    });
-                });
-            }
-            
-            // Setup track click handlers
-            setupTrackClickHandlers();
-        });
-        
-        // Setup track click handlers for modal
-        function setupTrackClickHandlers() {
-            // Listen for clicks on track elements
-            document.addEventListener('click', function(e) {
-                const trackLink = e.target.closest('[data-track-id]');
-                if (trackLink) {
-                    e.preventDefault();
-                    const trackId = trackLink.dataset.trackId;
-                    if (trackId && typeof openTrackModal === 'function') {
-                        openTrackModal(trackId);
-                    }
-                }
             });
-        }
+            
+            form.addEventListener('submit', function(e) {
+                const email = form.querySelector('input[type="email"]')?.value;
+                gtag('event', 'generate_lead', {
+                    'event_category': 'conversion',
+                    'event_label': 'email_submitted',
+                    'value': 1
+                });
+            });
+        });
     </script>
     <script src="/js/album-landing.bundle.js?v=4" defer></script>
-    <script src="/js/landing-modal.js" defer></script>
     <script src="/js/social-notifications.js" defer></script>
 </body>
 </html>

@@ -263,7 +263,7 @@ async function ensureLandingLeadsTable() {
                 `SELECT column_name FROM information_schema.columns
                  WHERE table_schema = DATABASE() AND table_name = 'landing_email_leads'`
             );
-            const columnSet = new Set(columns.map((row) => row.column_name.toLowerCase()));
+            const columnSet = new Set(columns.map((row) => (row.column_name || row.COLUMN_NAME).toLowerCase()));
 
             // Helper para agregar columna ignorando errores de duplicado
             async function addColumnIfNotExists(columnName, definition) {

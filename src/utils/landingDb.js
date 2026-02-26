@@ -129,61 +129,41 @@ async function ensureLandingLeadsTable() {
                 `SELECT column_name FROM information_schema.columns
                  WHERE table_schema = DATABASE() AND table_name = 'landing_email_leads'`
             );
-            const columnSet = new Set(columns.map((row) => row.column_name));
+            const columnSet = new Set(columns.map((row) => (row.column_name || row.COLUMN_NAME)?.toLowerCase()).filter(Boolean));
 
-            if (!columnSet.has('full_name')) {
-                await query('ALTER TABLE landing_email_leads ADD COLUMN full_name VARCHAR(255) NULL');
+            // Helper para agregar columna con manejo de errores
+            async function addColumnIfNotExists(columnName, definition) {
+                if (!columnSet.has(columnName.toLowerCase())) {
+                    try {
+                        await query(`ALTER TABLE landing_email_leads ADD COLUMN ${columnName} ${definition}`);
+                        console.log(`[Landing] ✅ Columna ${columnName} agregada`);
+                    } catch (err) {
+                        if (err.code === 'ER_DUP_FIELDNAME') {
+                            console.log(`[Landing] ℹ️ Columna ${columnName} ya existe`);
+                        } else {
+                            throw err;
+                        }
+                    }
+                }
             }
-            if (!columnSet.has('country')) {
-                await query('ALTER TABLE landing_email_leads ADD COLUMN country VARCHAR(120) NULL');
-            }
-            if (!columnSet.has('source_site')) {
-                await query('ALTER TABLE landing_email_leads ADD COLUMN source_site VARCHAR(100) DEFAULT "el_inmortal_2"');
-            }
-            if (!columnSet.has('synced_to_wordpress')) {
-                await query('ALTER TABLE landing_email_leads ADD COLUMN synced_to_wordpress TINYINT DEFAULT 0');
-            }
-            // Nuevas columnas para Mini-Disc
-            if (!columnSet.has('interested_in_minidisc')) {
-                await query('ALTER TABLE landing_email_leads ADD COLUMN interested_in_minidisc TINYINT DEFAULT 0');
-            }
-            if (!columnSet.has('paypal_order_id')) {
-                await query('ALTER TABLE landing_email_leads ADD COLUMN paypal_order_id VARCHAR(255) NULL');
-            }
-            if (!columnSet.has('paypal_payment_status')) {
-                await query('ALTER TABLE landing_email_leads ADD COLUMN paypal_payment_status VARCHAR(50) NULL');
-            }
-            if (!columnSet.has('paypal_payer_email')) {
-                await query('ALTER TABLE landing_email_leads ADD COLUMN paypal_payer_email VARCHAR(255) NULL');
-            }
-            if (!columnSet.has('minidisc_email_sent_at')) {
-                await query('ALTER TABLE landing_email_leads ADD COLUMN minidisc_email_sent_at DATETIME NULL');
-            }
-            if (!columnSet.has('minidisc_email_sent')) {
-                await query('ALTER TABLE landing_email_leads ADD COLUMN minidisc_email_sent TINYINT DEFAULT 0');
-            }
-            if (!columnSet.has('nfc_unique_code')) {
-                await query('ALTER TABLE landing_email_leads ADD COLUMN nfc_unique_code VARCHAR(20) UNIQUE NULL');
-            }
-            if (!columnSet.has('nfc_link')) {
-                await query('ALTER TABLE landing_email_leads ADD COLUMN nfc_link VARCHAR(255) NULL');
-            }
-            if (!columnSet.has('package_shipped')) {
-                await query('ALTER TABLE landing_email_leads ADD COLUMN package_shipped TINYINT DEFAULT 0');
-            }
-            if (!columnSet.has('tracking_number')) {
-                await query('ALTER TABLE landing_email_leads ADD COLUMN tracking_number VARCHAR(100) NULL');
-            }
-            // Columnas para magic links
-            if (!columnSet.has('magic_token')) {
-                await query('ALTER TABLE landing_email_leads ADD COLUMN magic_token VARCHAR(64) UNIQUE NULL');
-            }
-            if (!columnSet.has('email_verified')) {
-                await query('ALTER TABLE landing_email_leads ADD COLUMN email_verified TINYINT DEFAULT 0');
-            }
-            if (!columnSet.has('magic_token_expires_at')) {
-                await query('ALTER TABLE landing_email_leads ADD COLUMN magic_token_expires_at DATETIME NULL');
-            }
+
+            await addColumnIfNotExists('full_name', 'VARCHAR(255) NULL');
+            await addColumnIfNotExists('country', 'VARCHAR(120) NULL');
+            await addColumnIfNotExists('source_site', 'VARCHAR(100) DEFAULT "el_inmortal_2"');
+            await addColumnIfNotExists('synced_to_wordpress', 'TINYINT DEFAULT 0');
+            await addColumnIfNotExists('interested_in_minidisc', 'TINYINT DEFAULT 0');
+            await addColumnIfNotExists('paypal_order_id', 'VARCHAR(255) NULL');
+            await addColumnIfNotExists('paypal_payment_status', 'VARCHAR(50) NULL');
+            await addColumnIfNotExists('paypal_payer_email', 'VARCHAR(255) NULL');
+            await addColumnIfNotExists('minidisc_email_sent_at', 'DATETIME NULL');
+            await addColumnIfNotExists('minidisc_email_sent', 'TINYINT DEFAULT 0');
+            await addColumnIfNotExists('nfc_unique_code', 'VARCHAR(20) UNIQUE NULL');
+            await addColumnIfNotExists('nfc_link', 'VARCHAR(255) NULL');
+            await addColumnIfNotExists('package_shipped', 'TINYINT DEFAULT 0');
+            await addColumnIfNotExists('tracking_number', 'VARCHAR(100) NULL');
+            await addColumnIfNotExists('magic_token', 'VARCHAR(64) UNIQUE NULL');
+            await addColumnIfNotExists('email_verified', 'TINYINT DEFAULT 0');
+            await addColumnIfNotExists('magic_token_expires_at', 'DATETIME NULL');
         }
         
         console.log('[Landing] ✅ Tabla landing_email_leads verificada/creada exitosamente');

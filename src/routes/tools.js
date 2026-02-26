@@ -706,10 +706,14 @@ router.get('/remotion-studio', async (req, res) => {
         try {
             remotionPort = await findAvailablePort(3003);
             
-            remotionProcess = spawn('npx', ['remotion', 'studio', '--port', remotionPort.toString()], {
+            // Get server hostname for external access
+            const serverHost = req.headers.host ? req.headers.host.split(':')[0] : 'localhost';
+            
+            remotionProcess = spawn('npx', ['remotion', 'studio', '--port', remotionPort.toString(), '--host', '0.0.0.0'], {
                 cwd: path.join(__dirname, '../..'),
                 detached: false,
-                stdio: ['ignore', 'pipe', 'pipe']
+                stdio: ['ignore', 'pipe', 'pipe'],
+                env: { ...process.env, REMOTION_HOST: serverHost }
             });
             
             remotionProcess.stdout.on('data', (data) => {
@@ -737,11 +741,15 @@ router.get('/remotion-studio', async (req, res) => {
         }
     }
     
-    const studioUrl = `http://localhost:${remotionPort}`;
+    // Get server hostname for external access
+    const serverHost = req.headers.host ? req.headers.host.split(':')[0] : 'localhost';
+    const studioUrl = `http://${serverHost}:${remotionPort}`;
     
     res.render('tools/remotion-studio', {
         title: 'Remotion Studio - El Inmortal 2 Dashboard',
         studioUrl,
+        serverHost,
+        remotionPort,
         projectPath: 'remotion/',
         flash: String(req.query.flash || '')
     });

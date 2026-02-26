@@ -272,7 +272,46 @@
             }
             
             if (form) {
-                form.addEventListener('submit', function(e) {
+                form.addEventListener('submit', async function(e) {
+                    e.preventDefault();
+                    
+                    const formData = new FormData(form);
+                    const submitBtn = document.getElementById('submitBtn');
+                    const originalText = submitBtn.textContent;
+                    
+                    // Deshabilitar botón mientras se envía
+                    submitBtn.disabled = true;
+                    submitBtn.textContent = '⏳ Enviando...';
+                    
+                    try {
+                        const response = await fetch('/landing/subscribe', {
+                            method: 'POST',
+                            body: formData
+                        });
+                        
+                        if (response.redirected) {
+                            // Si redirige, seguir la redirección
+                            window.location.href = response.url;
+                        } else {
+                            const result = await response.json();
+                            
+                            if (result.success) {
+                                // Éxito - mostrar mensaje
+                                alert('🎵 ¡Registro exitoso! Revisa tu email y haz clic en el enlace de verificación para desbloquear el acceso.');
+                                form.reset();
+                            } else {
+                                // Error del servidor
+                                alert('❌ Error: ' + (result.error || 'No se pudo completar el registro'));
+                            }
+                        }
+                    } catch (error) {
+                        console.error('Error:', error);
+                        alert('❌ Error de conexión. Por favor intenta de nuevo.');
+                    } finally {
+                        submitBtn.disabled = false;
+                        submitBtn.textContent = originalText;
+                    }
+                    
                     const email = form.querySelector('input[type="email"]')?.value;
                     gtag('event', 'generate_lead', {
                         'event_category': 'conversion',

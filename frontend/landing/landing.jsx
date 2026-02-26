@@ -1632,9 +1632,9 @@ function LandingApp({ data }) {
             {/* Stats cards section removed - now integrated in hero */}
 
             {/* ========================================
-                FAN GENERATOR SECTION
+                FAN GENERATOR SECTION - TEMPORARILY DISABLED
                 ======================================== */}
-            {isUnlocked && (
+            {false && isUnlocked && (
                 <section id="fan-generator" className="relative z-10 py-16 px-6">
                     <div className="mx-auto max-w-4xl">
                         <div className="text-center mb-8">

@@ -22423,6 +22423,7 @@ var AlbumLandingApp = (() => {
     const [isSubmittingComment, setIsSubmittingComment] = (0, import_react.useState)(false);
     const [commentError, setCommentError] = (0, import_react.useState)("");
     const [lastCommentTime, setLastCommentTime] = (0, import_react.useState)(null);
+    const [currentUserEmail, setCurrentUserEmail] = (0, import_react.useState)("");
     const [currentTrack, setCurrentTrack] = (0, import_react.useState)(null);
     const [isPlaying, setIsPlaying] = (0, import_react.useState)(false);
     const [isLoading, setIsLoading] = (0, import_react.useState)(false);
@@ -22492,11 +22493,19 @@ var AlbumLandingApp = (() => {
       if (shouldUnlock) {
         setIsUnlocked(true);
         localStorage.setItem("landing_el_inmortal_unlock", "1");
+        const emailCookie = document.cookie.split("; ").find((row) => row.startsWith("landing_email="));
+        if (emailCookie) {
+          setCurrentUserEmail(decodeURIComponent(emailCookie.split("=")[1]));
+        }
         window.history.replaceState({}, document.title, window.location.pathname);
       } else {
         const storedUnlock = localStorage.getItem("landing_el_inmortal_unlock");
         if (storedUnlock === "1") {
           setIsUnlocked(true);
+          const emailCookie = document.cookie.split("; ").find((row) => row.startsWith("landing_email="));
+          if (emailCookie) {
+            setCurrentUserEmail(decodeURIComponent(emailCookie.split("=")[1]));
+          }
         } else {
           const timer = setTimeout(() => {
             setIsModalOpen(true);
@@ -22817,7 +22826,11 @@ var AlbumLandingApp = (() => {
         });
         const result = await response.json();
         if (response.ok && result.success) {
-          setComments((prev) => [result.comment, ...prev]);
+          const newCommentData = {
+            ...result.comment,
+            user_email: currentUserEmail
+          };
+          setComments((prev) => [newCommentData, ...prev]);
           setNewComment("");
           setLastCommentTime(Date.now());
         } else {
@@ -23061,6 +23074,17 @@ var AlbumLandingApp = (() => {
             /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "glass-panel rounded-2xl p-4 flex flex-col", children: [
               /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-xs uppercase tracking-[0.2em] text-slate-300 mb-3", children: "\u{1F4AC} Comentarios de Fans" }),
               commentError && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "mb-2 px-3 py-2 bg-red-500/20 border border-red-500/50 rounded-lg text-xs text-red-300", children: commentError }),
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "flex gap-1 mb-2 flex-wrap", children: ["\u{1F525}", "\u2764\uFE0F", "\u{1F3B5}", "\u{1F3A7}", "\u{1F451}", "\u{1F525}", "\u{1F4AF}", "\u{1F64C}", "\u{1F3A4}", "\u{1F3B8}", "\u{1F50A}", "\u26A1"].map((emoji) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+                "button",
+                {
+                  type: "button",
+                  onClick: () => setNewComment((prev) => prev + emoji),
+                  className: "text-lg hover:scale-110 transition-transform",
+                  title: `Agregar ${emoji}`,
+                  children: emoji
+                },
+                emoji
+              )) }),
               /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("form", { onSubmit: handleCommentSubmit, className: "mb-3", children: [
                 /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
                   "textarea",
@@ -23101,11 +23125,11 @@ var AlbumLandingApp = (() => {
                   /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "font-semibold text-amber-300 text-xs", children: comment.user_name }),
                   /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex items-center gap-2", children: [
                     /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "text-xs text-slate-500", children: new Date(comment.created_at).toLocaleDateString("es-ES", { month: "short", day: "numeric" }) }),
-                    !comment.id.toString().startsWith("sample_") && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
-                      "button",
+                    !comment.id.toString().startsWith("sample_") && (comment.user_email === currentUserEmail || comment.user_id) && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+                      "span",
                       {
                         onClick: () => handleDeleteComment(comment.id),
-                        className: "text-xs text-red-400 hover:text-red-300 transition-colors",
+                        style: { cursor: "pointer", fontSize: "12px" },
                         title: "Borrar comentario",
                         children: "\u{1F5D1}\uFE0F"
                       }

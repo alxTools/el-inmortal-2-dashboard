@@ -811,6 +811,7 @@ function LandingApp({ data }) {
     const [isSubmittingComment, setIsSubmittingComment] = useState(false);
     const [commentError, setCommentError] = useState('');
     const [lastCommentTime, setLastCommentTime] = useState(null);
+    const [currentUserEmail, setCurrentUserEmail] = useState('');
     const [currentTrack, setCurrentTrack] = useState(null);
     const [isPlaying, setIsPlaying] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
@@ -903,6 +904,11 @@ function LandingApp({ data }) {
         if (shouldUnlock) {
             setIsUnlocked(true);
             localStorage.setItem('landing_el_inmortal_unlock', '1');
+            // Leer email de la cookie
+            const emailCookie = document.cookie.split('; ').find(row => row.startsWith('landing_email='));
+            if (emailCookie) {
+                setCurrentUserEmail(decodeURIComponent(emailCookie.split('=')[1]));
+            }
             // Limpiar URL
             window.history.replaceState({}, document.title, window.location.pathname);
         } else {
@@ -910,6 +916,11 @@ function LandingApp({ data }) {
             const storedUnlock = localStorage.getItem('landing_el_inmortal_unlock');
             if (storedUnlock === '1') {
                 setIsUnlocked(true);
+                // Leer email de la cookie
+                const emailCookie = document.cookie.split('; ').find(row => row.startsWith('landing_email='));
+                if (emailCookie) {
+                    setCurrentUserEmail(decodeURIComponent(emailCookie.split('=')[1]));
+                }
             } else {
                 // Mostrar modal después de 2 segundos
                 const timer = setTimeout(() => {
@@ -1293,8 +1304,12 @@ function LandingApp({ data }) {
             const result = await response.json();
             
             if (response.ok && result.success) {
-                // Add new comment to list
-                setComments(prev => [result.comment, ...prev]);
+                // Add new comment to list with current user email
+                const newCommentData = {
+                    ...result.comment,
+                    user_email: currentUserEmail
+                };
+                setComments(prev => [newCommentData, ...prev]);
                 setNewComment('');
                 setLastCommentTime(Date.now());
             } else {
@@ -1586,6 +1601,21 @@ function LandingApp({ data }) {
                                     </div>
                                 )}
                                 
+                                {/* Emoji picker */}
+                                <div className="flex gap-1 mb-2 flex-wrap">
+                                    {['🔥', '❤️', '🎵', '🎧', '👑', '🔥', '💯', '🙌', '🎤', '🎸', '🔊', '⚡'].map(emoji => (
+                                        <button
+                                            key={emoji}
+                                            type="button"
+                                            onClick={() => setNewComment(prev => prev + emoji)}
+                                            className="text-lg hover:scale-110 transition-transform"
+                                            title={`Agregar ${emoji}`}
+                                        >
+                                            {emoji}
+                                        </button>
+                                    ))}
+                                </div>
+
                                 {/* Formulario de comentario */}
                                 <form onSubmit={handleCommentSubmit} className="mb-3">
                                     <textarea
@@ -1636,14 +1666,15 @@ function LandingApp({ data }) {
                                                             {new Date(comment.created_at).toLocaleDateString('es-ES', { month: 'short', day: 'numeric' })}
                                                         </span>
                                                         {/* Botón borrar solo si es comentario del usuario */}
-                                                        {!comment.id.toString().startsWith('sample_') && (
-                                                            <button
+                                                        {!comment.id.toString().startsWith('sample_') &&
+                                                         (comment.user_email === currentUserEmail || comment.user_id) && (
+                                                            <span
                                                                 onClick={() => handleDeleteComment(comment.id)}
-                                                                className="text-xs text-red-400 hover:text-red-300 transition-colors"
+                                                                style={{cursor: 'pointer', fontSize: '12px'}}
                                                                 title="Borrar comentario"
                                                             >
                                                                 🗑️
-                                                            </button>
+                                                            </span>
                                                         )}
                                                     </div>
                                                 </div>

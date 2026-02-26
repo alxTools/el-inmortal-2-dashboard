@@ -493,6 +493,14 @@ router.get('/unlock', async (req, res) => {
             sameSite: 'lax'
         });
         
+        // Cookie con email para identificar comentarios del usuario
+        res.cookie('landing_email', user.email, {
+            maxAge: 7 * 24 * 60 * 60 * 1000,
+            httpOnly: false, // Necesitamos leerla desde JS
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax'
+        });
+        
         console.log(`[Landing Unlock] ✅ Usuario ${user.email} verificado y desbloqueado como FAN (ID: ${userId})`);
         
         // Redirigir al álbum (fan home)
@@ -599,11 +607,11 @@ const SAMPLE_COMMENTS = [
 router.get('/comments', async (req, res) => {
     try {
         const comments = await getAll(`
-            SELECT id, user_name, comment, created_at, user_id
+            SELECT id, user_name, comment, created_at, user_id, user_email
             FROM landing_comments
             WHERE is_approved = 1
             ORDER BY created_at DESC
-            LIMIT 5
+            LIMIT 20
         `);
         
         // If less than 5 comments, fill with sample comments
@@ -755,11 +763,32 @@ router.delete('/comments/:id', async (req, res) => {
             }
         }
         
-        // Verificar que el comentario pertenece al usuario
-        const comment = await getOne(
-            'SELECT id FROM landing_comments WHERE id = ? AND (user_id = ? OR lead_id = ?)',
-            [commentId, userId, leadId]
-        );
+        // Obtener email del usuario actual
+        let userEmail = '';
+        if (req.session?.user) {
+            userEmail = req.session.user.email;
+        } else {
+            userEmail = req.cookies?.landing_email || '';
+        }
+        
+        // Verificar que el comentario pertenece al usuario (por user_id, lead_id, o email)
+        let comment;
+        
+        if (userId || leadId) {
+            // Primero intentar por ID
+            comment = await getOne(
+                'SELECT id FROM landing_comments WHERE id = ? AND (user_id = ? OR lead_id = ?)',
+                [commentId, userId, leadId]
+            );
+        }
+        
+        // Si no se encontró por ID, intentar por email
+        if (!comment && userEmail) {
+            comment = await getOne(
+                'SELECT id FROM landing_comments WHERE id = ? AND user_email = ?',
+                [commentId, userEmail]
+            );
+        }
         
         if (!comment) {
             return res.status(403).json({

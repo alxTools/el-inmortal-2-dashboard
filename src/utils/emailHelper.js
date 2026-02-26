@@ -36,10 +36,10 @@ async function sendWelcomeEmail({ to, name, country, magicToken, userId }) {
         // Obtener token de acceso
         const tokenUrl = `https://login.microsoftonline.com/${encodeURIComponent(tenantId)}/oauth2/v2.0/token`;
         const form = new FormData();
-        form.set('grant_type', 'client_credentials');
-        form.set('client_id', clientId);
-        form.set('client_secret', clientSecret);
-        form.set('scope', 'https://graph.microsoft.com/.default');
+        form.append('grant_type', 'client_credentials');
+        form.append('client_id', clientId);
+        form.append('client_secret', clientSecret);
+        form.append('scope', 'https://graph.microsoft.com/.default');
 
         const tokenRes = await fetch(tokenUrl, {
             method: 'POST',
@@ -253,10 +253,10 @@ async function sendMiniDiscOfferEmail({ to, name, country, userId }) {
         // Obtener token de acceso
         const tokenUrl = `https://login.microsoftonline.com/${encodeURIComponent(tenantId)}/oauth2/v2.0/token`;
         const form = new FormData();
-        form.set('grant_type', 'client_credentials');
-        form.set('client_id', clientId);
-        form.set('client_secret', clientSecret);
-        form.set('scope', 'https://graph.microsoft.com/.default');
+        form.append('grant_type', 'client_credentials');
+        form.append('client_id', clientId);
+        form.append('client_secret', clientSecret);
+        form.append('scope', 'https://graph.microsoft.com/.default');
 
         const tokenRes = await fetch(tokenUrl, {
             method: 'POST',
@@ -489,10 +489,10 @@ async function sendMiniDiscConfirmationEmail({ to, name, orderId, amount, nfcCod
         // Obtener token
         const tokenUrl = `https://login.microsoftonline.com/${encodeURIComponent(tenantId)}/oauth2/v2.0/token`;
         const form = new FormData();
-        form.set('grant_type', 'client_credentials');
-        form.set('client_id', clientId);
-        form.set('client_secret', clientSecret);
-        form.set('scope', 'https://graph.microsoft.com/.default');
+        form.append('grant_type', 'client_credentials');
+        form.append('client_id', clientId);
+        form.append('client_secret', clientSecret);
+        form.append('scope', 'https://graph.microsoft.com/.default');
 
         const tokenRes = await fetch(tokenUrl, { method: 'POST', body: form });
         const tokenData = await tokenRes.json();

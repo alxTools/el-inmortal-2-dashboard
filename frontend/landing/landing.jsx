@@ -847,6 +847,45 @@ function LandingApp({ data }) {
         detectCountry();
     }, []);
 
+    // Deshabilitar clic derecho y atajos de teclado para proteger el contenido
+    useEffect(() => {
+        const disableContextMenu = (e) => {
+            e.preventDefault();
+            return false;
+        };
+        
+        const disableKeyboardShortcuts = (e) => {
+            // Deshabilitar F12 (DevTools)
+            if (e.key === 'F12') {
+                e.preventDefault();
+                return false;
+            }
+            // Deshabilitar Ctrl+Shift+I (DevTools)
+            if (e.ctrlKey && e.shiftKey && e.key === 'I') {
+                e.preventDefault();
+                return false;
+            }
+            // Deshabilitar Ctrl+S (Guardar)
+            if (e.ctrlKey && e.key === 's') {
+                e.preventDefault();
+                return false;
+            }
+            // Deshabilitar Ctrl+U (Ver código fuente)
+            if (e.ctrlKey && e.key === 'u') {
+                e.preventDefault();
+                return false;
+            }
+        };
+
+        document.addEventListener('contextmenu', disableContextMenu);
+        document.addEventListener('keydown', disableKeyboardShortcuts);
+        
+        return () => {
+            document.removeEventListener('contextmenu', disableContextMenu);
+            document.removeEventListener('keydown', disableKeyboardShortcuts);
+        };
+    }, []);
+
     // Verificar si está desbloqueado
     useEffect(() => {
         const urlParams = new URLSearchParams(window.location.search);
@@ -1462,6 +1501,12 @@ function LandingApp({ data }) {
                 preload="metadata"
                 playsInline
                 controls={false}
+                onContextMenu={(e) => e.preventDefault()}
+                style={{ 
+                    pointerEvents: 'none',
+                    userSelect: 'none',
+                    WebkitUserSelect: 'none'
+                }}
             />
 
             {/* ========================================

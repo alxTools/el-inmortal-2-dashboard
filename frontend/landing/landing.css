@@ -919,3 +919,47 @@ body {
     25% { transform: translateX(-5px); }
     75% { transform: translateX(5px); }
 }
+
+/* ========================================
+   CONTENT PROTECTION - Anti-download
+   ======================================== */
+
+/* Deshabilitar selección de texto en toda la página */
+* {
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+}
+
+/* Permitir selección solo en inputs */
+input, textarea {
+    -webkit-user-select: text;
+    -moz-user-select: text;
+    -ms-user-select: text;
+    user-select: text;
+}
+
+/* Ocultar controles de descarga en audio/video */
+audio::-webkit-media-controls-enclosure {
+    display: none !important;
+}
+
+audio::-webkit-media-controls-panel {
+    display: none !important;
+}
+
+/* Deshabilitar arrastrar y soltar */
+img, audio, video {
+    -webkit-user-drag: none;
+    -khtml-user-drag: none;
+    -moz-user-drag: none;
+    -o-user-drag: none;
+    user-drag: none;
+    pointer-events: none;
+}
+
+/* Permitir clicks en botones e interactividad */
+button, a, input, .interactive {
+    pointer-events: auto;
+}

@@ -1013,10 +1013,10 @@ function LandingApp({ data }) {
     useEffect(() => {
         if (comments.length === 0) return;
 
-        // Show 5 comments starting from rotation index
+        // Show 4 comments starting from rotation index
         const start = commentRotationIndex;
         const visible = [];
-        for (let i = 0; i < 5; i++) {
+        for (let i = 0; i < 4; i++) {
             const index = (start + i) % comments.length;
             visible.push(comments[index]);
         }
@@ -1655,13 +1655,13 @@ function LandingApp({ data }) {
                                 </form>
                                 
                                 {/* Indicador de rotación */}
-                                {comments.length > 5 && (
+                                {comments.length > 4 && (
                                     <div className="flex justify-center gap-1 mb-2">
-                                        {Array.from({ length: Math.min(5, Math.ceil(comments.length / 5)) }).map((_, idx) => (
+                                        {Array.from({ length: Math.min(4, Math.ceil(comments.length / 4)) }).map((_, idx) => (
                                             <div
                                                 key={idx}
                                                 className={`w-2 h-2 rounded-full transition-colors ${
-                                                    idx === Math.floor(commentRotationIndex / 5) % Math.min(5, Math.ceil(comments.length / 5))
+                                                    idx === Math.floor(commentRotationIndex / 4) % Math.min(4, Math.ceil(comments.length / 4))
                                                         ? 'bg-amber-400'
                                                         : 'bg-slate-600'
                                                 }`}
@@ -1670,7 +1670,7 @@ function LandingApp({ data }) {
                                     </div>
                                 )}
                                 
-                                {/* Lista de comentarios (máximo 5 visibles) */}
+                                {/* Lista de comentarios (máximo 4 visibles) */}
                                 <div className="flex-1 overflow-hidden space-y-2">
                                     {visibleComments.length > 0 ? (
                                         visibleComments.map((comment) => (

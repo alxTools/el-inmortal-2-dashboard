@@ -22582,7 +22582,7 @@ var AlbumLandingApp = (() => {
       if (comments.length === 0) return;
       const start = commentRotationIndex;
       const visible = [];
-      for (let i = 0; i < 5; i++) {
+      for (let i = 0; i < 4; i++) {
         const index = (start + i) % comments.length;
         visible.push(comments[index]);
       }
@@ -23126,10 +23126,10 @@ var AlbumLandingApp = (() => {
                   )
                 ] })
               ] }),
-              comments.length > 5 && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "flex justify-center gap-1 mb-2", children: Array.from({ length: Math.min(5, Math.ceil(comments.length / 5)) }).map((_, idx) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+              comments.length > 4 && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "flex justify-center gap-1 mb-2", children: Array.from({ length: Math.min(4, Math.ceil(comments.length / 4)) }).map((_, idx) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
                 "div",
                 {
-                  className: `w-2 h-2 rounded-full transition-colors ${idx === Math.floor(commentRotationIndex / 5) % Math.min(5, Math.ceil(comments.length / 5)) ? "bg-amber-400" : "bg-slate-600"}`
+                  className: `w-2 h-2 rounded-full transition-colors ${idx === Math.floor(commentRotationIndex / 4) % Math.min(4, Math.ceil(comments.length / 4)) ? "bg-amber-400" : "bg-slate-600"}`
                 },
                 idx
               )) }),

@@ -106,9 +106,34 @@
             <% } %>
             
             <div class="album-info">
-                <span class="album-status-badge status-<%= album.status || 'upcoming' %>">
-                    <%= album.status === 'released' ? '🎵 Lanzado' : album.status === 'draft' ? '📝 Borrador' : '⏳ Próximamente' %>
-                </span>
+                <div style="display: flex; gap: 15px; align-items: center; margin-bottom: 20px; flex-wrap: wrap;">
+                    <span class="album-status-badge status-<%= album.status || 'upcoming' %>">
+                        <%= album.status === 'released' ? '🎵 Lanzado' : album.status === 'draft' ? '📝 Borrador' : '⏳ Próximamente' %>
+                    </span>
+                    
+                    <% if (typeof isAdmin !== 'undefined' && isAdmin) { %>
+                    <label class="visibility-toggle" style="display: flex; align-items: center; gap: 8px; cursor: pointer; background: rgba(255,255,255,0.05); padding: 8px 15px; border-radius: 20px;">
+                        <input type="checkbox" class="album-visibility-checkbox" 
+                               data-album-id="<%= album.id %>"
+                               <%= album.is_public ? 'checked' : '' %>
+                               style="display: none;">
+                        
+                        <span class="toggle-switch <%= album.is_public ? 'public' : 'private' %>" 
+                              style="width: 40px; height: 22px; background: <%= album.is_public ? '#28a745' : '#dc3545' %>; border-radius: 11px; position: relative; transition: all 0.3s;">
+                            <span class="toggle-knob" 
+                                  style="position: absolute; top: 2px; left: <%= album.is_public ? '20px' : '2px' %>; width: 18px; height: 18px; background: white; border-radius: 50%; transition: all 0.3s;"></span>
+                        </span>
+                        
+                        <span class="toggle-label" style="font-size: 0.85em; color: <%= album.is_public ? '#28a745' : '#dc3545' %>; font-weight: 500;">
+                            <%= album.is_public ? '🌐 Álbum Público' : '🔒 Álbum Privado' %>
+                        </span>
+                    </label>
+                    <% } else if (!album.is_public) { %>
+                    <span style="background: #dc3545; color: white; padding: 5px 12px; border-radius: 15px; font-size: 0.8em;">
+                        🔒 Privado
+                    </span>
+                    <% } %>
+                </div>
                 
                 <h1><%= album.name %></h1>
                 <div class="album-meta">
@@ -174,10 +199,13 @@
         <% } else { %>
             <div class="tracks-list">
                 <% tracks.forEach(track => { %>
-                <div class="track-item">
+                <div class="track-item" style="<% if (!track.is_public) { %>border-left: 3px solid #dc3545;<% } %>">
                     <span class="track-number"><%= track.track_number %></span>
                     <span class="track-title"><%= track.title %></span>
                     <div class="track-actions">
+                        <% if (!track.is_public && typeof isAdmin !== 'undefined' && isAdmin) { %>
+                            <span style="color: #dc3545; font-size: 0.85em; margin-right: 5px;">🔒</span>
+                        <% } %>
                         <% if (track.audio_file_path) { %>
                             <span style="color: #28a745; font-size: 0.9em;">🎵 Audio</span>
                         <% } %>
@@ -187,6 +215,21 @@
                         <% if (track.splitsheet_confirmed) { %>
                             <span style="color: #ffd700; font-size: 0.9em;">✓ Split</span>
                         <% } %>
+                        
+                        <% if (typeof isAdmin !== 'undefined' && isAdmin) { %>
+                        <label class="track-visibility-toggle" style="display: flex; align-items: center; cursor: pointer; margin: 0 5px;" title="<%= track.is_public ? 'Público' : 'Privado' %>">
+                            <input type="checkbox" class="track-visibility-checkbox" 
+                                   data-track-id="<%= track.id %>"
+                                   <%= track.is_public ? 'checked' : '' %>
+                                   style="display: none;">
+                            <span class="toggle-switch <%= track.is_public ? 'public' : 'private' %>" 
+                                  style="width: 32px; height: 18px; background: <%= track.is_public ? '#28a745' : '#dc3545' %>; border-radius: 9px; position: relative; transition: all 0.3s;">
+                                <span class="toggle-knob" 
+                                      style="position: absolute; top: 2px; left: <%= track.is_public ? '16px' : '2px' %>; width: 14px; height: 14px; background: white; border-radius: 50%; transition: all 0.3s;"></span>
+                            </span>
+                        </label>
+                        <% } %>
+                        
                         <a href="/tracks/<%= track.id %>/edit" class="btn-small">Editar</a>
                         <a href="/tracks/<%= track.id %>" class="btn-small">Ver</a>
                     </div>
@@ -199,6 +242,77 @@
     <%- include('../partials/footer') %>
     
     <script>
+        // Toggle album visibility
+        document.querySelector('.album-visibility-checkbox')?.addEventListener('change', async function() {
+            const albumId = this.getAttribute('data-album-id');
+            const label = this.closest('.visibility-toggle');
+            const switchEl = label.querySelector('.toggle-switch');
+            const knob = label.querySelector('.toggle-knob');
+            const text = label.querySelector('.toggle-label');
+            
+            const isPublic = this.checked;
+            switchEl.style.background = isPublic ? '#28a745' : '#dc3545';
+            knob.style.left = isPublic ? '20px' : '2px';
+            text.textContent = isPublic ? '🌐 Álbum Público' : '🔒 Álbum Privado';
+            text.style.color = isPublic ? '#28a745' : '#dc3545';
+            
+            try {
+                const response = await fetch(`/albums/${albumId}/toggle-visibility`, {
+                    method: 'POST',
+                    headers: { 'Accept': 'application/json' }
+                });
+                const result = await response.json();
+                if (!response.ok) throw new Error(result.error);
+            } catch (error) {
+                console.error('Error:', error);
+                this.checked = !isPublic;
+                switchEl.style.background = !isPublic ? '#28a745' : '#dc3545';
+                knob.style.left = !isPublic ? '20px' : '2px';
+                text.textContent = !isPublic ? '🌐 Álbum Público' : '🔒 Álbum Privado';
+                alert('Error cambiando visibilidad del álbum');
+            }
+        });
+
+        // Toggle track visibility
+        document.querySelectorAll('.track-visibility-checkbox').forEach(checkbox => {
+            checkbox.addEventListener('change', async function() {
+                const trackId = this.getAttribute('data-track-id');
+                const label = this.closest('.track-visibility-toggle');
+                const switchEl = label.querySelector('.toggle-switch');
+                const knob = label.querySelector('.toggle-knob');
+                
+                const isPublic = this.checked;
+                switchEl.style.background = isPublic ? '#28a745' : '#dc3545';
+                knob.style.left = isPublic ? '16px' : '2px';
+                
+                try {
+                    const response = await fetch(`/albums/<%= album.id %>/tracks/${trackId}/toggle-visibility`, {
+                        method: 'POST',
+                        headers: { 'Accept': 'application/json' }
+                    });
+                    const result = await response.json();
+                    if (!response.ok) throw new Error(result.error);
+                } catch (error) {
+                    console.error('Error:', error);
+                    this.checked = !isPublic;
+                    switchEl.style.background = !isPublic ? '#28a745' : '#dc3545';
+                    knob.style.left = !isPublic ? '16px' : '2px';
+                    alert('Error cambiando visibilidad del track');
+                }
+            });
+        });
+
+        // Click on toggle switches to trigger checkbox
+        document.querySelectorAll('.toggle-switch').forEach(toggle => {
+            toggle.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                const checkbox = this.closest('.visibility-toggle, .track-visibility-toggle').querySelector('input[type="checkbox"]');
+                checkbox.checked = !checkbox.checked;
+                checkbox.dispatchEvent(new Event('change'));
+            });
+        });
+
         document.getElementById('generateAllLyricsBtn')?.addEventListener('click', async function() {
             const btn = this;
             const status = document.getElementById('generationStatus');

@@ -803,6 +803,7 @@ function LandingApp({ data }) {
     const [submitError, setSubmitError] = useState('');
     const [detectedCountry, setDetectedCountry] = useState('');
     const [fanStats, setFanStats] = useState({ totalLeads: 0, topCountries: [] });
+    const [topTracks, setTopTracks] = useState([]);
     const [currentTrack, setCurrentTrack] = useState(null);
     const [isPlaying, setIsPlaying] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
@@ -933,6 +934,7 @@ function LandingApp({ data }) {
 
     useEffect(() => {
         if (!isUnlocked) return;
+        
         const fetchStats = async () => {
             try {
                 const response = await fetch('/landing/stats');
@@ -946,7 +948,22 @@ function LandingApp({ data }) {
                 console.error('Stats fetch error', error);
             }
         };
+        
+        const fetchTopTracks = async () => {
+            try {
+                const response = await fetch('/landing/top-tracks');
+                if (!response.ok) return;
+                const payload = await response.json();
+                if (payload.success && Array.isArray(payload.tracks)) {
+                    setTopTracks(payload.tracks);
+                }
+            } catch (error) {
+                console.error('Top tracks fetch error', error);
+            }
+        };
+        
         fetchStats();
+        fetchTopTracks();
     }, [isUnlocked]);
 
     useEffect(() => {
@@ -1444,22 +1461,28 @@ function LandingApp({ data }) {
 
                         <div className="mb-5 grid gap-3 md:grid-cols-2">
                             <div className="glass-panel rounded-2xl p-4">
-                                <p className="text-xs uppercase tracking-[0.2em] text-slate-300">Descargas por pais</p>
-                                <p className="mt-2 text-3xl font-semibold text-white">{fanStats.totalLeads}</p>
-                                <p className="mt-2 text-xs uppercase tracking-[0.12em] text-slate-400">Registros totales</p>
+                                <p className="text-xs uppercase tracking-[0.2em] text-slate-300">Fans Registrados</p>
+                                <p className="mt-2 text-3xl font-semibold text-white">{fanStats.totalLeads.toLocaleString()}</p>
+                                <p className="mt-2 text-xs uppercase tracking-[0.12em] text-slate-400">Total acumulado</p>
                             </div>
                             <div className="glass-panel rounded-2xl p-4">
-                                <p className="text-xs uppercase tracking-[0.2em] text-slate-300">Top paises</p>
-                                <div className="mt-3 space-y-2 text-sm text-slate-200">
-                                    {fanStats.topCountries.length ? (
-                                        fanStats.topCountries.map((item) => (
-                                            <div key={item.country} className="flex items-center justify-between">
-                                                <span>{item.country}</span>
-                                                <span className="text-amber-300">{item.total}</span>
+                                <p className="text-xs uppercase tracking-[0.2em] text-slate-300">Top 10 - Mas Escuchados</p>
+                                <div className="mt-3 space-y-2 text-sm text-slate-200 max-h-48 overflow-y-auto">
+                                    {topTracks.length > 0 ? (
+                                        topTracks.map((track, index) => (
+                                            <div key={track.id} className="flex items-center justify-between group cursor-pointer hover:bg-white/5 p-1 rounded transition" onClick={() => {
+                                                const trackData = data.tracks.find(t => t.id === track.id || t.trackNumber === track.track_number);
+                                                if (trackData) handlePlayToggle(trackData);
+                                            }}>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-amber-400 font-bold w-5">{index + 1}</span>
+                                                    <span className="truncate max-w-[140px] group-hover:text-amber-300 transition">{track.title}</span>
+                                                </div>
+                                                <span className="text-amber-300 text-xs">{track.play_count} plays</span>
                                             </div>
                                         ))
                                     ) : (
-                                        <p className="text-slate-400">Sin datos aun.</p>
+                                        <p className="text-slate-400">Reproduce para ver el ranking.</p>
                                     )}
                                 </div>
                             </div>

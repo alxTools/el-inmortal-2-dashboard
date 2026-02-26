@@ -551,6 +551,36 @@ router.get('/stats', async (_req, res) => {
     }
 });
 
+// GET Top 10 tracks más escuchados
+router.get('/top-tracks', async (req, res) => {
+    try {
+        const topTracks = await getAll(`
+            SELECT 
+                t.id,
+                t.title,
+                t.track_number,
+                COUNT(tp.id) as play_count
+            FROM tracks t
+            LEFT JOIN track_plays tp ON t.id = tp.track_id
+            WHERE t.is_public = 1
+            GROUP BY t.id, t.title, t.track_number
+            ORDER BY play_count DESC
+            LIMIT 10
+        `);
+        
+        return res.json({
+            success: true,
+            tracks: topTracks
+        });
+    } catch (error) {
+        console.error('[Top Tracks] Error:', error);
+        return res.json({
+            success: false,
+            tracks: []
+        });
+    }
+});
+
 // GET track info público (solo para fans verificados o admins)
 router.get('/track/:id', async (req, res) => {
     // Verificar si es admin o fan verificado

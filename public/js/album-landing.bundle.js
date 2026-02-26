@@ -22415,6 +22415,7 @@ var AlbumLandingApp = (() => {
     const [submitError, setSubmitError] = (0, import_react.useState)("");
     const [detectedCountry, setDetectedCountry] = (0, import_react.useState)("");
     const [fanStats, setFanStats] = (0, import_react.useState)({ totalLeads: 0, topCountries: [] });
+    const [topTracks, setTopTracks] = (0, import_react.useState)([]);
     const [currentTrack, setCurrentTrack] = (0, import_react.useState)(null);
     const [isPlaying, setIsPlaying] = (0, import_react.useState)(false);
     const [isLoading, setIsLoading] = (0, import_react.useState)(false);
@@ -22526,7 +22527,20 @@ var AlbumLandingApp = (() => {
           console.error("Stats fetch error", error);
         }
       };
+      const fetchTopTracks = async () => {
+        try {
+          const response = await fetch("/landing/top-tracks");
+          if (!response.ok) return;
+          const payload = await response.json();
+          if (payload.success && Array.isArray(payload.tracks)) {
+            setTopTracks(payload.tracks);
+          }
+        } catch (error) {
+          console.error("Top tracks fetch error", error);
+        }
+      };
       fetchStats();
+      fetchTopTracks();
     }, [isUnlocked]);
     (0, import_react.useEffect)(() => {
       const audio = audioRef.current;
@@ -22951,16 +22965,25 @@ var AlbumLandingApp = (() => {
           playError ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "mb-4 rounded-2xl border border-rose-400/40 bg-rose-500/10 px-4 py-3 text-xs uppercase tracking-[0.12em] text-rose-200", children: playError }) : null,
           /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "mb-5 grid gap-3 md:grid-cols-2", children: [
             /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "glass-panel rounded-2xl p-4", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-xs uppercase tracking-[0.2em] text-slate-300", children: "Descargas por pais" }),
-              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "mt-2 text-3xl font-semibold text-white", children: fanStats.totalLeads }),
-              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "mt-2 text-xs uppercase tracking-[0.12em] text-slate-400", children: "Registros totales" })
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-xs uppercase tracking-[0.2em] text-slate-300", children: "Fans Registrados" }),
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "mt-2 text-3xl font-semibold text-white", children: fanStats.totalLeads.toLocaleString() }),
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "mt-2 text-xs uppercase tracking-[0.12em] text-slate-400", children: "Total acumulado" })
             ] }),
             /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "glass-panel rounded-2xl p-4", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-xs uppercase tracking-[0.2em] text-slate-300", children: "Top paises" }),
-              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "mt-3 space-y-2 text-sm text-slate-200", children: fanStats.topCountries.length ? fanStats.topCountries.map((item) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex items-center justify-between", children: [
-                /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: item.country }),
-                /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "text-amber-300", children: item.total })
-              ] }, item.country)) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-slate-400", children: "Sin datos aun." }) })
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-xs uppercase tracking-[0.2em] text-slate-300", children: "Top 10 - Mas Escuchados" }),
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "mt-3 space-y-2 text-sm text-slate-200 max-h-48 overflow-y-auto", children: topTracks.length > 0 ? topTracks.map((track, index) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex items-center justify-between group cursor-pointer hover:bg-white/5 p-1 rounded transition", onClick: () => {
+                const trackData = data.tracks.find((t) => t.id === track.id || t.trackNumber === track.track_number);
+                if (trackData) handlePlayToggle(trackData);
+              }, children: [
+                /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex items-center gap-2", children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "text-amber-400 font-bold w-5", children: index + 1 }),
+                  /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "truncate max-w-[140px] group-hover:text-amber-300 transition", children: track.title })
+                ] }),
+                /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "text-amber-300 text-xs", children: [
+                  track.play_count,
+                  " plays"
+                ] })
+              ] }, track.id)) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-slate-400", children: "Reproduce para ver el ranking." }) })
             ] })
           ] }),
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "grid gap-4 md:grid-cols-2", children: filteredTracks.map((track) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(

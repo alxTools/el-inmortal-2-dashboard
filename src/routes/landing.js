@@ -239,8 +239,7 @@ async function renderLandingPage(res) {
         streamingLinks: {
             spotify: String(process.env.LANDING_SPOTIFY_URL || '').trim(),
             appleMusic: String(process.env.LANDING_APPLE_MUSIC_URL || '').trim(),
-            youtubeMusic: String(process.env.LANDING_YOUTUBE_MUSIC_URL || '').trim(),
-            deezer: String(process.env.LANDING_DEEZER_URL || '').trim()
+            youtube: 'https://www.youtube.com/@galanteelemperador'
         }
     };
 
@@ -798,13 +797,8 @@ router.get('/unlock/:code', async (req, res) => {
             links: {
                 spotify: 'https://open.spotify.com/artist/5SYAaCKEVYhN3RDSDKUTJn?si=g1ldaLJdQO61OY4Wk6Iz2A',
                 appleMusic: 'https://music.apple.com/us/artist/galante-el-emperador/415956668',
-                youtubeMusic: 'https://music.youtube.com/channel/UC-9-kyTW8ZkZNDHQJ6FgpwQ',
-                instagram: 'https://instagram.com/galanteddm',
-                tiktok: 'https://tiktok.com/@galante_elemperador',
                 youtube: 'https://www.youtube.com/@galanteelemperador',
-                merch: 'https://galantealx.com/merch',
-                website: 'https://galantealx.com',
-                amazonMusic: 'https://music.amazon.com/artists/B004K77DXQ/galante-el-emperador',
+                instagram: 'https://instagram.com/galanteddm',
                 twitter: 'https://twitter.com/galantealx'
             }
         });

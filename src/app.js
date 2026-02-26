@@ -160,9 +160,14 @@ app.use(session({
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, '../views'));
 
-// Make session available to all views
+// Import role middleware
+const { injectUser, requireAuth, requireAdmin, requireFanOrAdmin } = require('./middleware/roles');
+
+// Inject user info with roles into all views
+app.use(injectUser);
+
+// Make common data available to all views
 app.use((req, res, next) => {
-    res.locals.user = req.session.user || null;
     res.locals.albumName = 'El Inmortal 2';
     res.locals.artistName = 'Galante el Emperador';
     res.locals.launchDate = new Date('2026-02-17T00:00:00');
@@ -189,14 +194,6 @@ const landingRouter = require('./routes/landing');
 const landingApiRouter = require('./api/landing');
 const apiV1Router = require('./routes/api-v1');
 const { apiKeyAuth } = require('./middleware/apiKeyAuth');
-
-// Authentication middleware
-function requireAuth(req, res, next) {
-    if (!req.session.user) {
-        return res.redirect('/auth/login');
-    }
-    next();
-}
 
 // Middleware para verificar si es admin o fan verificado (vía cookie de landing)
 function requireVerifiedFanOrAuth(req, res, next) {
@@ -258,34 +255,37 @@ app.get('/admin', (req, res) => {
     res.redirect('/auth/login');
 });
 
-// Protected routes (auth required)
+// Protected routes with role-based access
+// Admin-only routes
+app.use('/tracks', requireAdmin, tracksRouter);
+app.use('/producers', requireAdmin, producersRouter);
+app.use('/composers', requireAdmin, composersRouter);
+app.use('/artists', requireAdmin, artistsRouter);
+app.use('/calendar', requireAdmin, calendarRouter);
+app.use('/uploads', requireAdmin, uploadsRouter);
+app.use('/bulk-upload', requireAdmin, bulkUploadRouter);
+app.use('/settings', requireAdmin, settingsRouter);
+app.use('/api', requireAdmin, apiRouter);
+
+// Fan-accessible routes (read-only for fans)
+app.use('/splitsheets', requireFanOrAdmin, splitsheetsRouter);
+app.use('/checklist', requireFanOrAdmin, checklistRouter);
+app.use('/albums', requireFanOrAdmin, albumsRouter);
 app.use('/', requireAuth, indexRouter);
-app.use('/tracks', requireAuth, tracksRouter);
-// Tools routes with conditional auth - allow proxy, download, extract-frame, gpu-info without auth
+
+// Tools routes - protect dangerous ones
 const publicToolsPaths = ['/proxy', '/download', '/extract-frame', '/gpu-info'];
 app.use('/tools', (req, res, next) => {
     console.log('Tools middleware - req.path:', req.path, 'req.originalUrl:', req.originalUrl);
-    // Check if this is a public tools path
+    // Public paths don't need auth
     const isPublicPath = publicToolsPaths.some(path => req.path.startsWith(path));
     console.log('Is public path:', isPublicPath);
     if (isPublicPath) {
         return next();
     }
-    // Otherwise require auth
-    return requireAuth(req, res, next);
+    // All other tools need admin
+    return requireAdmin(req, res, next);
 }, toolsRouter);
-
-app.use('/albums', requireAuth, albumsRouter);
-app.use('/producers', requireAuth, producersRouter);
-app.use('/composers', requireAuth, composersRouter);
-app.use('/artists', requireAuth, artistsRouter);
-app.use('/splitsheets', requireAuth, splitsheetsRouter);
-app.use('/calendar', requireAuth, calendarRouter);
-app.use('/checklist', requireAuth, checklistRouter);
-app.use('/api', requireAuth, apiRouter);
-app.use('/uploads', requireAuth, uploadsRouter);
-app.use('/bulk-upload', requireAuth, bulkUploadRouter);
-app.use('/settings', requireAuth, settingsRouter);
 
 // Multer error handling
 app.use((err, req, res, next) => {

@@ -459,6 +459,32 @@ router.get('/unlock', async (req, res) => {
         // Marcar email como verificado
         await markEmailAsVerified(user.id);
         
+        // Crear o actualizar usuario fan en la tabla users
+        const [existingUser] = await query('SELECT id FROM users WHERE email = ?', [user.email]);
+        let userId;
+        
+        if (existingUser) {
+            // Actualizar usuario existente a fan
+            await run('UPDATE users SET role = ?, name = ? WHERE id = ?', 
+                ['fan', user.full_name || user.email.split('@')[0], existingUser.id]);
+            userId = existingUser.id;
+        } else {
+            // Crear nuevo usuario fan
+            const result = await run(
+                'INSERT INTO users (email, name, role, created_at) VALUES (?, ?, ?, NOW())',
+                [user.email, user.full_name || user.email.split('@')[0], 'fan']
+            );
+            userId = result.lastID;
+        }
+        
+        // Crear sesión de fan
+        req.session.user = {
+            id: userId,
+            email: user.email,
+            name: user.full_name || user.email.split('@')[0],
+            role: 'fan'
+        };
+        
         // AHORA sí crear la cookie de desbloqueo
         res.cookie('landing_el_inmortal_unlock', '1', {
             maxAge: 7 * 24 * 60 * 60 * 1000, // 7 días
@@ -467,10 +493,10 @@ router.get('/unlock', async (req, res) => {
             sameSite: 'lax'
         });
         
-        console.log(`[Landing Unlock] ✅ Usuario ${user.email} verificado y desbloqueado`);
+        console.log(`[Landing Unlock] ✅ Usuario ${user.email} verificado y desbloqueado como FAN (ID: ${userId})`);
         
-        // Redirigir al landing con acceso completo
-        res.redirect('/ei2?verified=1');
+        // Redirigir al álbum (fan home)
+        res.redirect('/albums/1?verified=1');
         
     } catch (error) {
         console.error('[Landing Unlock] Error:', error);

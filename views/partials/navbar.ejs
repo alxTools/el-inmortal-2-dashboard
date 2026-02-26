@@ -13,18 +13,28 @@
     
     <ul class="navbar-nav" id="navbarNav">
         <% if (typeof user !== 'undefined' && user) { %>
-            <li><a href="/" data-tooltip="Dashboard principal">Dashboard</a></li>
-            <li><a href="/albums" data-tooltip="Gestionar álbumes">💿 Álbumes</a></li>
-            <li><a href="/tracks" data-tooltip="Lista de temas">🎵 Temas</a></li>
-            <li><a href="/producers" data-tooltip="Productores">🎧 Productores</a></li>
-            <li><a href="/composers" data-tooltip="Compositores">📝 Compositores</a></li>
-            <li><a href="/artists" data-tooltip="Artistas">👥 Artistas</a></li>
-            <li><a href="/splitsheets" data-tooltip="Splitsheets">📄 Splitsheets</a></li>
-            <li><a href="/calendar" data-tooltip="Calendario">📅 Calendario</a></li>
-            <li><a href="/checklist" data-tooltip="Checklist">✅ Checklist</a></li>
-            <li><a href="/tools" data-tooltip="Herramientas">🧰 Tools</a></li>
-            <li><a href="/ei2" target="_blank" rel="noreferrer" data-tooltip="Ver landing público">🚀 Landing</a></li>
-            <li><a href="/settings" data-tooltip="Configuración">⚙️ Config</a></li>
+            <% if (typeof isAdmin !== 'undefined' && isAdmin) { %>
+                <!-- ADMIN NAVBAR -->
+                <li><a href="/" data-tooltip="Dashboard principal">Dashboard</a></li>
+                <li><a href="/albums" data-tooltip="Gestionar álbumes">💿 Álbumes</a></li>
+                <li><a href="/tracks" data-tooltip="Lista de temas">🎵 Temas</a></li>
+                <li><a href="/producers" data-tooltip="Productores">🎧 Productores</a></li>
+                <li><a href="/composers" data-tooltip="Compositores">📝 Compositores</a></li>
+                <li><a href="/artists" data-tooltip="Artistas">👥 Artistas</a></li>
+                <li><a href="/splitsheets" data-tooltip="Splitsheets">📄 Splitsheets</a></li>
+                <li><a href="/calendar" data-tooltip="Calendario">📅 Calendario</a></li>
+                <li><a href="/checklist" data-tooltip="Checklist">✅ Checklist</a></li>
+                <li><a href="/tools" data-tooltip="Herramientas">🧰 Tools</a></li>
+                <li><a href="/ei2" target="_blank" rel="noreferrer" data-tooltip="Ver landing público">🚀 Landing</a></li>
+                <li><a href="/settings" data-tooltip="Configuración">⚙️ Config</a></li>
+            <% } else { %>
+                <!-- FAN NAVBAR -->
+                <li><a href="/albums/1" data-tooltip="Ver álbum">🎵 EI2</a></li>
+                <li><a href="/splitsheets" data-tooltip="Splitsheets">📄 Splitsheets</a></li>
+                <li><a href="/checklist" data-tooltip="Checklist">✅ Checklist</a></li>
+                <li><a href="/tools" data-tooltip="Herramientas">🧰 Tools</a></li>
+                <li><a href="/settings" data-tooltip="Mi cuenta">⚙️ Config</a></li>
+            <% } %>
             <li><a href="/auth/logout" data-tooltip="Cerrar sesión">🚪 Salir</a></li>
         <% } else { %>
             <li><a href="/auth/login">🔐 Login</a></li>
@@ -33,26 +43,20 @@
 </nav>
 
 <script>
-    // Mobile menu toggle - ejecutar cuando el DOM esté listo
+    // Mobile menu toggle
     document.addEventListener('DOMContentLoaded', function() {
         const mobileMenuToggle = document.getElementById('mobileMenuToggle');
         const navbarNav = document.getElementById('navbarNav');
         
-        if (!mobileMenuToggle || !navbarNav) {
-            console.error('Mobile menu elements not found');
-            return;
-        }
+        if (!mobileMenuToggle || !navbarNav) return;
         
-        // Toggle menu
         mobileMenuToggle.addEventListener('click', function(e) {
             e.preventDefault();
             e.stopPropagation();
             this.classList.toggle('active');
             navbarNav.classList.toggle('active');
-            console.log('Menu toggled:', navbarNav.classList.contains('active'));
         });
         
-        // Close mobile menu when clicking on a link
         navbarNav.querySelectorAll('a').forEach(link => {
             link.addEventListener('click', () => {
                 mobileMenuToggle.classList.remove('active');
@@ -60,7 +64,6 @@
             });
         });
         
-        // Close menu when clicking outside
         document.addEventListener('click', function(e) {
             if (!mobileMenuToggle.contains(e.target) && !navbarNav.contains(e.target)) {
                 mobileMenuToggle.classList.remove('active');

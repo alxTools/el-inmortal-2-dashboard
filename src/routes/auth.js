@@ -16,7 +16,7 @@ router.get('/login', (req, res) => {
 
 // POST login
 router.post('/login', async (req, res) => {
-    const { email, password } = req.body;
+    const { email, password, remember_me } = req.body;
     
     try {
         let user;
@@ -54,6 +54,11 @@ router.post('/login', async (req, res) => {
             role: user.role || 'artist',
             company_id: user.company_id
         };
+
+        // Extender sesión a 30 días si seleccionó "Remember Me"
+        if (remember_me === 'on') {
+            req.session.cookie.maxAge = 30 * 24 * 60 * 60 * 1000; // 30 días
+        }
 
         await run('UPDATE users SET last_login = NOW() WHERE id = ?', [user.id]);
 

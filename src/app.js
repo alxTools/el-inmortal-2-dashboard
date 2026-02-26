@@ -250,6 +250,14 @@ app.get('/', (req, res, next) => {
     res.redirect('/landing');
 });
 
+// Ruta /admin - shortcut para el dashboard
+app.get('/admin', (req, res) => {
+    if (req.session.user) {
+        return res.redirect('/');
+    }
+    res.redirect('/auth/login');
+});
+
 // Protected routes (auth required)
 app.use('/', requireAuth, indexRouter);
 app.use('/tracks', requireAuth, tracksRouter);

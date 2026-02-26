@@ -55,9 +55,9 @@ async function sendWelcomeEmail({ to, name, country, magicToken, userId }) {
         const tokenData = await tokenRes.json();
         const accessToken = tokenData.access_token;
 
-        // Crear magic link
+        // Crear magic link (usar /ei2/unlock porque el landing router está montado en /ei2)
         const baseUrl = process.env.BASE_URL || 'https://ei2.galantealx.com';
-        const magicLink = magicToken ? `${baseUrl}/unlock?token=${magicToken}` : `${baseUrl}/ei2`;
+        const magicLink = magicToken ? `${baseUrl}/ei2/unlock?token=${magicToken}` : `${baseUrl}/ei2`;
         
         // Crear contenido del email
         const subject = `🎵 Bienvenido a El Inmortal 2 - Verifica tu email para desbloquear`;

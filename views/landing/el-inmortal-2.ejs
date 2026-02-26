@@ -210,19 +210,34 @@
 
     <script>
         window.__ALBUM_LANDING_DATA__ = <%- landingDataJson %>;
-        
+
+        // Check URL parameters for messages
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('check_email') === '1') {
+            // Mostrar modal o mensaje de "Revisa tu email"
+            setTimeout(() => {
+                alert('🎵 ¡Registro exitoso! Revisa tu email y haz clic en el enlace de verificación para desbloquear el acceso.');
+            }, 1000);
+        }
+        if (urlParams.get('verified') === '1') {
+            // Mostrar mensaje de éxito
+            setTimeout(() => {
+                alert('✅ ¡Email verificado! Ahora tienes acceso completo a El Inmortal 2.');
+            }, 500);
+        }
+
         // GA4 Event Tracking
         document.addEventListener('DOMContentLoaded', function() {
             const form = document.getElementById('subscribeForm');
             const btn = document.getElementById('submitBtn');
-            
+
             btn.addEventListener('click', function() {
                 gtag('event', 'begin_checkout', {
                     'event_category': 'engagement',
                     'event_label': 'unlock_button_click'
                 });
             });
-            
+
             form.addEventListener('submit', function(e) {
                 const email = form.querySelector('input[type="email"]')?.value;
                 gtag('event', 'generate_lead', {

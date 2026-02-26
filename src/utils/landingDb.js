@@ -1,4 +1,119 @@
 const { getAll, getOne, query, run } = require('../config/database');
+const crypto = require('crypto');
+
+/**
+ * Genera un magic token único de 64 caracteres
+ */
+function generateMagicToken() {
+    return crypto.randomBytes(32).toString('hex');
+}
+
+/**
+ * Registra un nuevo lead o actualiza uno existente con nuevo magic token
+ * @param {Object} leadData - Datos del lead
+ * @returns {Object} - Resultado con userId, isNew, y magicToken
+ */
+async function registerOrUpdateLead(leadData) {
+    const { email, fullName, country, ipAddress, userAgent, sourceLabel = 'landing_el_inmortal_2' } = leadData;
+    
+    try {
+        // Buscar si el email ya existe
+        const existingUser = await getOne(
+            'SELECT id, email FROM landing_email_leads WHERE email = ?',
+            [email]
+        );
+        
+        const magicToken = generateMagicToken();
+        const expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + 30); // 30 días de expiración
+        
+        if (existingUser) {
+            // Usuario existente: actualizar magic token y fecha de expiración
+            await run(
+                `UPDATE landing_email_leads 
+                 SET magic_token = ?, 
+                     magic_token_expires_at = ?,
+                     full_name = COALESCE(?, full_name),
+                     country = COALESCE(?, country),
+                     updated_at = NOW()
+                 WHERE id = ?`,
+                [magicToken, expiresAt, fullName, country, existingUser.id]
+            );
+            
+            console.log(`[Landing] Usuario existente actualizado: ${email}, ID: ${existingUser.id}`);
+            
+            return {
+                userId: existingUser.id,
+                isNew: false,
+                magicToken,
+                email
+            };
+        } else {
+            // Nuevo usuario: crear registro
+            const result = await run(
+                `INSERT INTO landing_email_leads 
+                 (email, full_name, country, source_label, ip_address, user_agent, 
+                  magic_token, magic_token_expires_at, email_verified, unlock_cookie_set)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 0)`,
+                [email, fullName, country, sourceLabel, ipAddress, userAgent, magicToken, expiresAt]
+            );
+            
+            console.log(`[Landing] Nuevo usuario registrado: ${email}, ID: ${result.lastID}`);
+            
+            return {
+                userId: result.lastID,
+                isNew: true,
+                magicToken,
+                email
+            };
+        }
+    } catch (error) {
+        console.error('[Landing] Error en registerOrUpdateLead:', error);
+        throw error;
+    }
+}
+
+/**
+ * Verifica un magic token y retorna el usuario si es válido
+ * @param {string} token - Magic token a verificar
+ * @returns {Object|null} - Datos del usuario o null si no es válido
+ */
+async function verifyMagicToken(token) {
+    try {
+        const user = await getOne(
+            `SELECT id, email, full_name, country, magic_token_expires_at, email_verified 
+             FROM landing_email_leads 
+             WHERE magic_token = ? AND magic_token_expires_at > NOW()`,
+            [token]
+        );
+        
+        return user || null;
+    } catch (error) {
+        console.error('[Landing] Error verificando magic token:', error);
+        return null;
+    }
+}
+
+/**
+ * Marca el email como verificado y actualiza el estado
+ * @param {number} userId - ID del usuario
+ */
+async function markEmailAsVerified(userId) {
+    try {
+        await run(
+            `UPDATE landing_email_leads 
+             SET email_verified = 1, 
+                 email_verified_at = NOW(),
+                 unlock_cookie_set = 1
+             WHERE id = ?`,
+            [userId]
+        );
+        console.log(`[Landing] Email verificado para usuario ID: ${userId}`);
+    } catch (error) {
+        console.error('[Landing] Error marcando email como verificado:', error);
+        throw error;
+    }
+}
 
 /**
  * Verifica y crea la tabla central de leads si no existe
@@ -83,6 +198,25 @@ async function ensureLandingLeadsTable() {
             if (!columnSet.has('tracking_number')) {
                 await query('ALTER TABLE landing_email_leads ADD COLUMN tracking_number TEXT');
             }
+            // Magic token columns
+            if (!columnSet.has('magic_token')) {
+                await query('ALTER TABLE landing_email_leads ADD COLUMN magic_token VARCHAR(64) UNIQUE');
+            }
+            if (!columnSet.has('magic_token_expires_at')) {
+                await query('ALTER TABLE landing_email_leads ADD COLUMN magic_token_expires_at DATETIME');
+            }
+            if (!columnSet.has('email_verified')) {
+                await query('ALTER TABLE landing_email_leads ADD COLUMN email_verified INTEGER DEFAULT 0');
+            }
+            if (!columnSet.has('email_verified_at')) {
+                await query('ALTER TABLE landing_email_leads ADD COLUMN email_verified_at DATETIME');
+            }
+            if (!columnSet.has('unlock_cookie_set')) {
+                await query('ALTER TABLE landing_email_leads ADD COLUMN unlock_cookie_set INTEGER DEFAULT 0');
+            }
+            if (!columnSet.has('updated_at')) {
+                await query('ALTER TABLE landing_email_leads ADD COLUMN updated_at DATETIME DEFAULT CURRENT_TIMESTAMP');
+            }
         } else {
             // MySQL syntax
             await query(
@@ -106,14 +240,21 @@ async function ensureLandingLeadsTable() {
                     nfc_link VARCHAR(255) NULL,
                     package_shipped TINYINT DEFAULT 0,
                     tracking_number VARCHAR(100) NULL,
+                    magic_token VARCHAR(64) UNIQUE NULL,
+                    magic_token_expires_at DATETIME NULL,
+                    email_verified TINYINT DEFAULT 0,
+                    email_verified_at DATETIME NULL,
+                    unlock_cookie_set TINYINT DEFAULT 0,
                     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                     PRIMARY KEY (id),
                     KEY idx_email (email),
                     KEY idx_country (country),
                     KEY idx_source (source_label),
                     KEY idx_site (source_site),
                     KEY idx_paypal_order (paypal_order_id),
-                    KEY idx_nfc_code (nfc_unique_code)
+                    KEY idx_nfc_code (nfc_unique_code),
+                    KEY idx_magic_token (magic_token)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`
             );
 
@@ -165,6 +306,25 @@ async function ensureLandingLeadsTable() {
             }
             if (!columnSet.has('tracking_number')) {
                 await query('ALTER TABLE landing_email_leads ADD COLUMN tracking_number VARCHAR(100) NULL');
+            }
+            // Magic token columns para MySQL
+            if (!columnSet.has('magic_token')) {
+                await query('ALTER TABLE landing_email_leads ADD COLUMN magic_token VARCHAR(64) UNIQUE NULL');
+            }
+            if (!columnSet.has('magic_token_expires_at')) {
+                await query('ALTER TABLE landing_email_leads ADD COLUMN magic_token_expires_at DATETIME NULL');
+            }
+            if (!columnSet.has('email_verified')) {
+                await query('ALTER TABLE landing_email_leads ADD COLUMN email_verified TINYINT DEFAULT 0');
+            }
+            if (!columnSet.has('email_verified_at')) {
+                await query('ALTER TABLE landing_email_leads ADD COLUMN email_verified_at DATETIME NULL');
+            }
+            if (!columnSet.has('unlock_cookie_set')) {
+                await query('ALTER TABLE landing_email_leads ADD COLUMN unlock_cookie_set TINYINT DEFAULT 0');
+            }
+            if (!columnSet.has('updated_at')) {
+                await query('ALTER TABLE landing_email_leads ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP');
             }
         }
         
@@ -335,5 +495,9 @@ module.exports = {
     ensureLandingLeadsTable,
     saveNFCCode,
     syncToWordPress,
-    getUnifiedStats
+    getUnifiedStats,
+    generateMagicToken,
+    registerOrUpdateLead,
+    verifyMagicToken,
+    markEmailAsVerified
 };

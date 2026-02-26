@@ -185,6 +185,7 @@ const bulkUploadRouter = require('./routes/bulk-upload');
 const settingsRouter = require('./routes/settings');
 const toolsRouter = require('./routes/tools');
 const landingRouter = require('./routes/landing');
+const landingApiRouter = require('./api/landing');
 const apiV1Router = require('./routes/api-v1');
 const { apiKeyAuth } = require('./middleware/apiKeyAuth');
 
@@ -223,6 +224,9 @@ app.use('/ei2', landingRouter);
 app.use('/api/v1', apiV1Router);
 app.use('/api/v1/uploads', apiKeyAuth, uploadsRouter);
 app.use('/api/v1/bulk-upload', apiKeyAuth, bulkUploadRouter);
+
+// Landing Page Public API (requires unlock cookie)
+app.use('/api/landing', landingApiRouter);
 
 // Health check endpoint (public)
 app.get('/api/health', (req, res) => {

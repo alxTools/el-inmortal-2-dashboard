@@ -208,32 +208,67 @@
         </div>
     </div>
 
+    <!-- Track Modal -->
+    <%- include('track-modal') %>
+    
     <script>
         window.__ALBUM_LANDING_DATA__ = <%- landingDataJson %>;
+        
+        // Check for URL parameters
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('check_email') === '1') {
+            alert('🎵 ¡Registro exitoso! Revisa tu email y haz clic en el enlace de verificación para desbloquear el acceso.');
+        }
+        if (urlParams.get('verified') === '1') {
+            alert('✅ ¡Email verificado! Ahora tienes acceso completo a El Inmortal 2.');
+        }
         
         // GA4 Event Tracking
         document.addEventListener('DOMContentLoaded', function() {
             const form = document.getElementById('subscribeForm');
             const btn = document.getElementById('submitBtn');
             
-            btn.addEventListener('click', function() {
-                gtag('event', 'begin_checkout', {
-                    'event_category': 'engagement',
-                    'event_label': 'unlock_button_click'
+            if (btn) {
+                btn.addEventListener('click', function() {
+                    gtag('event', 'begin_checkout', {
+                        'event_category': 'engagement',
+                        'event_label': 'unlock_button_click'
+                    });
                 });
-            });
+            }
             
-            form.addEventListener('submit', function(e) {
-                const email = form.querySelector('input[type="email"]')?.value;
-                gtag('event', 'generate_lead', {
-                    'event_category': 'conversion',
-                    'event_label': 'email_submitted',
-                    'value': 1
+            if (form) {
+                form.addEventListener('submit', function(e) {
+                    const email = form.querySelector('input[type="email"]')?.value;
+                    gtag('event', 'generate_lead', {
+                        'event_category': 'conversion',
+                        'event_label': 'email_submitted',
+                        'value': 1
+                    });
                 });
-            });
+            }
+            
+            // Setup track click handlers
+            setupTrackClickHandlers();
         });
+        
+        // Setup track click handlers for modal
+        function setupTrackClickHandlers() {
+            // Listen for clicks on track elements
+            document.addEventListener('click', function(e) {
+                const trackLink = e.target.closest('[data-track-id]');
+                if (trackLink) {
+                    e.preventDefault();
+                    const trackId = trackLink.dataset.trackId;
+                    if (trackId && typeof openTrackModal === 'function') {
+                        openTrackModal(trackId);
+                    }
+                }
+            });
+        }
     </script>
     <script src="/js/album-landing.bundle.js?v=4" defer></script>
+    <script src="/js/landing-modal.js" defer></script>
     <script src="/js/social-notifications.js" defer></script>
 </body>
 </html>

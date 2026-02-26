@@ -34,7 +34,10 @@
     "export:ascap-catalog": "node scripts/export-ascap-catalog.js",
     "intel:social-scan": "node scripts/intel-social-scan-once.js",
     "intel:platform-footprint": "node scripts/intel-platform-footprint-once.js",
-    "status:update": "node scripts/log-status-update.js"
+    "status:update": "node scripts/log-status-update.js",
+    "loops:generate": "node scripts/batch-generate-loops.js",
+    "loops:generate:force": "node scripts/batch-generate-loops.js --force",
+    "loops:generate:dry": "node scripts/batch-generate-loops.js --dry-run"
   },
   "engines": {
     "node": ">=16.0.0"
@@ -68,6 +71,7 @@
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "remotion": "^4.0.428",
+    "sharp": "^0.34.5",
     "sqlite3": "^5.1.6",
     "winston": "^3.11.0",
     "youtube-dl-exec": "^3.1.2"

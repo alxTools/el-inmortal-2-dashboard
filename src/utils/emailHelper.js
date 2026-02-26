@@ -18,8 +18,10 @@ if (!fetch) {
  * @param {string} options.to - Email del destinatario
  * @param {string} options.name - Nombre del destinatario
  * @param {string} options.country - País del destinatario
+ * @param {string} options.magicToken - Token mágico para desbloquear acceso
+ * @param {string} options.userId - ID del usuario
  */
-async function sendWelcomeEmail({ to, name, country }) {
+async function sendWelcomeEmail({ to, name, country, magicToken, userId }) {
     try {
         const tenantId = process.env.MS_GRAPH_TENANT_ID;
         const clientId = process.env.MS_GRAPH_CLIENT_ID;
@@ -54,6 +56,9 @@ async function sendWelcomeEmail({ to, name, country }) {
         const accessToken = tokenData.access_token;
 
         // Crear contenido del email
+        const baseUrl = process.env.BASE_URL || 'https://ei2.galantealx.com';
+        const magicLink = magicToken ? `${baseUrl}/unlock?token=${magicToken}` : `${baseUrl}/ei2`;
+        
         const subject = `🎵 Bienvenido a El Inmortal 2 - Acceso Exclusivo Desbloqueado`;
         
         const htmlBody = `
@@ -84,21 +89,33 @@ async function sendWelcomeEmail({ to, name, country }) {
                                     <h2 style="color:#ffffff;font-size:24px;margin:0 0 20px 0;">¡Hola ${name || 'Fan'}! 🎵</h2>
                                     
                                     <p style="color:#94a3b8;font-size:16px;line-height:1.6;margin:0 0 20px 0;">
-                                        ¡Gracias por registrarte! Ahora tienes acceso exclusivo a <strong style="color:#facc15;">El Inmortal 2</strong>, el nuevo álbum de Galante el Emperador con 21 temas que están rompiendo la escena del reggaeton.
+                                        ¡Gracias por registrarte! Estás a un paso de desbloquear acceso exclusivo a <strong style="color:#facc15;">El Inmortal 2</strong>, el nuevo álbum de Galante el Emperador con 21 temas que están rompiendo la escena del reggaeton.
                                     </p>
                                     
                                     <div style="background:rgba(250,204,21,0.1);border:1px solid rgba(250,204,21,0.3);border-radius:12px;padding:25px;margin:25px 0;text-align:center;">
-                                        <p style="color:#facc15;font-size:18px;margin:0 0 15px 0;font-weight:bold;">🔓 Tu acceso está desbloqueado</p>
-                                        <a href="https://ei2.galantealx.com/landing" 
+                                        <p style="color:#facc15;font-size:18px;margin:0 0 15px 0;font-weight:bold;">🔓 Desbloquea tu acceso exclusivo</p>
+                                        <p style="color:#94a3b8;font-size:14px;margin:0 0 20px 0;">
+                                            Haz clic en el botón de abajo para verificar tu email y acceder al álbum completo.
+                                        </p>
+                                        <a href="${magicLink}" 
                                            style="display:inline-block;background:linear-gradient(135deg,#facc15,#fbbf24);color:#0f172a;text-decoration:none;padding:15px 30px;border-radius:50px;font-weight:bold;font-size:16px;">
-                                             🎧 Escuchar el Álbum Ahora
+                                             🔓 Desbloquear Acceso Ahora
                                         </a>
+                                        <p style="color:#64748b;font-size:12px;margin:15px 0 0 0;">
+                                            ⏰ Este enlace expira en 30 días
+                                        </p>
                                     </div>
                                     
+                                    <p style="color:#94a3b8;font-size:14px;line-height:1.6;margin:20px 0;text-align:center;">
+                                        Si el botón no funciona, copia y pega este enlace en tu navegador:<br>
+                                        <a href="${magicLink}" style="color:#facc15;word-break:break-all;">${magicLink}</a>
+                                    </p>
+                                    
                                     <p style="color:#94a3b8;font-size:16px;line-height:1.6;margin:20px 0;">
-                                        <strong style="color:#ffffff;">Lo que incluye tu registro:</strong><br>
+                                        <strong style="color:#ffffff;">Lo que incluye tu acceso:</strong><br>
                                         ✅ Acceso al tracklist completo (21 canciones)<br>
                                         ✅ Reproductor exclusivo del álbum<br>
+                                        ✅ Crea promos personalizados con tus fotos<br>
                                         ✅ Noticias y lanzamientos prioritarios<br>
                                         ✅ Contenido exclusivo de Galante
                                     </p>

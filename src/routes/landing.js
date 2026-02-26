@@ -3,7 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const { getAll, getOne, query, run } = require('../config/database');
 const { sendWelcomeEmail, sendMiniDiscConfirmationEmail, sendWebhookToN8N } = require('../utils/emailHelper');
-const { ensureLandingLeadsTable, saveNFCCode, syncToWordPress, getUnifiedStats } = require('../utils/landingDb');
+const { ensureLandingLeadsTable, saveNFCCode, syncToWordPress, getUnifiedStats, registerOrUpdateLead, verifyMagicToken, markEmailAsVerified } = require('../utils/landingDb');
 const { createPayPalOrder, capturePayPalOrder, getPayPalConfig } = require('../utils/paypalHelper');
 const { scheduleMiniDiscEmail } = require('../utils/scheduledEmails');
 const { syncUserToNotion, isNotionConfigured, syncAllUsersToNotion, getNotionStats } = require('../utils/notionHelper');
@@ -237,10 +237,11 @@ async function renderLandingPage(res) {
             featuredTracks
         },
         streamingLinks: {
-            spotify: String(process.env.LANDING_SPOTIFY_URL || '').trim(),
-            appleMusic: String(process.env.LANDING_APPLE_MUSIC_URL || '').trim(),
-            youtubeMusic: String(process.env.LANDING_YOUTUBE_MUSIC_URL || '').trim(),
-            deezer: String(process.env.LANDING_DEEZER_URL || '').trim()
+            spotify: String(process.env.LANDING_SPOTIFY_URL || 'https://open.spotify.com/artist/5SYAaCKEVYhN3RDSDKUTJn').trim(),
+            appleMusic: String(process.env.LANDING_APPLE_MUSIC_URL || 'https://music.apple.com/us/artist/galante-el-emperador/415956668').trim(),
+            youtubeMusic: String(process.env.LANDING_YOUTUBE_MUSIC_URL || 'https://music.youtube.com/channel/UC-9-kyTW8ZkZNDHQJ6FgpwQ').trim(),
+            deezer: String(process.env.LANDING_DEEZER_URL || 'https://www.deezer.com').trim(),
+            amazonMusic: String(process.env.LANDING_AMAZON_MUSIC_URL || 'https://music.amazon.com/artists/B004K77DXQ/galante-el-emperador').trim()
         }
     };
 
@@ -294,35 +295,25 @@ router.post('/subscribe', async (req, res) => {
         console.log('[Landing Subscribe] Datos recibidos:', { email, fullName, country, sourceLabel });
         console.log('[Landing Subscribe] IP:', req.ip);
         
-        // Intentar guardar en DB, pero si falla, continuamos igual
-        let result = { lastID: null };
-        try {
-            console.log('[Landing Subscribe] Paso 1: Verificando tabla...');
-            await ensureLandingLeadsTable();
-            console.log('[Landing Subscribe] ✅ Tabla verificada');
-            
-            console.log('[Landing Subscribe] Paso 2: Insertando datos...');
-            result = await run(
-                `INSERT INTO landing_email_leads (email, full_name, country, source_label, ip_address, user_agent)
-                 VALUES (?, ?, ?, ?, ?, ?)`,
-                [
-                    email,
-                    fullName,
-                    country,
-                    sourceLabel,
-                    req.ip,
-                    String(req.headers['user-agent'] || '').slice(0, 255)
-                ]
-            );
-            console.log('[Landing Subscribe] ✅ Datos insertados, ID:', result.lastID);
-        } catch (dbError) {
-            console.error('[Landing Subscribe] ⚠️ Error en DB (continuando igual):', dbError.message);
-            // No fallamos, continuamos para enviar email y webhook
-        }
-        console.log('[Landing Subscribe] Table ready, inserting data...');
-
-        // Sincronizar con tablas WordPress existentes (no bloqueante)
+        // Paso 1: Verificar tabla
+        console.log('[Landing Subscribe] Paso 1: Verificando tabla...');
+        await ensureLandingLeadsTable();
+        console.log('[Landing Subscribe] ✅ Tabla verificada');
+        
+        // Paso 2: Registrar o actualizar lead con magic token
+        console.log('[Landing Subscribe] Paso 2: Registrando/actualizando lead...');
+        const userResult = await registerOrUpdateLead({
+            email,
+            fullName,
+            country,
+            ipAddress: req.ip,
+            userAgent: String(req.headers['user-agent'] || '').slice(0, 255),
+            sourceLabel
+        });
+        
+        console.log('[Landing Subscribe] ✅ Lead registrado/actualizado:', userResult);
         console.log('[Landing Subscribe] Paso 3: Sincronizando con WordPress...');
+
         let syncResults = [];
         try {
             syncResults = await syncToWordPress({ email, full_name: fullName, country, source_label: sourceLabel });
@@ -331,11 +322,17 @@ router.post('/subscribe', async (req, res) => {
             console.log('[Landing Subscribe] ⚠️ Error sincronizando WordPress (continuando):', syncError.message);
         }
 
-        // Enviar email de bienvenida y webhook en paralelo (no bloqueantes)
-        console.log('[Landing Subscribe] Paso 4: Enviando email y webhook...');
+        // Enviar email de bienvenida con magic link y webhook en paralelo (no bloqueantes)
+        console.log('[Landing Subscribe] Paso 4: Enviando email con magic link y webhook...');
         
         const [emailResult, webhookResult] = await Promise.allSettled([
-            sendWelcomeEmail({ to: email, name: fullName, country: country }),
+            sendWelcomeEmail({ 
+                to: email, 
+                name: fullName, 
+                country: country,
+                magicToken: userResult.magicToken,
+                userId: userResult.userId
+            }),
             sendWebhookToN8N({
                 email,
                 fullName,
@@ -344,18 +341,20 @@ router.post('/subscribe', async (req, res) => {
                 ipAddress: req.ip,
                 userAgent: String(req.headers['user-agent'] || '').slice(0, 255),
                 registeredAt: new Date().toISOString(),
-                wordpressSync: syncResults
+                wordpressSync: syncResults,
+                isNewUser: userResult.isNew,
+                userId: userResult.userId
             })
         ]);
 
         console.log('[Landing Subscribe] Email result:', emailResult.status === 'fulfilled' ? emailResult.value : emailResult.reason);
         console.log('[Landing Subscribe] Webhook result:', webhookResult.status === 'fulfilled' ? webhookResult.value : webhookResult.reason);
 
-        // Programar email de Mini-Disc para 30 minutos después
-        if (result.lastID) {
+        // Programar email de Mini-Disc para 30 minutos después (solo si es usuario nuevo)
+        if (userResult.isNew && userResult.userId) {
             console.log('[Landing Subscribe] Paso 5: Programando email de Mini-Disc para 30 min después...');
             try {
-                await scheduleMiniDiscEmail(result.lastID, email, {
+                await scheduleMiniDiscEmail(userResult.userId, email, {
                     fullName,
                     country,
                     sourceLabel
@@ -372,7 +371,7 @@ router.post('/subscribe', async (req, res) => {
             console.log('[Landing Subscribe] Paso 6: Sincronizando con Notion...');
             try {
                 const userData = {
-                    id: result.lastID,
+                    id: userResult.userId,
                     email,
                     full_name: fullName,
                     country,
@@ -383,7 +382,9 @@ router.post('/subscribe', async (req, res) => {
                     paypal_payment_status: null,
                     nfc_unique_code: null,
                     package_shipped: 0,
-                    tracking_number: null
+                    tracking_number: null,
+                    magic_token: userResult.magicToken,
+                    email_verified: 0
                 };
                 const notionResult = await syncUserToNotion(userData);
                 console.log('[Landing Subscribe] ✅ Notion sync:', notionResult.success ? 'OK' : 'Skipped');
@@ -393,21 +394,19 @@ router.post('/subscribe', async (req, res) => {
             }
         }
 
-        // Establecer cookie de acceso para fans verificados (válida por 7 días)
-        res.cookie('landing_el_inmortal_unlock', '1', {
-            maxAge: 7 * 24 * 60 * 60 * 1000, // 7 días (1 semana)
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'lax'
-        });
-
+        // NO establecer cookie aquí - el usuario debe verificar su email primero
+        // La cookie se establece cuando hace clic en el magic link en /unlock
+        
+        // Respuesta indicando que debe revisar su email
         if (!wantsJson) {
-            return res.redirect('/ei2?unlock=1');
+            return res.redirect('/ei2?check_email=1');
         }
 
         return res.json({ 
             success: true, 
-            id: result.lastID, 
+            message: 'Revisa tu email para desbloquear el acceso',
+            id: userResult.userId, 
+            isNew: userResult.isNew,
             emailSent: emailResult.status === 'fulfilled' ? emailResult.value?.success : false, 
             webhookSent: webhookResult.status === 'fulfilled' ? webhookResult.value?.success : false,
             wordpressSync: syncResults
@@ -432,6 +431,58 @@ router.post('/subscribe', async (req, res) => {
 
 // Variable para mantener el número más alto mostrado (nunca baja)
 let highestDisplayedCount = 15000; // Número base inicial
+
+// ==================== MAGIC LINK UNLOCK ROUTE ====================
+
+// Ruta de desbloqueo con magic token
+router.get('/unlock', async (req, res) => {
+    const { token } = req.query;
+    
+    if (!token) {
+        return res.status(400).render('error', {
+            title: 'Token Requerido',
+            message: 'Se requiere un token de verificación. Por favor, revisa tu email.',
+            error: { status: 400 }
+        });
+    }
+    
+    try {
+        // Verificar el token
+        const user = await verifyMagicToken(token);
+        
+        if (!user) {
+            return res.status(401).render('error', {
+                title: 'Token Inválido o Expirado',
+                message: 'Este enlace de verificación ha expirado o no es válido. Por favor, regístrate nuevamente en la landing page.',
+                error: { status: 401 }
+            });
+        }
+        
+        // Marcar email como verificado
+        await markEmailAsVerified(user.id);
+        
+        // Establecer cookie de acceso para fans verificados (válida por 7 días)
+        res.cookie('landing_el_inmortal_unlock', '1', {
+            maxAge: 7 * 24 * 60 * 60 * 1000, // 7 días
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax'
+        });
+        
+        console.log(`[Landing Unlock] Usuario verificado: ${user.email}, ID: ${user.id}`);
+        
+        // Redirigir al landing con parámetros de éxito
+        return res.redirect('/ei2?unlock=1&verified=1');
+        
+    } catch (error) {
+        console.error('[Landing Unlock] Error:', error);
+        return res.status(500).render('error', {
+            title: 'Error',
+            message: 'Ocurrió un error al verificar tu acceso. Por favor, intenta nuevamente.',
+            error: process.env.NODE_ENV === 'development' ? error : {}
+        });
+    }
+});
 
 router.get('/stats', async (_req, res) => {
     try {
@@ -474,55 +525,11 @@ router.get('/stats', async (_req, res) => {
     }
 });
 
-// GET track info público (solo para fans verificados o admins)
+// GET track info público - REDIRECT to landing con modal
+// Los tracks ahora se muestran en modal en la landing, no en página separada
 router.get('/track/:id', async (req, res) => {
-    // Verificar si es admin o fan verificado
-    const isAdmin = req.session.user ? true : false;
-    const isVerifiedFan = req.cookies?.landing_el_inmortal_unlock === '1';
-    
-    if (!isAdmin && !isVerifiedFan) {
-        return res.redirect('/ei2');
-    }
-    
-    try {
-        const trackId = req.params.id;
-        
-        const track = await getOne(
-            `SELECT t.*, p.name as producer_name 
-             FROM tracks t 
-             LEFT JOIN producers p ON t.producer_id = p.id 
-             WHERE t.id = ?`, 
-            [trackId]
-        );
-        
-        if (!track) {
-            return res.status(404).render('error', {
-                title: '404',
-                message: 'Tema no encontrado',
-                error: {}
-            });
-        }
-        
-        // Si es admin, redirigir a la vista admin completa
-        if (isAdmin) {
-            return res.redirect(`/tracks/${trackId}`);
-        }
-        
-        // Fan verificado: mostrar vista solo lectura
-        res.render('landing/track-info', {
-            title: track.title,
-            track: track,
-            isFan: true,
-            isAdmin: false
-        });
-    } catch (error) {
-        console.error('[Landing Track Info] Error:', error);
-        res.status(500).render('error', {
-            title: 'Error',
-            message: 'Error cargando tema',
-            error: process.env.NODE_ENV === 'development' ? error : {}
-        });
-    }
+    // Redirigir siempre al landing principal - el modal manejará la visualización
+    return res.redirect(`/ei2?track=${req.params.id}`);
 });
 
 // ==================== PAYPAL ROUTES ====================
@@ -739,22 +746,26 @@ router.get('/unlock/:code', async (req, res) => {
             });
         }
         
+        // Cargar enlaces desde variables de entorno con valores por defecto
+        const links = {
+            spotify: process.env.LANDING_SPOTIFY_URL || 'https://open.spotify.com/artist/5SYAaCKEVYhN3RDSDKUTJn',
+            appleMusic: process.env.LANDING_APPLE_MUSIC_URL || 'https://music.apple.com/us/artist/galante-el-emperador/415956668',
+            youtubeMusic: process.env.LANDING_YOUTUBE_MUSIC_URL || 'https://music.youtube.com/channel/UC-9-kyTW8ZkZNDHQJ6FgpwQ',
+            deezer: process.env.LANDING_DEEZER_URL || 'https://www.deezer.com',
+            amazonMusic: process.env.LANDING_AMAZON_MUSIC_URL || 'https://music.amazon.com/artists/B004K77DXQ/galante-el-emperador',
+            instagram: process.env.LANDING_INSTAGRAM_URL || 'https://instagram.com/galantealx',
+            tiktok: process.env.LANDING_TIKTOK_URL || 'https://tiktok.com/@galantealx',
+            twitter: process.env.LANDING_TWITTER_URL || 'https://twitter.com/galantealx',
+            youtube: process.env.LANDING_YOUTUBE_URL || 'https://youtube.com/@galante',
+            merch: process.env.LANDING_MERCH_URL || 'https://galantealx.com/merch',
+            website: process.env.LANDING_WEBSITE_URL || 'https://galantealx.com'
+        };
+        
         res.render('landing/nfc-landing', {
             title: 'Contenido Exclusivo - El Inmortal 2',
             user: user,
             code: code,
-            links: {
-                spotify: 'https://open.spotify.com/artist/5SYAaCKEVYhN3RDSDKUTJn?si=DjzkUy8MQU2BK9L0zdwE5A',
-                appleMusic: 'https://music.apple.com/us/artist/galante-el-emperador/415956668',
-                youtubeMusic: 'https://music.youtube.com/channel/UC-9-kyTW8ZkZNDHQJ6FgpwQ',
-                instagram: 'https://instagram.com/galanteddm',
-                tiktok: 'https://tiktok.com/@galante_elemperador',
-                youtube: 'https://youtube.com/@galante',
-                merch: 'https://galantealx.com/merch',
-                website: 'https://galantealx.com',
-                amazonMusic: 'https://music.amazon.com/artists/B004K77DXQ/galante-el-emperador',
-                twitter: 'https://twitter.com/galantealx'
-            }
+            links
         });
     } catch (error) {
         console.error('[NFC] Error:', error);

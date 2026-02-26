@@ -22,6 +22,12 @@
       "env": {
         "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}"
       }
+    },
+    "eagle-mcp": {
+      "command": "node",
+      "args": [
+        "C:\\Users\\AlexSerrano\\AppData\\Roaming\\Eagle\\Plugins\\mcp-server/modules/mcp-proxy.js"
+      ]
     }
   }
 }

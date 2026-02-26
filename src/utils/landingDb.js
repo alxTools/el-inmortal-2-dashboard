@@ -26,6 +26,7 @@ async function registerOrUpdateLead(leadData) {
         const magicToken = generateMagicToken();
         const expiresAt = new Date();
         expiresAt.setDate(expiresAt.getDate() + 30); // 30 días de expiración
+        const expiresAtFormatted = expiresAt.toISOString().slice(0, 19).replace('T', ' '); // Formato MySQL: YYYY-MM-DD HH:MM:SS
         
         if (existingUser) {
             // Usuario existente: actualizar magic token y fecha de expiración
@@ -37,7 +38,7 @@ async function registerOrUpdateLead(leadData) {
                      country = COALESCE(?, country),
                      updated_at = NOW()
                  WHERE id = ?`,
-                [magicToken, expiresAt, fullName, country, existingUser.id]
+                [magicToken, expiresAtFormatted, fullName, country, existingUser.id]
             );
             
             console.log(`[Landing] Usuario existente actualizado: ${email}, ID: ${existingUser.id}`);
@@ -55,7 +56,7 @@ async function registerOrUpdateLead(leadData) {
                  (email, full_name, country, source_label, ip_address, user_agent, 
                   magic_token, magic_token_expires_at, email_verified, unlock_cookie_set)
                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 0)`,
-                [email, fullName, country, sourceLabel, ipAddress, userAgent, magicToken, expiresAt]
+                [email, fullName, country, sourceLabel, ipAddress, userAgent, magicToken, expiresAtFormatted]
             );
             
             console.log(`[Landing] Nuevo usuario registrado: ${email}, ID: ${result.lastID}`);

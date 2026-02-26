@@ -175,10 +175,30 @@
                 </p>
             </div>
             
-            <div class="form-section">
+            <!-- Botón para desbloquear (visible inicialmente) -->
+            <div id="unlockCTA" class="form-section" style="text-align: center;">
                 <h2 class="form-title">🔓 Desbloquea el Álbum Completo</h2>
                 <p class="form-subtitle">
                     Sé el primero en escuchar "El Inmortal 2" antes que nadie
+                </p>
+                
+                <ul class="benefits" style="text-align: left; max-width: 400px; margin: 20px auto;">
+                    <li>Escucha todas las 21 canciones</li>
+                    <li>Acceso exclusivo al reproductor</li>
+                    <li>Contenido exclusivo y noticias</li>
+                    <li>🎁 Tu información está segura</li>
+                </ul>
+                
+                <button type="button" id="showFormBtn" style="margin-top: 20px; padding: 16px 32px; font-size: 1.1rem;">
+                    🔓 Desbloquear Acceso Ahora
+                </button>
+            </div>
+            
+            <!-- Formulario (oculto inicialmente) -->
+            <div id="subscribeFormContainer" class="form-section" style="display: none;">
+                <h2 class="form-title">📝 Completa tu Registro</h2>
+                <p class="form-subtitle">
+                    Ingresa tus datos para recibir el acceso exclusivo
                 </p>
                 
                 <form method="post" action="/landing/subscribe" id="subscribeForm">
@@ -196,14 +216,14 @@
                     <button type="submit" id="submitBtn">
                         🔓 Desbloquear Acceso Ahora
                     </button>
+                    <button type="submit" id="submitBtn">
+                        🚀 Enviar y Recibir Acceso
+                    </button>
                 </form>
                 
-                <ul class="benefits">
-                    <li>Escucha todas las 21 canciones</li>
-                    <li>Acceso exclusivo al reproductor</li>
-                    <li>Contenido exclusivo y noticias</li>
-                    <li>🎁 Tu información está segura. Nunca compartimos tus datos.</li>
-                </ul>
+                <p style="color: #64748b; font-size: 0.85rem; margin-top: 15px; text-align: center;">
+                    🔒 Tu información está segura. Nunca compartimos tus datos.
+                </p>
             </div>
         </div>
     </div>
@@ -226,13 +246,30 @@
         // GA4 Event Tracking
         document.addEventListener('DOMContentLoaded', function() {
             const form = document.getElementById('subscribeForm');
-            const btn = document.getElementById('submitBtn');
+            const submitBtn = document.getElementById('submitBtn');
+            const showFormBtn = document.getElementById('showFormBtn');
+            const unlockCTA = document.getElementById('unlockCTA');
+            const formContainer = document.getElementById('subscribeFormContainer');
             
-            if (btn) {
-                btn.addEventListener('click', function() {
+            // Mostrar formulario al hacer clic en "Desbloquear"
+            if (showFormBtn && unlockCTA && formContainer) {
+                showFormBtn.addEventListener('click', function() {
+                    unlockCTA.style.display = 'none';
+                    formContainer.style.display = 'block';
+                    formContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    
                     gtag('event', 'begin_checkout', {
                         'event_category': 'engagement',
                         'event_label': 'unlock_button_click'
+                    });
+                });
+            }
+            
+            if (submitBtn) {
+                submitBtn.addEventListener('click', function() {
+                    gtag('event', 'begin_checkout', {
+                        'event_category': 'engagement',
+                        'event_label': 'submit_form_click'
                     });
                 });
             }

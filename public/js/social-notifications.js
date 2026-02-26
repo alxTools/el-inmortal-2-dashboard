@@ -156,10 +156,41 @@
     // Variable para controlar si está activo
     let isActive = false;
     let container = null;
+    let isPaused = false; // Pausar cuando hay audio reproduciéndose
+
+    // Escuchar eventos del reproductor de audio
+    const setupAudioListeners = () => {
+        // Evento global para cuando el audio comienza a reproducirse
+        document.addEventListener('audio-playing', () => {
+            isPaused = true;
+            console.log('[Social Notifications] Pausado - audio reproduciéndose');
+        });
+
+        // Evento global para cuando el audio se pausa
+        document.addEventListener('audio-paused', () => {
+            isPaused = false;
+            console.log('[Social Notifications] Reanudado - audio pausado');
+        });
+
+        // También detectar elementos de audio directamente
+        const checkAudioElements = () => {
+            const audios = document.querySelectorAll('audio');
+            let anyPlaying = false;
+            audios.forEach(audio => {
+                if (!audio.paused && !audio.ended) {
+                    anyPlaying = true;
+                }
+            });
+            isPaused = anyPlaying;
+        };
+
+        // Verificar cada segundo
+        setInterval(checkAudioElements, 1000);
+    };
 
     // Mostrar una notificación
     const showNotification = () => {
-        if (!isActive || !container) return;
+        if (!isActive || !container || isPaused) return;
 
         // Seleccionar notificación aleatoria
         const data = notifications[Math.floor(Math.random() * notifications.length)];
@@ -198,6 +229,9 @@
         addStyles();
         container = createContainer();
         isActive = true;
+
+        // Configurar listeners de audio
+        setupAudioListeners();
 
         // Mostrar primera notificación después de 3 segundos
         setTimeout(showNotification, 3000);

@@ -957,6 +957,8 @@ function LandingApp({ data }) {
         const handleEnded = () => {
             setIsPlaying(false);
             setIsLoading(false);
+            // Reproducir siguiente track automáticamente
+            playNextTrack();
         };
         const handlePause = () => {
             setIsPlaying(false);
@@ -1055,6 +1057,13 @@ function LandingApp({ data }) {
         const isSame = currentTrack && currentTrack.trackNumber === track.trackNumber;
         setPlayError('');
 
+        // Emitir evento para notificaciones
+        if (isSame && isPlaying) {
+            document.dispatchEvent(new CustomEvent('audio-paused'));
+        } else {
+            document.dispatchEvent(new CustomEvent('audio-playing'));
+        }
+
         if (isSame) {
             if (isPlaying) {
                 audio.pause();
@@ -1095,6 +1104,37 @@ function LandingApp({ data }) {
                 setPlayError('Formato de audio no soportado en este dispositivo.');
             } else {
                 setPlayError('No se pudo reproducir el audio.');
+            }
+        }
+    };
+
+    // ESCUCHAR AHORA - Iniciar con track 1
+    const handleListenNow = async () => {
+        if (!isUnlocked) {
+            setIsModalOpen(true);
+            return;
+        }
+        
+        // Encontrar el track 1
+        const track1 = data.tracks.find(t => t.trackNumber === 1);
+        if (track1 && track1.audioUrl) {
+            await handlePlayToggle(track1);
+            // Scroll al tracklist
+            document.getElementById('tracklist')?.scrollIntoView({ behavior: 'smooth' });
+        } else {
+            setPlayError('Track 1 no disponible.');
+        }
+    };
+
+    // Reproducción continua - cuando termina un track, pasa al siguiente
+    const playNextTrack = () => {
+        if (!currentTrack || !data.tracks.length) return;
+        
+        const currentIndex = data.tracks.findIndex(t => t.trackNumber === currentTrack.trackNumber);
+        if (currentIndex >= 0 && currentIndex < data.tracks.length - 1) {
+            const nextTrack = data.tracks[currentIndex + 1];
+            if (nextTrack && nextTrack.audioUrl) {
+                handlePlayToggle(nextTrack);
             }
         }
     };
@@ -1264,10 +1304,13 @@ function LandingApp({ data }) {
                             <span>Ver Tracklist</span>
                         </a>
                     )}
-                    <a href="#streaming" className="btn-neon btn-neon-cyan">
+                    <button
+                        onClick={handleListenNow}
+                        className="btn-neon btn-neon-cyan"
+                    >
                         <span>▶</span>
                         <span>Escuchar Ahora</span>
-                    </a>
+                    </button>
                 </div>
 
                 {/* Release Date Badge */}
@@ -1464,10 +1507,10 @@ function LandingApp({ data }) {
                                                         ? 'cursor-wait border border-white/20 bg-white/5 text-slate-400'
                                                         : currentTrack && currentTrack.trackNumber === track.trackNumber && isPlaying
                                                             ? 'border-2 border-emerald-400 bg-emerald-400/20 text-emerald-300 shadow-[0_0_20px_rgba(52,211,153,0.3)]'
-                                                            : track.audioUrl
-                                                                ? 'border border-amber-400/50 bg-amber-400/10 text-amber-300 hover:bg-amber-400/25 hover:border-amber-400 hover:shadow-[0_0_15px_rgba(251,191,36,0.3)]'
-                                                                : 'cursor-not-allowed border border-white/10 bg-white/5 text-slate-500'
-                                                }`}
+                                                : track.audioUrl
+                                                    ? 'border border-amber-400 bg-amber-400 text-slate-900 font-extrabold hover:bg-amber-300 hover:border-amber-300 hover:shadow-[0_0_20px_rgba(251,191,36,0.4)]'
+                                                    : 'cursor-not-allowed border border-white/10 bg-white/5 text-slate-500'
+                                        }`}
                                             >
                                                 {currentTrack && currentTrack.trackNumber === track.trackNumber
                                                     ? isLoading

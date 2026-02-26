@@ -78,7 +78,7 @@ async function sendWelcomeEmail({ to, name, country, magicToken, userId }) {
                             <!-- Header -->
                             <tr>
                                 <td style="background:linear-gradient(135deg, rgba(250,204,21,0.2), rgba(15,23,42,0.8));padding:40px 30px;text-align:center;border-bottom:2px solid rgba(250,204,21,0.5);">
-                                    <img src="https://galantealx.com/images/logo.png" alt="Galante el Emperador" style="max-width:120px;height:auto;margin-bottom:20px;border-radius:50%;" />
+                                    <img src="https://ei2.galantealx.com/images/galante_signature.png" alt="Galante el Emperador" style="max-width:180px;height:auto;margin-bottom:15px;" />
                                     <h1 style="color:#facc15;font-size:32px;margin:0;font-weight:bold;letter-spacing:2px;">EL INMORTAL 2</h1>
                                     <p style="color:#e2e8f0;margin:10px 0 0 0;font-size:16px;">Galante el Emperador</p>
                                 </td>

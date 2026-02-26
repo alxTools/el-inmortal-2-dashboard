@@ -202,7 +202,7 @@ async function renderLandingPage(res) {
         const dbTrack = trackMap.get(key);
         const trackNum = Number(fallback.trackNumber || idx + 1);
         return {
-            id: dbTrack?.id || `track_${trackNum}`,
+            id: dbTrack?.id || String(trackNum),
             trackNumber: trackNum,
             title: fallback.title,
             producer: fallback.producer,
@@ -796,12 +796,12 @@ router.get('/unlock/:code', async (req, res) => {
             user: user,
             code: code,
             links: {
-                spotify: 'https://open.spotify.com/artist/5SYAaCKEVYhN3RDSDKUTJn?si=DjzkUy8MQU2BK9L0zdwE5A',
+                spotify: 'https://open.spotify.com/artist/5SYAaCKEVYhN3RDSDKUTJn?si=g1ldaLJdQO61OY4Wk6Iz2A',
                 appleMusic: 'https://music.apple.com/us/artist/galante-el-emperador/415956668',
                 youtubeMusic: 'https://music.youtube.com/channel/UC-9-kyTW8ZkZNDHQJ6FgpwQ',
                 instagram: 'https://instagram.com/galanteddm',
                 tiktok: 'https://tiktok.com/@galante_elemperador',
-                youtube: 'https://youtube.com/@galante',
+                youtube: 'https://www.youtube.com/@galanteelemperador',
                 merch: 'https://galantealx.com/merch',
                 website: 'https://galantealx.com',
                 amazonMusic: 'https://music.amazon.com/artists/B004K77DXQ/galante-el-emperador',

@@ -22416,6 +22416,9 @@ var AlbumLandingApp = (() => {
     const [detectedCountry, setDetectedCountry] = (0, import_react.useState)("");
     const [fanStats, setFanStats] = (0, import_react.useState)({ totalLeads: 0, topCountries: [] });
     const [topTracks, setTopTracks] = (0, import_react.useState)([]);
+    const [comments, setComments] = (0, import_react.useState)([]);
+    const [newComment, setNewComment] = (0, import_react.useState)("");
+    const [isSubmittingComment, setIsSubmittingComment] = (0, import_react.useState)(false);
     const [currentTrack, setCurrentTrack] = (0, import_react.useState)(null);
     const [isPlaying, setIsPlaying] = (0, import_react.useState)(false);
     const [isLoading, setIsLoading] = (0, import_react.useState)(false);
@@ -22539,8 +22542,21 @@ var AlbumLandingApp = (() => {
           console.error("Top tracks fetch error", error);
         }
       };
+      const fetchComments = async () => {
+        try {
+          const response = await fetch("/landing/comments");
+          if (!response.ok) return;
+          const payload = await response.json();
+          if (payload.success && Array.isArray(payload.comments)) {
+            setComments(payload.comments);
+          }
+        } catch (error) {
+          console.error("Comments fetch error", error);
+        }
+      };
       fetchStats();
       fetchTopTracks();
+      fetchComments();
     }, [isUnlocked]);
     (0, import_react.useEffect)(() => {
       const audio = audioRef.current;
@@ -22756,6 +22772,35 @@ var AlbumLandingApp = (() => {
         setIsSubmitting(false);
       }
     };
+    const handleCommentSubmit = async (e) => {
+      e.preventDefault();
+      if (!newComment.trim() || newComment.trim().length < 3) {
+        return;
+      }
+      setIsSubmittingComment(true);
+      try {
+        const response = await fetch("/landing/comments", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Accept": "application/json"
+          },
+          body: JSON.stringify({ comment: newComment.trim() })
+        });
+        const result = await response.json();
+        if (response.ok && result.success) {
+          setComments((prev) => [result.comment, ...prev]);
+          setNewComment("");
+        } else {
+          alert(result.error || "Error al publicar comentario");
+        }
+      } catch (error) {
+        console.error("Error posting comment:", error);
+        alert("Error al publicar comentario");
+      } finally {
+        setIsSubmittingComment(false);
+      }
+    };
     return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("main", { className: "relative overflow-hidden text-slate-100", children: [
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)(AudioWavesBackground, {}),
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)(FloatingParticles, {}),
@@ -22964,10 +23009,43 @@ var AlbumLandingApp = (() => {
           ] }) : null,
           playError ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "mb-4 rounded-2xl border border-rose-400/40 bg-rose-500/10 px-4 py-3 text-xs uppercase tracking-[0.12em] text-rose-200", children: playError }) : null,
           /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "mb-5 grid gap-3 md:grid-cols-2", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "glass-panel rounded-2xl p-4", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-xs uppercase tracking-[0.2em] text-slate-300", children: "Fans Registrados" }),
-              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "mt-2 text-3xl font-semibold text-white", children: fanStats.totalLeads.toLocaleString() }),
-              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "mt-2 text-xs uppercase tracking-[0.12em] text-slate-400", children: "Total acumulado" })
+            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "glass-panel rounded-2xl p-4 flex flex-col", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-xs uppercase tracking-[0.2em] text-slate-300 mb-3", children: "\u{1F4AC} Comentarios de Fans" }),
+              /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("form", { onSubmit: handleCommentSubmit, className: "mb-3", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+                  "textarea",
+                  {
+                    value: newComment,
+                    onChange: (e) => setNewComment(e.target.value),
+                    placeholder: "Deja tu comentario...",
+                    maxLength: 500,
+                    rows: 2,
+                    className: "w-full px-3 py-2 bg-slate-800/50 border border-slate-600 rounded-lg text-sm text-white placeholder-slate-400 focus:outline-none focus:border-amber-400 resize-none"
+                  }
+                ),
+                /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex justify-between items-center mt-2", children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "text-xs text-slate-400", children: [
+                    newComment.length,
+                    "/500"
+                  ] }),
+                  /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+                    "button",
+                    {
+                      type: "submit",
+                      disabled: isSubmittingComment || newComment.trim().length < 3,
+                      className: "px-4 py-1.5 bg-amber-500 hover:bg-amber-400 disabled:bg-slate-600 disabled:cursor-not-allowed rounded-lg text-sm font-semibold text-slate-900 transition-colors",
+                      children: isSubmittingComment ? "..." : "Publicar"
+                    }
+                  )
+                ] })
+              ] }),
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "flex-1 overflow-y-auto max-h-40 space-y-2", children: comments.length > 0 ? comments.map((comment) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "bg-slate-800/30 rounded-lg p-2 text-sm", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex justify-between items-start mb-1", children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "font-semibold text-amber-300 text-xs", children: comment.user_name }),
+                  /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "text-xs text-slate-500", children: new Date(comment.created_at).toLocaleDateString("es-ES", { month: "short", day: "numeric" }) })
+                ] }),
+                /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-slate-200 text-xs leading-relaxed", children: comment.comment })
+              ] }, comment.id)) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-slate-400 text-xs text-center py-4", children: "S\xE9 el primero en comentar \u{1F3B5}" }) })
             ] }),
             /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "glass-panel rounded-2xl p-4", children: [
               /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-xs uppercase tracking-[0.2em] text-slate-300", children: "Top 10 - Mas Escuchados" }),

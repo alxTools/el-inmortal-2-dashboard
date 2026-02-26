@@ -92,6 +92,26 @@ async function updateDB() {
       console.log('ℹ️ Track_plays table already exists');
     }
     
+    // Landing comments table
+    if (!await tableExists(pool, 'landing_comments')) {
+      await pool.execute(`CREATE TABLE landing_comments (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        lead_id INT NULL,
+        user_id INT NULL,
+        user_name VARCHAR(255) NOT NULL,
+        user_email VARCHAR(255) NOT NULL,
+        comment TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        is_approved TINYINT(1) DEFAULT 1,
+        INDEX idx_lead_id (lead_id),
+        INDEX idx_user_id (user_id),
+        INDEX idx_created_at (created_at)
+      )`);
+      console.log('✅ Landing_comments table created');
+    } else {
+      console.log('ℹ️ Landing_comments table already exists');
+    }
+    
     console.log('✅ Database schema updated successfully');
   } catch (err) {
     console.error('❌ Error:', err.message);

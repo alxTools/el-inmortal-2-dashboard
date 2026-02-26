@@ -804,6 +804,9 @@ function LandingApp({ data }) {
     const [detectedCountry, setDetectedCountry] = useState('');
     const [fanStats, setFanStats] = useState({ totalLeads: 0, topCountries: [] });
     const [topTracks, setTopTracks] = useState([]);
+    const [comments, setComments] = useState([]);
+    const [newComment, setNewComment] = useState('');
+    const [isSubmittingComment, setIsSubmittingComment] = useState(false);
     const [currentTrack, setCurrentTrack] = useState(null);
     const [isPlaying, setIsPlaying] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
@@ -961,9 +964,23 @@ function LandingApp({ data }) {
                 console.error('Top tracks fetch error', error);
             }
         };
-        
+
+        const fetchComments = async () => {
+            try {
+                const response = await fetch('/landing/comments');
+                if (!response.ok) return;
+                const payload = await response.json();
+                if (payload.success && Array.isArray(payload.comments)) {
+                    setComments(payload.comments);
+                }
+            } catch (error) {
+                console.error('Comments fetch error', error);
+            }
+        };
+
         fetchStats();
         fetchTopTracks();
+        fetchComments();
     }, [isUnlocked]);
 
     useEffect(() => {
@@ -1216,6 +1233,42 @@ function LandingApp({ data }) {
         }
     };
 
+    const handleCommentSubmit = async (e) => {
+        e.preventDefault();
+        
+        if (!newComment.trim() || newComment.trim().length < 3) {
+            return;
+        }
+        
+        setIsSubmittingComment(true);
+        
+        try {
+            const response = await fetch('/landing/comments', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({ comment: newComment.trim() })
+            });
+            
+            const result = await response.json();
+            
+            if (response.ok && result.success) {
+                // Add new comment to list
+                setComments(prev => [result.comment, ...prev]);
+                setNewComment('');
+            } else {
+                alert(result.error || 'Error al publicar comentario');
+            }
+        } catch (error) {
+            console.error('Error posting comment:', error);
+            alert('Error al publicar comentario');
+        } finally {
+            setIsSubmittingComment(false);
+        }
+    };
+
     return (
         <main className="relative overflow-hidden text-slate-100">
             {/* Background Effects */}
@@ -1460,10 +1513,49 @@ function LandingApp({ data }) {
                         ) : null}
 
                         <div className="mb-5 grid gap-3 md:grid-cols-2">
-                            <div className="glass-panel rounded-2xl p-4">
-                                <p className="text-xs uppercase tracking-[0.2em] text-slate-300">Fans Registrados</p>
-                                <p className="mt-2 text-3xl font-semibold text-white">{fanStats.totalLeads.toLocaleString()}</p>
-                                <p className="mt-2 text-xs uppercase tracking-[0.12em] text-slate-400">Total acumulado</p>
+                            <div className="glass-panel rounded-2xl p-4 flex flex-col">
+                                <p className="text-xs uppercase tracking-[0.2em] text-slate-300 mb-3">💬 Comentarios de Fans</p>
+                                
+                                {/* Formulario de comentario */}
+                                <form onSubmit={handleCommentSubmit} className="mb-3">
+                                    <textarea
+                                        value={newComment}
+                                        onChange={(e) => setNewComment(e.target.value)}
+                                        placeholder="Deja tu comentario..."
+                                        maxLength={500}
+                                        rows={2}
+                                        className="w-full px-3 py-2 bg-slate-800/50 border border-slate-600 rounded-lg text-sm text-white placeholder-slate-400 focus:outline-none focus:border-amber-400 resize-none"
+                                    />
+                                    <div className="flex justify-between items-center mt-2">
+                                        <span className="text-xs text-slate-400">{newComment.length}/500</span>
+                                        <button
+                                            type="submit"
+                                            disabled={isSubmittingComment || newComment.trim().length < 3}
+                                            className="px-4 py-1.5 bg-amber-500 hover:bg-amber-400 disabled:bg-slate-600 disabled:cursor-not-allowed rounded-lg text-sm font-semibold text-slate-900 transition-colors"
+                                        >
+                                            {isSubmittingComment ? '...' : 'Publicar'}
+                                        </button>
+                                    </div>
+                                </form>
+                                
+                                {/* Lista de comentarios */}
+                                <div className="flex-1 overflow-y-auto max-h-40 space-y-2">
+                                    {comments.length > 0 ? (
+                                        comments.map((comment) => (
+                                            <div key={comment.id} className="bg-slate-800/30 rounded-lg p-2 text-sm">
+                                                <div className="flex justify-between items-start mb-1">
+                                                    <span className="font-semibold text-amber-300 text-xs">{comment.user_name}</span>
+                                                    <span className="text-xs text-slate-500">
+                                                        {new Date(comment.created_at).toLocaleDateString('es-ES', { month: 'short', day: 'numeric' })}
+                                                    </span>
+                                                </div>
+                                                <p className="text-slate-200 text-xs leading-relaxed">{comment.comment}</p>
+                                            </div>
+                                        ))
+                                    ) : (
+                                        <p className="text-slate-400 text-xs text-center py-4">Sé el primero en comentar 🎵</p>
+                                    )}
+                                </div>
                             </div>
                             <div className="glass-panel rounded-2xl p-4">
                                 <p className="text-xs uppercase tracking-[0.2em] text-slate-300">Top 10 - Mas Escuchados</p>

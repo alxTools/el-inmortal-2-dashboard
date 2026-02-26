@@ -581,6 +581,108 @@ router.get('/top-tracks', async (req, res) => {
     }
 });
 
+// GET comments (público, solo aprobados)
+router.get('/comments', async (req, res) => {
+    try {
+        const comments = await getAll(`
+            SELECT id, user_name, comment, created_at
+            FROM landing_comments
+            WHERE is_approved = 1
+            ORDER BY created_at DESC
+            LIMIT 50
+        `);
+        
+        return res.json({
+            success: true,
+            comments: comments
+        });
+    } catch (error) {
+        console.error('[Comments] Error fetching:', error);
+        return res.json({
+            success: false,
+            comments: []
+        });
+    }
+});
+
+// POST new comment (requiere estar verificado)
+router.post('/comments', async (req, res) => {
+    try {
+        const { comment } = req.body;
+        
+        // Verificar que está verificado (tiene sesión o cookie)
+        const isVerified = req.session?.user || req.cookies?.landing_el_inmortal_unlock === '1';
+        
+        if (!isVerified) {
+            return res.status(401).json({
+                success: false,
+                error: 'Debes verificar tu email para comentar'
+            });
+        }
+        
+        if (!comment || comment.trim().length < 3) {
+            return res.status(400).json({
+                success: false,
+                error: 'El comentario debe tener al menos 3 caracteres'
+            });
+        }
+        
+        if (comment.trim().length > 500) {
+            return res.status(400).json({
+                success: false,
+                error: 'El comentario no puede exceder 500 caracteres'
+            });
+        }
+        
+        // Obtener nombre del usuario
+        let userName = 'Fan';
+        let userEmail = '';
+        let userId = null;
+        let leadId = null;
+        
+        if (req.session?.user) {
+            userName = req.session.user.name || req.session.user.email.split('@')[0];
+            userEmail = req.session.user.email;
+            userId = req.session.user.id;
+        } else {
+            // Intentar obtener de la lead por cookie
+            const leadEmail = req.cookies?.landing_email;
+            if (leadEmail) {
+                const lead = await getOne('SELECT id, email, full_name FROM landing_email_leads WHERE email = ?', [leadEmail]);
+                if (lead) {
+                    userName = lead.full_name || lead.email.split('@')[0];
+                    userEmail = lead.email;
+                    leadId = lead.id;
+                }
+            }
+        }
+        
+        // Guardar comentario
+        const result = await run(
+            `INSERT INTO landing_comments (lead_id, user_id, user_name, user_email, comment, is_approved)
+             VALUES (?, ?, ?, ?, ?, 1)`,
+            [leadId, userId, userName, userEmail, comment.trim()]
+        );
+        
+        return res.json({
+            success: true,
+            message: 'Comentario publicado',
+            comment: {
+                id: result.lastID || result.insertId,
+                user_name: userName,
+                comment: comment.trim(),
+                created_at: new Date().toISOString()
+            }
+        });
+    } catch (error) {
+        console.error('[Comments] Error saving:', error);
+        return res.status(500).json({
+            success: false,
+            error: 'Error al guardar el comentario'
+        });
+    }
+});
+
 // GET track info público (solo para fans verificados o admins)
 router.get('/track/:id', async (req, res) => {
     // Verificar si es admin o fan verificado

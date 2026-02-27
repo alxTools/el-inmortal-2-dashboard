@@ -944,10 +944,13 @@ function LandingApp({ data }) {
         if (shouldUnlock) {
             setIsUnlocked(true);
             localStorage.setItem('landing_el_inmortal_unlock', '1');
+            localStorage.setItem('ei2_registered', 'true');
             // Leer email de la cookie
             const emailCookie = document.cookie.split('; ').find(row => row.startsWith('landing_email='));
             if (emailCookie) {
-                setCurrentUserEmail(decodeURIComponent(emailCookie.split('=')[1]));
+                const email = decodeURIComponent(emailCookie.split('=')[1]);
+                setCurrentUserEmail(email);
+                localStorage.setItem('ei2_email', email);
             }
             // Limpiar URL
             window.history.replaceState({}, document.title, window.location.pathname);
@@ -956,10 +959,13 @@ function LandingApp({ data }) {
             const storedUnlock = localStorage.getItem('landing_el_inmortal_unlock');
             if (storedUnlock === '1') {
                 setIsUnlocked(true);
+                localStorage.setItem('ei2_registered', 'true');
                 // Leer email de la cookie
                 const emailCookie = document.cookie.split('; ').find(row => row.startsWith('landing_email='));
                 if (emailCookie) {
-                    setCurrentUserEmail(decodeURIComponent(emailCookie.split('=')[1]));
+                    const email = decodeURIComponent(emailCookie.split('=')[1]);
+                    setCurrentUserEmail(email);
+                    localStorage.setItem('ei2_email', email);
                 }
             } else {
                 // Mostrar modal después de 2 segundos

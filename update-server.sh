@@ -18,6 +18,10 @@ git stash
 echo "⬇️  Descargando actualizaciones desde GitHub..."
 git pull
 
+# Compilar el landing page
+echo "🔨 Compilando landing page..."
+npm run landing:build
+
 # Verificar si PM2 está instalado
 if command -v pm2 &> /dev/null; then
     echo "🚀 Reiniciando con PM2..."

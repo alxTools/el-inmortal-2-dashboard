@@ -1058,21 +1058,43 @@ function LandingApp({ data }) {
         if (!audio) return undefined;
 
         const handleEnded = () => {
+            console.log('[Audio] Track ended, attempting to play next');
             setIsPlaying(false);
             setIsLoading(false);
+            
             // Reproducir siguiente track automáticamente usando la ref para obtener el valor actual
             const track = currentTrackRef.current;
-            if (!track || !data.tracks.length) return;
+            console.log('[Audio] Current track from ref:', track);
             
+            if (!track) {
+                console.log('[Audio] No current track in ref, cannot continue');
+                return;
+            }
+            
+            if (!data.tracks || data.tracks.length === 0) {
+                console.log('[Audio] No tracks data available');
+                return;
+            }
+            
+            console.log('[Audio] Available tracks:', data.tracks.length);
             const currentIndex = data.tracks.findIndex(t => t.trackNumber === track.trackNumber);
+            console.log('[Audio] Current index:', currentIndex);
+            
             if (currentIndex >= 0 && currentIndex < data.tracks.length - 1) {
                 const nextTrack = data.tracks[currentIndex + 1];
+                console.log('[Audio] Next track found:', nextTrack);
+                
                 if (nextTrack && nextTrack.audioUrl) {
+                    console.log('[Audio] Playing next track:', nextTrack.title);
                     // Usar setTimeout para evitar problemas de sincronización
                     setTimeout(() => {
                         handlePlayToggle(nextTrack);
-                    }, 100);
+                    }, 500);
+                } else {
+                    console.log('[Audio] Next track has no audio URL');
                 }
+            } else {
+                console.log('[Audio] No more tracks or invalid index');
             }
         };
         const handlePause = () => {

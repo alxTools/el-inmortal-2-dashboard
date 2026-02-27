@@ -22617,7 +22617,6 @@ var AlbumLandingApp = (() => {
       const handleEnded = () => {
         console.log("[Audio] Track ended, attempting to play next");
         setIsPlaying(false);
-        setIsLoading(false);
         const track = currentTrackRef.current;
         console.log("[Audio] Current track from ref:", track);
         if (!track) {
@@ -22637,8 +22636,36 @@ var AlbumLandingApp = (() => {
           if (nextTrack && nextTrack.audioUrl) {
             console.log("[Audio] Playing next track:", nextTrack.title);
             setTimeout(() => {
-              handlePlayToggle(nextTrack);
-            }, 500);
+              audio.pause();
+              audio.src = "";
+              audio.load();
+              setTimeout(() => {
+                audio.src = nextTrack.audioUrl;
+                audio.currentTime = 0;
+                setCurrentTrack(nextTrack);
+                setAudioReady(false);
+                setIsLoading(true);
+                audio.play().then(() => {
+                  console.log("[Audio] Next track playing successfully");
+                  setIsPlaying(true);
+                  setIsLoading(false);
+                  setAudioReady(true);
+                  fetch("/landing/track-play", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      track_id: nextTrack.id,
+                      track_number: nextTrack.trackNumber
+                    })
+                  }).catch(() => {
+                  });
+                }).catch((error) => {
+                  console.error("[Audio] Error playing next track:", error);
+                  setIsLoading(false);
+                  setPlayError("Error al reproducir el siguiente track");
+                });
+              }, 100);
+            }, 300);
           } else {
             console.log("[Audio] Next track has no audio URL");
           }
@@ -23318,9 +23345,15 @@ var AlbumLandingApp = (() => {
                     }
                   ),
                   track.id && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
-                    "a",
+                    "button",
                     {
-                      href: `/landing/track/${track.id}`,
+                      onClick: () => {
+                        if (!isUnlocked) {
+                          setIsModalOpen(true);
+                        } else {
+                          window.location.href = `/landing/track/${track.id}`;
+                        }
+                      },
                       className: "rounded-full px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.12em] transition-all border border-cyan-400/30 bg-cyan-400/10 text-cyan-300 hover:bg-cyan-400/20 hover:border-cyan-400 text-center",
                       children: "Info"
                     }

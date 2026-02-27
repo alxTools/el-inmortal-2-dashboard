@@ -1060,7 +1060,6 @@ function LandingApp({ data }) {
         const handleEnded = () => {
             console.log('[Audio] Track ended, attempting to play next');
             setIsPlaying(false);
-            setIsLoading(false);
             
             // Reproducir siguiente track automáticamente usando la ref para obtener el valor actual
             const track = currentTrackRef.current;
@@ -1086,10 +1085,44 @@ function LandingApp({ data }) {
                 
                 if (nextTrack && nextTrack.audioUrl) {
                     console.log('[Audio] Playing next track:', nextTrack.title);
-                    // Usar setTimeout para evitar problemas de sincronización
+                    
+                    // Pequeña pausa para asegurar que el audio anterior terminó completamente
                     setTimeout(() => {
-                        handlePlayToggle(nextTrack);
-                    }, 500);
+                        // Resetear el audio completamente antes de cargar el siguiente
+                        audio.pause();
+                        audio.src = '';
+                        audio.load();
+                        
+                        // Ahora cargar y reproducir el siguiente track
+                        setTimeout(() => {
+                            audio.src = nextTrack.audioUrl;
+                            audio.currentTime = 0;
+                            setCurrentTrack(nextTrack);
+                            setAudioReady(false);
+                            setIsLoading(true);
+                            
+                            audio.play().then(() => {
+                                console.log('[Audio] Next track playing successfully');
+                                setIsPlaying(true);
+                                setIsLoading(false);
+                                setAudioReady(true);
+                                
+                                // Registrar play
+                                fetch('/landing/track-play', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                        track_id: nextTrack.id,
+                                        track_number: nextTrack.trackNumber
+                                    })
+                                }).catch(() => {});
+                            }).catch((error) => {
+                                console.error('[Audio] Error playing next track:', error);
+                                setIsLoading(false);
+                                setPlayError('Error al reproducir el siguiente track');
+                            });
+                        }, 100);
+                    }, 300);
                 } else {
                     console.log('[Audio] Next track has no audio URL');
                 }
@@ -2077,12 +2110,18 @@ function LandingApp({ data }) {
                                                         : '—'}
                                             </button>
                                             {track.id && (
-                                                <a
-                                                    href={`/landing/track/${track.id}`}
+                                                <button
+                                                    onClick={() => {
+                                                        if (!isUnlocked) {
+                                                            setIsModalOpen(true);
+                                                        } else {
+                                                            window.location.href = `/landing/track/${track.id}`;
+                                                        }
+                                                    }}
                                                     className="rounded-full px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.12em] transition-all border border-cyan-400/30 bg-cyan-400/10 text-cyan-300 hover:bg-cyan-400/20 hover:border-cyan-400 text-center"
                                                 >
                                                     Info
-                                                </a>
+                                                </button>
                                             )}
                                         </div>
                                     </div>

@@ -22743,9 +22743,17 @@ var AlbumLandingApp = (() => {
         detail: "momentos clave para contenido viral"
       }
     ];
+    const isEmailVerified = () => {
+      return isUnlocked && (document.cookie.includes("landing_el_inmortal_unlock=1") || localStorage.getItem("landing_el_inmortal_unlock") === "1");
+    };
     const handlePlayToggle = async (track) => {
       if (!isUnlocked) {
         setIsModalOpen(true);
+        return;
+      }
+      if (!isEmailVerified()) {
+        setPlayError("Verifica tu email para escuchar. Revisa tu correo por el magic link.");
+        setTimeout(() => setPlayError(""), 5e3);
         return;
       }
       if (!track.audioUrl) {

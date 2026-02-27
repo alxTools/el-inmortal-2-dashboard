@@ -353,8 +353,28 @@
             </div>
             
             <div class="testimonials">
-                <p>"No pensé que un minidisc pudiera significar tanto. Tocarlo y escuchar la música es otra experiencia completamente diferente. Además, el NFC es mágico - toco con el celular y aparece contenido exclusivo." </p>
-                <p class="author">— Carlos M., México 🇲🇽</p>
+                <p>"No pensé que un minidisc pudiera significar tanto. Tocarlo y escuchar la música es otra experiencia completamente diferente. Además, el NFC es mágico - toco con el celular y aparece contenido exclusivo."</p>
+                <p class="author">— Carlos M., México &#127474;&#127485;</p>
+            </div>
+            
+            <div class="testimonials">
+                <p>"La calidad del audio es increíble. Se nota que Galante puso todo su corazón en este proyecto. El minidisc es una pieza de colección que vale cada centavo."</p>
+                <p class="author">— María L., España &#127466;&#127480;</p>
+            </div>
+            
+            <div class="testimonials">
+                <p>"Soy fan de Galante desde hace años y este minidisc es el complemento perfecto para mi colección. La edición firmada es un plus increíble."</p>
+                <p class="author">— Juan P., Argentina &#127462;&#127479;</p>
+            </div>
+            
+            <div class="testimonials">
+                <p>"El contenido exclusivo que se desbloquea con el NFC es una locura. Fotos detrás de cámaras, videos inéditos... totalmente vale la inversión."</p>
+                <p class="author">— Ana K., Colombia &#127464;&#127476;</p>
+            </div>
+            
+            <div class="testimonials">
+                <p>"Compré el pack con el video saludo y fue la mejor decisión. Galante me mandó un mensaje personalizado que guardaré para siempre. Experiencia única."</p>
+                <p class="author">— Diego R., Chile &#127464;&#127473;</p>
             </div>
             
             <div class="guarantee">
@@ -381,8 +401,6 @@
             fundingSource: paypal.FUNDING.PAYPAL,
             
             // Configuración del flujo
-            createOrder: async function(data, actions) {
-            
             createOrder: async function(data, actions) {
                 try {
                     const response = await fetch('/landing/create-paypal-order', {

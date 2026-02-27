@@ -2339,29 +2339,6 @@ function LandingApp({ data }) {
             <footer className="relative z-10 border-t border-white/10 bg-slate-950/80 backdrop-blur-lg">
                 <div className="mx-auto max-w-6xl px-6 py-12 md:px-10">
                     <div className="flex flex-col items-center gap-8 text-center">
-                        {/* Streaming Platforms */}
-                        <div>
-                            <h4 className="font-display text-xl text-white mb-4">
-                                Escucha en tu plataforma favorita
-                            </h4>
-                            <p className="text-sm text-slate-400 mb-4">
-                                Disponible en todas las plataformas digitales
-                            </p>
-                            <div className="flex flex-wrap items-center justify-center gap-4">
-                                <a href={data.streamingLinks.spotify || '#'} className="streaming-btn bg-[#1DB954] hover:scale-110 transition-transform" title="Spotify">
-                                    <svg className="h-7 w-7" fill="white" viewBox="0 0 24 24"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>
-                                </a>
-                                <a href={data.streamingLinks.youtube || '#'} className="streaming-btn bg-[#FF0000] hover:scale-110 transition-transform" title="YouTube">
-                                    <svg className="h-7 w-7" fill="white" viewBox="0 0 24 24"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
-                                </a>
-                                <a href={data.streamingLinks.appleMusic || '#'} className="streaming-btn bg-[#FA243C] hover:scale-110 transition-transform" title="Apple Music">
-                                    <svg className="h-7 w-7" fill="white" viewBox="0 0 24 24"><path d="M23.994 6.124a9.23 9.23 0 00-.24-2.19c-.317-1.31-1.062-2.31-2.18-3.043a5.022 5.022 0 00-1.877-.726 10.496 10.496 0 00-1.564-.15c-.04-.003-.083-.01-.124-.013H5.986c-.152.01-.303.017-.455.026-.747.043-1.49.123-2.214.265-1.333.272-2.397.918-3.062 2.065a4.845 4.845 0 00-.676 1.992 9.51 9.51 0 00-.099 1.114c-.004.064-.01.13-.01.195v8.16c.01.12.017.242.024.363.04.718.106 1.435.238 2.144.24 1.27.793 2.273 1.805 3.02.913.672 1.955 1.012 3.082 1.147.737.09 1.48.153 2.22.177.18.01.363.014.543.014h11.19c.065-.003.133-.01.195-.012.798-.024 1.596-.086 2.385-.208 1.21-.19 2.235-.666 3.026-1.505.684-.726 1.078-1.59 1.23-2.59.06-.417.093-.84.108-1.265.01-.134.02-.269.02-.404V6.514c0-.135-.01-.269-.02-.39zm-6.5 6.044l-4.6 3.24c-.24.17-.54.186-.78.04-.06-.04-.11-.09-.15-.146V7.4c.02-.06.06-.12.1-.17.16-.16.4-.19.6-.08l4.59 3.23c.04.03.07.07.1.11.12.2.12.44-.02.64-.04.04-.08.08-.13.11l.19.14z"/></svg>
-                                </a>
-                            </div>
-                        </div>
-
-                        <div className="w-full max-w-xs h-px bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
-
                         {/* Logo/Name */}
                         <h3 className="font-display text-3xl text-white">
                             Galante <span className="text-amber-400">El Emperador</span>

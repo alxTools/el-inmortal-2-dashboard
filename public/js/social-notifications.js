@@ -118,7 +118,7 @@
             </div>
             <div style="flex: 1;">
                 <p style="margin: 0; color: #e2e8f0; font-size: 13px; line-height: 1.4;">
-                    <strong style="color: #facc15;">${data.name}</strong> ${countryEmojis[data.country] || data.country}
+                    <strong style="color: #facc15;">${data.name}</strong> de ${countryEmojis[data.country] || data.country}
                     <br>
                     <span style="color: #94a3b8;">${data.action} ${data.product} ${data.time}</span>
                 </p>

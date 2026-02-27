@@ -1707,6 +1707,7 @@ function LandingApp({ data }) {
     };
 
     return (
+        <>
         <main className="relative overflow-hidden text-slate-100">
             {/* Background Effects */}
             <AudioWavesBackground />

@@ -352,30 +352,58 @@
                 </div>
             </div>
             
-            <div class="testimonials">
-                <p>"No pensé que un minidisc pudiera significar tanto. Tocarlo y escuchar la música es otra experiencia completamente diferente. Además, el NFC es mágico - toco con el celular y aparece contenido exclusivo."</p>
-                <p class="author">— Carlos M., México &#127474;&#127485;</p>
+            <div class="testimonials-container" id="testimonials-container">
+                <!-- Los testimonios se cargarán dinámicamente -->
             </div>
             
-            <div class="testimonials">
-                <p>"La calidad del audio es increíble. Se nota que Galante puso todo su corazón en este proyecto. El minidisc es una pieza de colección que vale cada centavo."</p>
-                <p class="author">— María L., España &#127466;&#127480;</p>
-            </div>
-            
-            <div class="testimonials">
-                <p>"Soy fan de Galante desde hace años y este minidisc es el complemento perfecto para mi colección. La edición firmada es un plus increíble."</p>
-                <p class="author">— Juan P., Argentina &#127462;&#127479;</p>
-            </div>
-            
-            <div class="testimonials">
-                <p>"El contenido exclusivo que se desbloquea con el NFC es una locura. Fotos detrás de cámaras, videos inéditos... totalmente vale la inversión."</p>
-                <p class="author">— Ana K., Colombia &#127464;&#127476;</p>
-            </div>
-            
-            <div class="testimonials">
-                <p>"Compré el pack con el video saludo y fue la mejor decisión. Galante me mandó un mensaje personalizado que guardaré para siempre. Experiencia única."</p>
-                <p class="author">— Diego R., Chile &#127464;&#127473;</p>
-            </div>
+            <script>
+                const testimonials = [
+                    { text: "No pensé que un minidisc pudiera significar tanto. Tocarlo y escuchar la música es otra experiencia completamente diferente. Además, el NFC es mágico - toco con el celular y aparece contenido exclusivo.", author: "Carlos M.", country: "México", flag: "&#127474;&#127485;" },
+                    { text: "La calidad del audio es increíble. Se nota que Galante puso todo su corazón en este proyecto. El minidisc es una pieza de colección que vale cada centavo.", author: "María L.", country: "España", flag: "&#127466;&#127480;" },
+                    { text: "Soy fan de Galante desde hace años y este minidisc es el complemento perfecto para mi colección. La edición firmada es un plus increíble.", author: "Juan P.", country: "Argentina", flag: "&#127462;&#127479;" },
+                    { text: "El contenido exclusivo que se desbloquea con el NFC es una locura. Fotos detrás de cámaras, videos inéditos... totalmente vale la inversión.", author: "Ana K.", country: "Colombia", flag: "&#127464;&#127476;" },
+                    { text: "Compré el pack con el video saludo y fue la mejor decisión. Galante me mandó un mensaje personalizado que guardaré para siempre. Experiencia única.", author: "Diego R.", country: "Chile", flag: "&#127464;&#127473;" },
+                    { text: "Increíble experiencia tener el álbum en formato físico. El arte del cover se ve espectacular en el minidisc.", author: "Laura S.", country: "Perú", flag: "&#127477;&#127473;" },
+                    { text: "El sonido del minidisc es cálido y nostálgico. Perfecto para disfrutar El Inmortal 2 como se debe.", author: "Roberto M.", country: "Uruguay", flag: "&#127486;&#127481;" },
+                    { text: "Mi primer minidisc y no podría ser de mejor artista. Galante nunca decepciona con su música.", author: "Patricia G.", country: "Ecuador", flag: "&#127466;&#127468;" },
+                    { text: "El envío fue súper rápido y el empaque es premium. Se nota el cuidado en cada detalle.", author: "Andrés F.", country: "Venezuela", flag: "&#127483;&#127474;" },
+                    { text: "Tener la firma de Galante en mi minidisc es un tesoro. Un recuerdo único de este gran álbum.", author: "Carmen V.", country: "Guatemala", flag: "&#127468;&#127481;" },
+                    { text: "El soporte al cliente fue excelente. Me ayudaron con todas mis dudas sobre el envío internacional.", author: "Fernando L.", country: "Costa Rica", flag: "&#127464;&#127475;" },
+                    { text: "No sabía que los minidiscs seguían existiendo. ¡Qué alegría poder tener música nueva en este formato clásico!", author: "Lucía H.", country: "Panamá", flag: "&#127477;&#127462;" },
+                    { text: "El contenido NFC es sorprendente. Accedí a material exclusivo que no está en ninguna otra plataforma.", author: "Miguel Á.", country: "República Dominicana", flag: "&#127465;&#127476;" },
+                    { text: "Como coleccionista de música, este minidisc es la joya de mi colección. Edición limitada firmada.", author: "Isabella R.", country: "Honduras", flag: "&#127469;&#127475;" },
+                    { text: "La calidad de construcción del minidisc es impresionante. Se siente sólido y bien hecho.", author: "Daniel C.", country: "El Salvador", flag: "&#127468;&#127479;" },
+                    { text: "Escuchar El Inmortal 2 en minidisc es una experiencia completamente diferente. Más íntima y personal.", author: "Sofía M.", country: "Nicaragua", flag: "&#127475;&#127486;" },
+                    { text: "El video saludo que recibí de Galante me hizo el día. Mensaje personal y auténtico.", author: "Alejandro T.", country: "Bolivia", flag: "&#127463;&#127476;" },
+                    { text: "Recomiendo totalmente el minidisc. Es una forma única de apoyar a los artistas y tener algo físico especial.", author: "Valentina P.", country: "Paraguay", flag: "&#127477;&#127486;" },
+                    { text: "El proceso de compra fue súper sencillo y seguro con PayPal. Minutos después tenía mi orden confirmada.", author: "Martín G.", country: "Brasil", flag: "&#127463;&#127479;" },
+                    { text: "Ya quiero que salga el próximo álbum de Galante para tenerlo también en minidisc. Experiencia 10/10.", author: "Paula N.", country: "Puerto Rico", flag: "&#127477;&#127473;" }
+                ];
+
+                let currentTestimonial = 0;
+                const container = document.getElementById('testimonials-container');
+
+                function showTestimonial(index) {
+                    const t = testimonials[index];
+                    container.innerHTML = `
+                        <div class="testimonials">
+                            <p>"${t.text}"</p>
+                            <p class="author">— ${t.author}, ${t.country} ${t.flag}</p>
+                        </div>
+                    `;
+                }
+
+                function rotateTestimonials() {
+                    currentTestimonial = (currentTestimonial + 1) % testimonials.length;
+                    showTestimonial(currentTestimonial);
+                }
+
+                // Mostrar el primero
+                showTestimonial(0);
+
+                // Rotar cada 6 segundos
+                setInterval(rotateTestimonials, 6000);
+            </script>
             
             <div class="guarantee">
                 <p>✅ <strong>Garantía de Devolución:</strong> Si no quedas 100% satisfecho con tu Mini-Disc, te devolvemos tu dinero. Sin preguntas, sin complicaciones.</p>

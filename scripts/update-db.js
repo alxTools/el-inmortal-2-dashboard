@@ -112,6 +112,27 @@ async function updateDB() {
       console.log('ℹ️ Landing_comments table already exists');
     }
     
+    // Landing reactions table (para sistema de recompensas)
+    if (!await tableExists(pool, 'landing_reactions')) {
+      await pool.execute(`CREATE TABLE landing_reactions (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        lead_id INT NULL,
+        user_id INT NULL,
+        track_id INT NOT NULL,
+        track_number INT NOT NULL,
+        user_name VARCHAR(255) NOT NULL,
+        reaction TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_lead_id (lead_id),
+        INDEX idx_user_id (user_id),
+        INDEX idx_track_id (track_id),
+        INDEX idx_created_at (created_at)
+      )`);
+      console.log('✅ Landing_reactions table created');
+    } else {
+      console.log('ℹ️ Landing_reactions table already exists');
+    }
+    
     console.log('✅ Database schema updated successfully');
   } catch (err) {
     console.error('❌ Error:', err.message);

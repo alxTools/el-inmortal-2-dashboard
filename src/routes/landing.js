@@ -894,6 +894,72 @@ router.delete('/comments/:id', async (req, res) => {
     }
 });
 
+// POST track reaction (para sistema de recompensas)
+router.post('/reaction', async (req, res) => {
+    try {
+        const { track_id, track_number, reaction } = req.body;
+        
+        // Verificar autenticación
+        const isVerified = req.session?.user || req.cookies?.landing_el_inmortal_unlock === '1';
+        
+        if (!isVerified) {
+            return res.status(401).json({
+                success: false,
+                error: 'Debes verificar tu email para dejar reacciones'
+            });
+        }
+        
+        if (!track_id || !reaction?.trim()) {
+            return res.status(400).json({
+                success: false,
+                error: 'Track y reacción son requeridos'
+            });
+        }
+        
+        // Obtener info del usuario
+        let userId = null;
+        let leadId = null;
+        let userName = 'Fan';
+        
+        if (req.session?.user) {
+            userName = req.session.user.name || req.session.user.email;
+            userId = req.session.user.id;
+        } else {
+            const leadEmail = req.cookies?.landing_email;
+            if (leadEmail) {
+                const lead = await getOne(
+                    'SELECT id, full_name FROM landing_email_leads WHERE email = ?',
+                    [leadEmail]
+                );
+                if (lead) {
+                    userName = lead.full_name || leadEmail.split('@')[0];
+                    leadId = lead.id;
+                }
+            }
+        }
+        
+        // Guardar reacción
+        await run(
+            `INSERT INTO landing_reactions (lead_id, user_id, track_id, track_number, user_name, reaction, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, NOW())`,
+            [leadId, userId, track_id, track_number, userName, reaction.trim()]
+        );
+        
+        console.log(`[Reaction] Nueva reacción guardada para track ${track_number} por ${userName}`);
+        
+        return res.json({
+            success: true,
+            message: 'Reacción guardada'
+        });
+    } catch (error) {
+        console.error('[Reactions] Error:', error);
+        return res.status(500).json({
+            success: false,
+            error: 'Error al guardar la reacción'
+        });
+    }
+});
+
 // GET track info público (solo para fans verificados o admins)
 router.get('/track/:id', async (req, res) => {
     // Verificar si es admin o fan verificado

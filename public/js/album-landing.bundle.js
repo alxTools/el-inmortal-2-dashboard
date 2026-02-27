@@ -22440,6 +22440,16 @@ var AlbumLandingApp = (() => {
     (0, import_react.useEffect)(() => {
       currentTrackRef.current = currentTrack;
     }, [currentTrack]);
+    const [unlockedTracks, setUnlockedTracks] = (0, import_react.useState)([]);
+    const [currentUnlockIndex, setCurrentUnlockIndex] = (0, import_react.useState)(0);
+    const [hasStartedListening, setHasStartedListening] = (0, import_react.useState)(false);
+    const [showReactionModal, setShowReactionModal] = (0, import_react.useState)(false);
+    const [reactionTrack, setReactionTrack] = (0, import_react.useState)(null);
+    const [reactionText, setReactionText] = (0, import_react.useState)("");
+    const [isSubmittingReaction, setIsSubmittingReaction] = (0, import_react.useState)(false);
+    const [showRewardModal, setShowRewardModal] = (0, import_react.useState)(false);
+    const [currentReward, setCurrentReward] = (0, import_react.useState)(null);
+    const [collectedRewards, setCollectedRewards] = (0, import_react.useState)([]);
     const [showCartModal, setShowCartModal] = (0, import_react.useState)(false);
     const [cartItems, setCartItems] = (0, import_react.useState)([]);
     const [isCheckingOut, setIsCheckingOut] = (0, import_react.useState)(false);
@@ -22615,62 +22625,25 @@ var AlbumLandingApp = (() => {
       const audio = audioRef.current;
       if (!audio) return void 0;
       const handleEnded = () => {
-        console.log("[Audio] Track ended, attempting to play next");
+        console.log("[Audio] Track ended!");
         setIsPlaying(false);
         const track = currentTrackRef.current;
-        console.log("[Audio] Current track from ref:", track);
-        if (!track) {
-          console.log("[Audio] No current track in ref, cannot continue");
-          return;
-        }
-        if (!data.tracks || data.tracks.length === 0) {
-          console.log("[Audio] No tracks data available");
-          return;
-        }
-        console.log("[Audio] Available tracks:", data.tracks.length);
+        if (!track || !data.tracks || data.tracks.length === 0) return;
         const currentIndex = data.tracks.findIndex((t) => t.trackNumber === track.trackNumber);
-        console.log("[Audio] Current index:", currentIndex);
+        console.log("[Audio] Track", currentIndex + 1, "finished");
+        if (!unlockedTracks.includes(track.trackNumber)) {
+          setUnlockedTracks((prev) => [...prev, track.trackNumber]);
+        }
         if (currentIndex >= 0 && currentIndex < data.tracks.length - 1) {
           const nextTrack = data.tracks[currentIndex + 1];
-          console.log("[Audio] Next track found:", nextTrack);
-          if (nextTrack && nextTrack.audioUrl) {
-            console.log("[Audio] Playing next track:", nextTrack.title);
-            setTimeout(() => {
-              audio.pause();
-              audio.src = "";
-              audio.load();
-              setTimeout(() => {
-                audio.src = nextTrack.audioUrl;
-                audio.currentTime = 0;
-                setCurrentTrack(nextTrack);
-                setAudioReady(false);
-                setIsLoading(true);
-                audio.play().then(() => {
-                  console.log("[Audio] Next track playing successfully");
-                  setIsPlaying(true);
-                  setIsLoading(false);
-                  setAudioReady(true);
-                  fetch("/landing/track-play", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                      track_id: nextTrack.id,
-                      track_number: nextTrack.trackNumber
-                    })
-                  }).catch(() => {
-                  });
-                }).catch((error) => {
-                  console.error("[Audio] Error playing next track:", error);
-                  setIsLoading(false);
-                  setPlayError("Error al reproducir el siguiente track");
-                });
-              }, 100);
-            }, 300);
-          } else {
-            console.log("[Audio] Next track has no audio URL");
-          }
+          setReactionTrack(track);
+          setShowReactionModal(true);
+          setCurrentUnlockIndex(currentIndex + 1);
+          console.log("[Audio] Showing reaction modal for track", track.trackNumber);
         } else {
-          console.log("[Audio] No more tracks or invalid index");
+          console.log("[Audio] Album completed!");
+          setReactionTrack(track);
+          setShowReactionModal(true);
         }
       };
       const handlePause = () => {
@@ -22756,6 +22729,17 @@ var AlbumLandingApp = (() => {
         setTimeout(() => setPlayError(""), 5e3);
         return;
       }
+      if (!hasStartedListening) {
+        setPlayError('Presiona "Escuchar \xC1lbum" para comenzar la experiencia.');
+        setTimeout(() => setPlayError(""), 3e3);
+        return;
+      }
+      const trackIndex = data.tracks.findIndex((t) => t.trackNumber === track.trackNumber);
+      if (trackIndex > currentUnlockIndex) {
+        setPlayError(`Escucha los tracks anteriores para desbloquear este. Siguiente: Track ${currentUnlockIndex + 1}`);
+        setTimeout(() => setPlayError(""), 3e3);
+        return;
+      }
       if (!track.audioUrl) {
         setPlayError("Audio no disponible para este track.");
         return;
@@ -22832,6 +22816,7 @@ var AlbumLandingApp = (() => {
         setIsModalOpen(true);
         return;
       }
+      setHasStartedListening(true);
       const track1 = data.tracks.find((t) => t.trackNumber === 1);
       if (track1 && track1.audioUrl) {
         await handlePlayToggle(track1);
@@ -22961,6 +22946,70 @@ var AlbumLandingApp = (() => {
         console.error("Error deleting comment:", error);
         alert("Error al eliminar comentario");
       }
+    };
+    const handleSubmitReaction = async () => {
+      if (!reactionText.trim()) {
+        closeReactionModal();
+        return;
+      }
+      setIsSubmittingReaction(true);
+      try {
+        const response = await fetch("/landing/reaction", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Accept": "application/json"
+          },
+          body: JSON.stringify({
+            track_id: reactionTrack.id,
+            track_number: reactionTrack.trackNumber,
+            reaction: reactionText.trim()
+          })
+        });
+        const result = await response.json();
+        if (response.ok && result.success) {
+          generateReward(reactionTrack.trackNumber);
+        }
+      } catch (error) {
+        console.error("Error submitting reaction:", error);
+      } finally {
+        setIsSubmittingReaction(false);
+        closeReactionModal();
+      }
+    };
+    const generateReward = (trackNumber) => {
+      const rewards = [
+        { type: "image", title: "Foto Exclusiva", description: "Una imagen especial de Galante solo para ti" },
+        { type: "message", title: "Mensaje Personal", description: "Un mensaje de agradecimiento personalizado" },
+        { type: "behind_scenes", title: "Detr\xE1s de C\xE1maras", description: "Contenido exclusivo de la creaci\xF3n del \xE1lbum" },
+        { type: "sticker", title: "Sticker Digital", description: "Un sticker exclusivo para compartir" },
+        { type: "wallpaper", title: "Wallpaper HD", description: "Fondo de pantalla especial de El Inmortal 2" },
+        { type: "voice_note", title: "Nota de Voz", description: "Un saludo en audio de Galante" }
+      ];
+      const rewardIndex = (trackNumber - 1) % rewards.length;
+      const reward = {
+        ...rewards[rewardIndex],
+        trackNumber,
+        unlockedAt: (/* @__PURE__ */ new Date()).toISOString()
+      };
+      setCurrentReward(reward);
+      setCollectedRewards((prev) => [...prev, reward]);
+      setShowRewardModal(true);
+    };
+    const closeReactionModal = () => {
+      setShowReactionModal(false);
+      setReactionTrack(null);
+      setReactionText("");
+      const currentIndex = data.tracks.findIndex((t) => t.trackNumber === reactionTrack?.trackNumber);
+      if (currentIndex >= 0 && currentIndex < data.tracks.length - 1) {
+        const nextTrack = data.tracks[currentIndex + 1];
+        if (nextTrack && nextTrack.audioUrl) {
+          handlePlayToggle(nextTrack);
+        }
+      }
+    };
+    const skipReaction = () => {
+      closeReactionModal();
     };
     const handlePhotoUpload = async (e) => {
       const file = e.target.files[0];
@@ -23342,16 +23391,21 @@ var AlbumLandingApp = (() => {
                   ] }) : null
                 ] }),
                 /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "pt-1 flex flex-col gap-2 shrink-0", children: [
-                  /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
-                    "button",
-                    {
-                      type: "button",
-                      onClick: () => handlePlayToggle(track),
-                      disabled: isLoading && currentTrack && currentTrack.trackNumber === track.trackNumber,
-                      className: `rounded-full px-4 py-2.5 text-[11px] font-bold uppercase tracking-[0.15em] transition-all duration-300 ${isLoading && currentTrack && currentTrack.trackNumber === track.trackNumber ? "cursor-wait border border-white/20 bg-white/5 text-slate-400" : currentTrack && currentTrack.trackNumber === track.trackNumber && isPlaying ? "border-2 border-emerald-400 bg-emerald-400/20 text-emerald-300 shadow-[0_0_20px_rgba(52,211,153,0.3)]" : track.audioUrl ? "border border-amber-400 bg-amber-400 text-slate-900 font-extrabold hover:bg-amber-300 hover:border-amber-300 hover:shadow-[0_0_20px_rgba(251,191,36,0.4)]" : "cursor-not-allowed border border-white/10 bg-white/5 text-slate-500"}`,
-                      children: currentTrack && currentTrack.trackNumber === track.trackNumber ? isLoading ? "..." : isPlaying ? "\u23F8 Pause" : "\u25B6 Play" : track.audioUrl ? "\u25B6 Play" : "\u2014"
-                    }
-                  ),
+                  (() => {
+                    const trackIndex = data.tracks.findIndex((t) => t.trackNumber === track.trackNumber);
+                    const isLocked = !hasStartedListening || trackIndex > currentUnlockIndex;
+                    const isCurrentTrack = currentTrack && currentTrack.trackNumber === track.trackNumber;
+                    return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+                      "button",
+                      {
+                        type: "button",
+                        onClick: () => handlePlayToggle(track),
+                        disabled: isLocked || isLoading && isCurrentTrack,
+                        className: `rounded-full px-4 py-2.5 text-[11px] font-bold uppercase tracking-[0.15em] transition-all duration-300 ${isLocked ? "cursor-not-allowed border border-slate-600 bg-slate-800/50 text-slate-500" : isLoading && isCurrentTrack ? "cursor-wait border border-white/20 bg-white/5 text-slate-400" : isCurrentTrack && isPlaying ? "border-2 border-emerald-400 bg-emerald-400/20 text-emerald-300 shadow-[0_0_20px_rgba(52,211,153,0.3)]" : track.audioUrl ? "border border-amber-400 bg-amber-400 text-slate-900 font-extrabold hover:bg-amber-300 hover:border-amber-300 hover:shadow-[0_0_20px_rgba(251,191,36,0.4)]" : "cursor-not-allowed border border-white/10 bg-white/5 text-slate-500"}`,
+                        children: isLocked ? "\u{1F512} Locked" : isCurrentTrack ? isLoading ? "..." : isPlaying ? "\u23F8 Pause" : "\u25B6 Play" : track.audioUrl ? "\u25B6 Play" : "\u2014"
+                      }
+                    );
+                  })(),
                   track.id && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
                     "button",
                     {
@@ -23440,7 +23494,75 @@ var AlbumLandingApp = (() => {
           (/* @__PURE__ */ new Date()).getFullYear(),
           " Galante El Emperador. Todos los derechos reservados."
         ] })
-      ] }) }) })
+      ] }) }) }),
+      showReactionModal && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm", children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "glass-panel-enhanced rounded-3xl p-8 max-w-md w-full text-center", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "text-6xl mb-4", children: "\u{1F3A4}" }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("h3", { className: "text-2xl font-bold text-white mb-2", children: [
+          "\xA1Track ",
+          reactionTrack?.trackNumber,
+          " Completado!"
+        ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", { className: "text-slate-300 mb-6", children: [
+          "\xBFQu\xE9 te pareci\xF3 ",
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "text-amber-400 font-semibold", children: reactionTrack?.title }),
+          "?"
+        ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+          "textarea",
+          {
+            value: reactionText,
+            onChange: (e) => setReactionText(e.target.value),
+            placeholder: "Deja tu reacci\xF3n aqu\xED... (opcional)",
+            className: "w-full px-4 py-3 bg-slate-800/50 border border-slate-600 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:border-amber-400 resize-none mb-4",
+            rows: 3
+          }
+        ),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-xs text-slate-400 mb-6", children: "\u{1F4A1} Si dejas tu reacci\xF3n, desbloquear\xE1s una sorpresa exclusiva" }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex gap-3", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+            "button",
+            {
+              onClick: skipReaction,
+              className: "flex-1 px-4 py-3 rounded-xl border border-slate-600 text-slate-300 hover:bg-slate-800 transition-all",
+              children: "Saltar"
+            }
+          ),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+            "button",
+            {
+              onClick: handleSubmitReaction,
+              disabled: isSubmittingReaction,
+              className: "flex-1 px-4 py-3 rounded-xl bg-amber-500 text-slate-900 font-bold hover:bg-amber-400 transition-all disabled:opacity-50",
+              children: isSubmittingReaction ? "..." : "Enviar \u{1F49D}"
+            }
+          )
+        ] })
+      ] }) }),
+      showRewardModal && currentReward && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm", children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "glass-panel-enhanced rounded-3xl p-8 max-w-md w-full text-center", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "text-6xl mb-4 animate-bounce", children: "\u{1F381}" }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { className: "text-2xl font-bold text-white mb-2", children: "\xA1Recompensa Desbloqueada!" }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-amber-400 font-semibold mb-4", children: currentReward.title }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-slate-300 mb-6", children: currentReward.description }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "bg-gradient-to-br from-amber-500/20 to-purple-500/20 rounded-2xl p-6 mb-6 border border-amber-500/30", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "text-5xl mb-2", children: "\u{1F3C6}" }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", { className: "text-sm text-slate-400", children: [
+            "Recompensa #",
+            currentReward.trackNumber,
+            " de 21"
+          ] })
+        ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+          "button",
+          {
+            onClick: () => {
+              setShowRewardModal(false);
+              setCurrentReward(null);
+            },
+            className: "w-full px-4 py-3 rounded-xl bg-amber-500 text-slate-900 font-bold hover:bg-amber-400 transition-all",
+            children: "\xA1Genial! Continuar \u2192"
+          }
+        )
+      ] }) })
     ] });
   }
   function bootstrap() {

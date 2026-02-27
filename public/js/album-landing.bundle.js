@@ -22629,21 +22629,19 @@ var AlbumLandingApp = (() => {
         setIsPlaying(false);
         const track = currentTrackRef.current;
         if (!track || !data.tracks || data.tracks.length === 0) return;
-        const currentIndex = data.tracks.findIndex((t) => t.trackNumber === track.trackNumber);
-        console.log("[Audio] Track", currentIndex + 1, "finished");
+        console.log("[Audio] Track", track.trackNumber, "finished");
         if (!unlockedTracks.includes(track.trackNumber)) {
           setUnlockedTracks((prev) => [...prev, track.trackNumber]);
         }
-        if (currentIndex >= 0 && currentIndex < data.tracks.length - 1) {
-          const nextTrack = data.tracks[currentIndex + 1];
-          setReactionTrack(track);
-          setShowReactionModal(true);
-          setCurrentUnlockIndex(currentIndex + 1);
-          console.log("[Audio] Showing reaction modal for track", track.trackNumber);
+        const nextTrackNumber = track.trackNumber + 1;
+        const hasMoreTracks = data.tracks.some((t) => t.trackNumber === nextTrackNumber);
+        setReactionTrack(track);
+        setShowReactionModal(true);
+        if (hasMoreTracks) {
+          setCurrentUnlockIndex((prev) => Math.max(prev, nextTrackNumber - 1));
+          console.log("[Audio] Unlocked track", nextTrackNumber);
         } else {
           console.log("[Audio] Album completed!");
-          setReactionTrack(track);
-          setShowReactionModal(true);
         }
       };
       const handlePause = () => {
@@ -23416,7 +23414,7 @@ var AlbumLandingApp = (() => {
                           window.location.href = `/landing/track/${track.id}`;
                         }
                       },
-                      className: "rounded-full px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.12em] transition-all border border-cyan-400/30 bg-cyan-400/10 text-cyan-300 hover:bg-cyan-400/20 hover:border-cyan-400 text-center",
+                      className: "rounded-full px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.12em] transition-all border border-cyan-500/50 bg-cyan-500/20 text-slate-900 hover:bg-cyan-400/30 hover:border-cyan-500 text-center",
                       children: "Info"
                     }
                   )

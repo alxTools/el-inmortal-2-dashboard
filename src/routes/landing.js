@@ -130,31 +130,6 @@ function getAvailableAudioFiles() {
     }
     return [];
 }
-    
-    try {
-        const audioDir = path.join(__dirname, '../../public/uploads/audio');
-        if (fs.existsSync(audioDir)) {
-            audioFilesCache = fs.readdirSync(audioDir)
-                .filter(f => f.toLowerCase().endsWith('.wav') || f.toLowerCase().endsWith('.mp3'))
-                .map(f => ({
-                    filename: f,
-                    path: `/uploads/audio/${f}`,
-                    // Extraer número de track del nombre (ej: "177188..._01_..." -> "01")
-                    trackNum: f.match(/_(\d+)_/)?.[1] || null,
-                    // Extraer nombre limpio para matching
-                    cleanName: f.toLowerCase()
-                        .replace(/^\d+_/, '')
-                        .replace(/\.wav$|\.mp3$/i, '')
-                        .replace(/[^a-z0-9]/g, '')
-                }));
-            audioFilesCacheTime = now;
-            return audioFilesCache;
-        }
-    } catch (err) {
-        console.error('Error reading audio directory:', err.message);
-    }
-    return [];
-}
 
 function findAudioFileByTrackNumber(trackNumber) {
     const files = getAvailableAudioFiles();

@@ -854,7 +854,11 @@ function LandingApp({ data }) {
     const [showStartModal, setShowStartModal] = useState(false);
     const [showCompletionModal, setShowCompletionModal] = useState(false);
     const [nextUnlockableTrack, setNextUnlockableTrack] = useState(1);
-    
+
+    // Modal de info de track
+    const [showTrackInfoModal, setShowTrackInfoModal] = useState(false);
+    const [selectedTrackForInfo, setSelectedTrackForInfo] = useState(null);
+
     // Carrito VIP (Mini-Disc)
     const [showCartModal, setShowCartModal] = useState(false);
     const [cartItems, setCartItems] = useState([]);
@@ -1820,7 +1824,7 @@ function LandingApp({ data }) {
                     {countdown.launched ? (
                         <p className="text-sm font-semibold text-emerald-400">
                             <span className="mr-2">✓</span>
-                            Ya disponible en todas las plataformas
+                            Pronto disponible en todas las plataformas
                         </p>
                     ) : (
                         <p className="text-sm text-slate-300">
@@ -2262,7 +2266,8 @@ function LandingApp({ data }) {
                                                         if (!isUnlocked) {
                                                             setIsModalOpen(true);
                                                         } else {
-                                                            window.location.href = `/landing/track/${track.id}`;
+                                                            setSelectedTrackForInfo(track);
+                                                            setShowTrackInfoModal(true);
                                                         }
                                                     }}
                                                     className="rounded-full px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.12em] transition-all border border-cyan-500/50 bg-cyan-500/20 text-slate-900 hover:bg-cyan-400/30 hover:border-cyan-500 text-center"
@@ -2293,26 +2298,36 @@ function LandingApp({ data }) {
             />
 
             {/* ========================================
-                STREAMING PLATFORMS - MOVED TO END
+                MINI-DISC CTA SECTION
                 ======================================== */}
-            <section id="streaming" className="relative z-10 py-16 px-6">
+            <section id="minidisc-cta" className="relative z-10 py-20 px-6 bg-gradient-to-b from-slate-900 to-slate-950">
                 <div className="mx-auto max-w-4xl text-center">
-                    <h2 className="font-display text-3xl text-white md:text-4xl mb-4 reveal">
-                        Escucha en tu plataforma favorita
-                    </h2>
-                    <p className="text-slate-300 mb-8 reveal reveal-delay-1">
-                        Disponible en todas las plataformas digitales
-                    </p>
-                    <div className="flex flex-wrap items-center justify-center gap-4 reveal reveal-delay-2">
-                        <a href={data.streamingLinks.spotify || '#'} className="streaming-btn bg-[#1DB954] hover:scale-110 transition-transform" title="Spotify">
-                            <svg className="h-7 w-7" fill="white" viewBox="0 0 24 24"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>
-                        </a>
-                        <a href={data.streamingLinks.youtube || '#'} className="streaming-btn bg-[#FF0000] hover:scale-110 transition-transform" title="YouTube">
-                            <svg className="h-7 w-7" fill="white" viewBox="0 0 24 24"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
-                        </a>
-                        <a href={data.streamingLinks.appleMusic || '#'} className="streaming-btn bg-[#FA243C] hover:scale-110 transition-transform" title="Apple Music">
-                            <svg className="h-7 w-7" fill="white" viewBox="0 0 24 24"><path d="M23.994 6.124a9.23 9.23 0 00-.24-2.19c-.317-1.31-1.062-2.31-2.18-3.043a5.022 5.022 0 00-1.877-.726 10.496 10.496 0 00-1.564-.15c-.04-.003-.083-.01-.124-.013H5.986c-.152.01-.303.017-.455.026-.747.043-1.49.123-2.214.265-1.333.272-2.397.918-3.062 2.065a4.845 4.845 0 00-.676 1.992 9.51 9.51 0 00-.099 1.114c-.004.064-.01.13-.01.195v8.16c.01.12.017.242.024.363.04.718.106 1.435.238 2.144.24 1.27.793 2.273 1.805 3.02.913.672 1.955 1.012 3.082 1.147.737.09 1.48.153 2.22.177.18.01.363.014.543.014h11.19c.065-.003.133-.01.195-.012.798-.024 1.596-.086 2.385-.208 1.21-.19 2.235-.666 3.026-1.505.684-.726 1.078-1.59 1.23-2.59.06-.417.093-.84.108-1.265.01-.134.02-.269.02-.404V6.514c0-.135-.01-.269-.02-.39zm-6.5 6.044l-4.6 3.24c-.24.17-.54.186-.78.04-.06-.04-.11-.09-.15-.146V7.4c.02-.06.06-.12.1-.17.16-.16.4-.19.6-.08l4.59 3.23c.04.03.07.07.1.11.12.2.12.44-.02.64-.04.04-.08.08-.13.11l.19.14z"/></svg>
-                        </a>
+                    <div className="glass-panel-enhanced rounded-3xl p-8 md:p-12 border border-amber-500/30">
+                        <div className="text-6xl mb-6">💿</div>
+                        <h2 className="font-display text-3xl md:text-4xl text-white mb-4">
+                            Mini-Disc Edición Limitada
+                        </h2>
+                        <p className="text-slate-300 mb-6 max-w-xl mx-auto">
+                            Consigue el álbum en formato físico exclusivo. Edición firmada por Galante con envío incluido.
+                        </p>
+                        <div className="flex flex-wrap justify-center gap-4 mb-8">
+                            <div className="text-center px-4">
+                                <p className="text-2xl font-bold text-amber-400">$15</p>
+                                <p className="text-xs text-slate-400">Mini-Disc Firmado</p>
+                            </div>
+                            <div className="w-px bg-white/10"></div>
+                            <div className="text-center px-4">
+                                <p className="text-2xl font-bold text-amber-400">$25</p>
+                                <p className="text-xs text-slate-400">+ Video Saludo</p>
+                            </div>
+                        </div>
+                        <button 
+                            onClick={() => setShowCartModal(true)}
+                            className="btn-neon"
+                        >
+                            <span>💿</span>
+                            <span>Reservar Mini-Disc</span>
+                        </button>
                     </div>
                 </div>
             </section>
@@ -2322,7 +2337,30 @@ function LandingApp({ data }) {
                 ======================================== */}
             <footer className="relative z-10 border-t border-white/10 bg-slate-950/80 backdrop-blur-lg">
                 <div className="mx-auto max-w-6xl px-6 py-12 md:px-10">
-                    <div className="flex flex-col items-center gap-6 text-center">
+                    <div className="flex flex-col items-center gap-8 text-center">
+                        {/* Streaming Platforms */}
+                        <div>
+                            <h4 className="font-display text-xl text-white mb-4">
+                                Escucha en tu plataforma favorita
+                            </h4>
+                            <p className="text-sm text-slate-400 mb-4">
+                                Disponible en todas las plataformas digitales
+                            </p>
+                            <div className="flex flex-wrap items-center justify-center gap-4">
+                                <a href={data.streamingLinks.spotify || '#'} className="streaming-btn bg-[#1DB954] hover:scale-110 transition-transform" title="Spotify">
+                                    <svg className="h-7 w-7" fill="white" viewBox="0 0 24 24"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>
+                                </a>
+                                <a href={data.streamingLinks.youtube || '#'} className="streaming-btn bg-[#FF0000] hover:scale-110 transition-transform" title="YouTube">
+                                    <svg className="h-7 w-7" fill="white" viewBox="0 0 24 24"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+                                </a>
+                                <a href={data.streamingLinks.appleMusic || '#'} className="streaming-btn bg-[#FA243C] hover:scale-110 transition-transform" title="Apple Music">
+                                    <svg className="h-7 w-7" fill="white" viewBox="0 0 24 24"><path d="M23.994 6.124a9.23 9.23 0 00-.24-2.19c-.317-1.31-1.062-2.31-2.18-3.043a5.022 5.022 0 00-1.877-.726 10.496 10.496 0 00-1.564-.15c-.04-.003-.083-.01-.124-.013H5.986c-.152.01-.303.017-.455.026-.747.043-1.49.123-2.214.265-1.333.272-2.397.918-3.062 2.065a4.845 4.845 0 00-.676 1.992 9.51 9.51 0 00-.099 1.114c-.004.064-.01.13-.01.195v8.16c.01.12.017.242.024.363.04.718.106 1.435.238 2.144.24 1.27.793 2.273 1.805 3.02.913.672 1.955 1.012 3.082 1.147.737.09 1.48.153 2.22.177.18.01.363.014.543.014h11.19c.065-.003.133-.01.195-.012.798-.024 1.596-.086 2.385-.208 1.21-.19 2.235-.666 3.026-1.505.684-.726 1.078-1.59 1.23-2.59.06-.417.093-.84.108-1.265.01-.134.02-.269.02-.404V6.514c0-.135-.01-.269-.02-.39zm-6.5 6.044l-4.6 3.24c-.24.17-.54.186-.78.04-.06-.04-.11-.09-.15-.146V7.4c.02-.06.06-.12.1-.17.16-.16.4-.19.6-.08l4.59 3.23c.04.03.07.07.1.11.12.2.12.44-.02.64-.04.04-.08.08-.13.11l.19.14z"/></svg>
+                                </a>
+                            </div>
+                        </div>
+
+                        <div className="w-full max-w-xs h-px bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
+
                         {/* Logo/Name */}
                         <h3 className="font-display text-3xl text-white">
                             Galante <span className="text-amber-400">El Emperador</span>
@@ -2355,170 +2393,315 @@ function LandingApp({ data }) {
                     </div>
                 </div>
             </footer>
-
-            {/* ========================================
-                MODAL DE REACCIÓN
-                ======================================== */}
-            {showReactionModal && (
-                <div className="fixed inset-0 !z-[9999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-                    <div className="glass-panel-enhanced rounded-3xl p-8 max-w-md w-full text-center">
-                        <div className="text-6xl mb-4">🎤</div>
-                        <h3 className="text-2xl font-bold text-white mb-2">
-                            ¡Track {reactionTrack?.trackNumber} Completado!
-                        </h3>
-                        <p className="text-slate-300 mb-6">
-                            ¿Qué te pareció <span className="text-amber-400 font-semibold">{reactionTrack?.title}</span>?
-                        </p>
-                        
-                        <textarea
-                            value={reactionText}
-                            onChange={(e) => setReactionText(e.target.value)}
-                            placeholder="Deja tu reacción aquí... (opcional)"
-                            className="w-full px-4 py-3 bg-white border border-slate-300 rounded-xl text-black placeholder-slate-500 focus:outline-none focus:border-amber-400 resize-none mb-4"
-                            rows={3}
-                        />
-                        
-                        <p className="text-xs text-slate-400 mb-6">
-                            💡 Si dejas tu reacción, desbloquearás una sorpresa exclusiva
-                        </p>
-                        
-                        <div className="flex gap-3">
-                            <button
-                                onClick={skipReaction}
-                                className="flex-1 px-4 py-3 rounded-xl border border-slate-600 text-slate-300 hover:bg-slate-800 transition-all"
-                            >
-                                Saltar
-                            </button>
-                            <button
-                                onClick={handleSubmitReaction}
-                                disabled={isSubmittingReaction}
-                                className="flex-1 px-4 py-3 rounded-xl bg-amber-500 text-slate-900 font-bold hover:bg-amber-400 transition-all disabled:opacity-50"
-                            >
-                                {isSubmittingReaction ? '...' : 'Enviar 💝'}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* ========================================
-                MODAL DE RECOMPENSA
-                ======================================== */}
-            {showRewardModal && currentReward && (
-                <div className="fixed inset-0 !z-[9999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-                    <div className="glass-panel-enhanced rounded-3xl p-8 max-w-md w-full text-center">
-                        <div className="text-6xl mb-4 animate-bounce">🎁</div>
-                        <h3 className="text-2xl font-bold text-white mb-2">
-                            ¡Recompensa Desbloqueada!
-                        </h3>
-                        <p className="text-amber-400 font-semibold mb-4">
-                            {currentReward.title}
-                        </p>
-                        <p className="text-slate-300 mb-6">
-                            {currentReward.description}
-                        </p>
-                        
-                        <div className="bg-gradient-to-br from-amber-500/20 to-purple-500/20 rounded-2xl p-6 mb-6 border border-amber-500/30">
-                            <div className="text-5xl mb-2">🏆</div>
-                            <p className="text-sm text-slate-400">
-                                Recompensa #{currentReward.trackNumber} de 21
-                            </p>
-                        </div>
-                        
-                        <button
-                            onClick={() => {
-                                setShowRewardModal(false);
-                                setCurrentReward(null);
-                            }}
-                            className="w-full px-4 py-3 rounded-xl bg-amber-500 text-slate-900 font-bold hover:bg-amber-400 transition-all"
-                        >
-                            ¡Genial! Continuar →
-                        </button>
-                    </div>
-                </div>
-            )}
-
-            {/* ========================================
-                MODAL DE INICIO - COMENZAR A ESCUCHAR
-                ======================================== */}
-            {showStartModal && (
-                <div className="fixed inset-0 !z-[9999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-                    <div className="glass-panel-enhanced rounded-3xl p-8 max-w-md w-full text-center">
-                        <div className="text-6xl mb-4 animate-pulse">🎵</div>
-                        <h3 className="text-2xl font-bold text-white mb-4">
-                            ¡Comienza la Experiencia!
-                        </h3>
-                        
-                        <div className="bg-gradient-to-br from-amber-500/20 to-purple-500/20 rounded-2xl p-6 mb-6 border border-amber-500/30">
-                            <div className="text-4xl mb-2">🔓</div>
-                            <p className="text-amber-300 font-semibold mb-2">
-                                Desbloquea 21 Collectibles
-                            </p>
-                            <p className="text-sm text-slate-300">
-                                Escucha cada track y desbloquea recompensas exclusivas. 
-                                El próximo collectible te espera después del Track 1.
-                            </p>
-                        </div>
-
-                        <p className="text-slate-400 text-sm mb-6">
-                            🎁 Sorpresas exclusivas por cada reacción que dejes
-                        </p>
-                        
-                        <button
-                            onClick={() => {
-                                setShowStartModal(false);
-                                startAlbumPlayback();
-                            }}
-                            className="w-full px-4 py-3 rounded-xl bg-amber-500 text-slate-900 font-bold hover:bg-amber-400 transition-all"
-                        >
-                            ¡Vamos! 🚀
-                        </button>
-                    </div>
-                </div>
-            )}
-
-            {/* ========================================
-                MODAL DE COMPLETACIÓN - ÁLBUM TERMINADO
-                ======================================== */}
-            {showCompletionModal && (
-                <div className="fixed inset-0 !z-[9999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-                    <div className="glass-panel-enhanced rounded-3xl p-8 max-w-md w-full text-center">
-                        <div className="text-6xl mb-4 animate-bounce">🎉</div>
-                        <h3 className="text-2xl font-bold text-white mb-4">
-                            ¡Felicidades! 🏆
-                        </h3>
-                        
-                        <div className="bg-gradient-to-br from-emerald-500/20 to-cyan-500/20 rounded-2xl p-6 mb-6 border border-emerald-500/30">
-                            <div className="text-4xl mb-2">💎</div>
-                            <p className="text-emerald-300 font-semibold mb-2">
-                                Álbum Completado
-                            </p>
-                            <p className="text-sm text-slate-300">
-                                Has escuchado todos los 21 tracks de "El Inmortal 2". 
-                                Eres uno de los primeros en experimentar este estreno mundial diferente.
-                            </p>
-                        </div>
-
-                        <div className="bg-slate-800/50 rounded-xl p-4 mb-6">
-                            <p className="text-amber-400 font-semibold mb-2">
-                                🎵 Próximamente en Spotify
-                            </p>
-                            <p className="text-sm text-slate-400">
-                                El álbum oficial se lanzará pronto en todas las plataformas. 
-                                Tú ya lo conoces completo. ¡Gracias por ser parte de esta experiencia única!
-                            </p>
-                        </div>
-                        
-                        <button
-                            onClick={() => setShowCompletionModal(false)}
-                            className="w-full px-4 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-slate-900 font-bold hover:from-amber-400 hover:to-orange-400 transition-all"
-                        >
-                            ¡Eres Legendario! 👑
-                        </button>
-                    </div>
-                </div>
-            )}
         </main>
+
+        {/* ========================================
+            MODALES GLOBALES - FUERA DEL MAIN PARA Z-INDEX CORRECTO
+            ======================================== */}
+        
+        {/* Modal de Reacción */}
+        {showReactionModal && (
+            <div style={{
+                position: 'fixed',
+                top: 0, left: 0, right: 0, bottom: 0,
+                zIndex: 99999,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '1rem',
+                backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                backdropFilter: 'blur(4px)'
+            }}>
+                <div className="glass-panel-enhanced rounded-3xl p-8 max-w-md w-full text-center">
+                    <div className="text-6xl mb-4">🎤</div>
+                    <h3 className="text-2xl font-bold text-white mb-2">
+                        ¡Track {reactionTrack?.trackNumber} Completado!
+                    </h3>
+                    <p className="text-slate-300 mb-6">
+                        ¿Qué te pareció <span className="text-amber-400 font-semibold">{reactionTrack?.title}</span>?
+                    </p>
+                    
+                    <textarea
+                        value={reactionText}
+                        onChange={(e) => setReactionText(e.target.value)}
+                        placeholder="Deja tu reacción aquí... (opcional)"
+                        className="w-full px-4 py-3 bg-white border border-slate-300 rounded-xl text-black placeholder-slate-500 focus:outline-none focus:border-amber-400 resize-none mb-4"
+                        rows={3}
+                    />
+                    
+                    <p className="text-xs text-slate-400 mb-6">
+                        💡 Si dejas tu reacción, desbloquearás una sorpresa exclusiva
+                    </p>
+                    
+                    <div className="flex gap-3">
+                        <button
+                            onClick={skipReaction}
+                            className="flex-1 px-4 py-3 rounded-xl border border-slate-600 text-slate-300 hover:bg-slate-800 transition-all"
+                        >
+                            Saltar
+                        </button>
+                        <button
+                            onClick={handleSubmitReaction}
+                            disabled={isSubmittingReaction}
+                            className="flex-1 px-4 py-3 rounded-xl bg-amber-500 text-slate-900 font-bold hover:bg-amber-400 transition-all disabled:opacity-50"
+                        >
+                            {isSubmittingReaction ? '...' : 'Enviar 💝'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )}
+
+        {/* Modal de Recompensa */}
+        {showRewardModal && currentReward && (
+            <div style={{
+                position: 'fixed',
+                top: 0, left: 0, right: 0, bottom: 0,
+                zIndex: 99999,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '1rem',
+                backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                backdropFilter: 'blur(4px)'
+            }}>
+                <div className="glass-panel-enhanced rounded-3xl p-8 max-w-md w-full text-center">
+                    <div className="text-6xl mb-4 animate-bounce">🎁</div>
+                    <h3 className="text-2xl font-bold text-white mb-2">
+                        ¡Recompensa Desbloqueada!
+                    </h3>
+                    <p className="text-amber-400 font-semibold mb-4">
+                        {currentReward.title}
+                    </p>
+                    <p className="text-slate-300 mb-6">
+                        {currentReward.description}
+                    </p>
+                    
+                    <div className="bg-gradient-to-br from-amber-500/20 to-purple-500/20 rounded-2xl p-6 mb-6 border border-amber-500/30">
+                        <div className="text-5xl mb-2">🏆</div>
+                        <p className="text-sm text-slate-400">
+                            Recompensa #{currentReward.trackNumber} de 21
+                        </p>
+                    </div>
+                    
+                    <button
+                        onClick={() => {
+                            setShowRewardModal(false);
+                            setCurrentReward(null);
+                        }}
+                        className="w-full px-4 py-3 rounded-xl bg-amber-500 text-slate-900 font-bold hover:bg-amber-400 transition-all"
+                    >
+                        ¡Genial! Continuar →
+                    </button>
+                </div>
+            </div>
+        )}
+
+        {/* Modal de Inicio */}
+        {showStartModal && (
+            <div style={{
+                position: 'fixed',
+                top: 0, left: 0, right: 0, bottom: 0,
+                zIndex: 99999,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '1rem',
+                backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                backdropFilter: 'blur(4px)'
+            }}>
+                <div className="glass-panel-enhanced rounded-3xl p-8 max-w-md w-full text-center">
+                    <div className="text-6xl mb-4 animate-pulse">🎵</div>
+                    <h3 className="text-2xl font-bold text-white mb-4">
+                        ¡Comienza la Experiencia!
+                    </h3>
+                    
+                    <div className="bg-gradient-to-br from-amber-500/20 to-purple-500/20 rounded-2xl p-6 mb-6 border border-amber-500/30">
+                        <div className="text-4xl mb-2">🔓</div>
+                        <p className="text-amber-300 font-semibold mb-2">
+                            Desbloquea 21 Collectibles
+                        </p>
+                        <p className="text-sm text-slate-300">
+                            Escucha cada track y desbloquea recompensas exclusivas. 
+                            El próximo collectible te espera después del Track 1.
+                        </p>
+                    </div>
+
+                    <p className="text-slate-400 text-sm mb-6">
+                        🎁 Sorpresas exclusivas por cada reacción que dejes
+                    </p>
+                    
+                    <button
+                        onClick={() => {
+                            setShowStartModal(false);
+                            startAlbumPlayback();
+                        }}
+                        className="w-full px-4 py-3 rounded-xl bg-amber-500 text-slate-900 font-bold hover:bg-amber-400 transition-all"
+                    >
+                        ¡Vamos! 🚀
+                    </button>
+                </div>
+            </div>
+        )}
+
+        {/* Modal de Completación */}
+        {showCompletionModal && (
+            <div style={{
+                position: 'fixed',
+                top: 0, left: 0, right: 0, bottom: 0,
+                zIndex: 99999,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '1rem',
+                backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                backdropFilter: 'blur(4px)'
+            }}>
+                <div className="glass-panel-enhanced rounded-3xl p-8 max-w-md w-full text-center">
+                    <div className="text-6xl mb-4 animate-bounce">🎉</div>
+                    <h3 className="text-2xl font-bold text-white mb-4">
+                        ¡Felicidades! 🏆
+                    </h3>
+                    
+                    <div className="bg-gradient-to-br from-emerald-500/20 to-cyan-500/20 rounded-2xl p-6 mb-6 border border-emerald-500/30">
+                        <div className="text-4xl mb-2">💎</div>
+                        <p className="text-emerald-300 font-semibold mb-2">
+                            Álbum Completado
+                        </p>
+                        <p className="text-sm text-slate-300">
+                            Has escuchado todos los 21 tracks de "El Inmortal 2". 
+                            Eres uno de los primeros en experimentar este estreno mundial diferente.
+                        </p>
+                    </div>
+
+                    <div className="bg-slate-800/50 rounded-xl p-4 mb-6">
+                        <p className="text-amber-400 font-semibold mb-2">
+                            🎵 Próximamente en Spotify
+                        </p>
+                        <p className="text-sm text-slate-400">
+                            El álbum oficial se lanzará pronto en todas las plataformas. 
+                            Tú ya lo conoces completo. ¡Gracias por ser parte de esta experiencia única!
+                        </p>
+                    </div>
+                    
+                    <button
+                        onClick={() => setShowCompletionModal(false)}
+                        className="w-full px-4 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-slate-900 font-bold hover:from-amber-400 hover:to-orange-400 transition-all"
+                    >
+                        ¡Eres Legendario! 👑
+                    </button>
+                </div>
+            </div>
+        )}
+
+        {/* Modal de Info del Track */}
+        {showTrackInfoModal && selectedTrackForInfo && (
+            <div style={{
+                position: 'fixed',
+                top: 0, left: 0, right: 0, bottom: 0,
+                zIndex: 99999,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '1rem',
+                backgroundColor: 'rgba(0, 0, 0, 0.85)',
+                backdropFilter: 'blur(4px)'
+            }} onClick={() => setShowTrackInfoModal(false)}>
+                <div className="glass-panel-enhanced rounded-3xl p-6 md:p-8 max-w-lg w-full" onClick={(e) => e.stopPropagation()}>
+                    {/* Header */}
+                    <div className="flex items-start justify-between mb-6">
+                        <div>
+                            <p className="text-amber-400 text-sm font-bold uppercase tracking-wider mb-1">
+                                Track {String(selectedTrackForInfo.trackNumber).padStart(2, '0')}
+                            </p>
+                            <h3 className="text-2xl md:text-3xl font-bold text-white">
+                                {selectedTrackForInfo.title}
+                            </h3>
+                        </div>
+                        <button
+                            onClick={() => setShowTrackInfoModal(false)}
+                            className="text-slate-400 hover:text-white transition-colors text-2xl"
+                        >
+                            ×
+                        </button>
+                    </div>
+
+                    {/* Track Details */}
+                    <div className="space-y-4 mb-6">
+                        {selectedTrackForInfo.producer && (
+                            <div className="flex items-center gap-3 p-3 bg-white/5 rounded-xl">
+                                <span className="text-2xl">🎹</span>
+                                <div>
+                                    <p className="text-xs text-slate-400 uppercase tracking-wider">Productor</p>
+                                    <p className="text-white font-semibold">{selectedTrackForInfo.producer}</p>
+                                </div>
+                            </div>
+                        )}
+
+                        {selectedTrackForInfo.features && (
+                            <div className="flex items-center gap-3 p-3 bg-white/5 rounded-xl">
+                                <span className="text-2xl">🎤</span>
+                                <div>
+                                    <p className="text-xs text-slate-400 uppercase tracking-wider">Featuring</p>
+                                    <p className="text-white font-semibold">{selectedTrackForInfo.features}</p>
+                                </div>
+                            </div>
+                        )}
+
+                        {selectedTrackForInfo.bpm && (
+                            <div className="flex items-center gap-3 p-3 bg-white/5 rounded-xl">
+                                <span className="text-2xl">⏱️</span>
+                                <div>
+                                    <p className="text-xs text-slate-400 uppercase tracking-wider">BPM</p>
+                                    <p className="text-white font-semibold">{selectedTrackForInfo.bpm}</p>
+                                </div>
+                            </div>
+                        )}
+
+                        {selectedTrackForInfo.key && (
+                            <div className="flex items-center gap-3 p-3 bg-white/5 rounded-xl">
+                                <span className="text-2xl">🎵</span>
+                                <div>
+                                    <p className="text-xs text-slate-400 uppercase tracking-wider">Tonalidad</p>
+                                    <p className="text-white font-semibold">{selectedTrackForInfo.key}</p>
+                                </div>
+                            </div>
+                        )}
+
+                        {selectedTrackForInfo.duration && (
+                            <div className="flex items-center gap-3 p-3 bg-white/5 rounded-xl">
+                                <span className="text-2xl">⏳</span>
+                                <div>
+                                    <p className="text-xs text-slate-400 uppercase tracking-wider">Duración</p>
+                                    <p className="text-white font-semibold">{selectedTrackForInfo.duration}</p>
+                                </div>
+                            </div>
+                        )}
+
+                        {selectedTrackForInfo.description && (
+                            <div className="p-4 bg-gradient-to-r from-amber-500/10 to-cyan-500/10 rounded-xl border border-amber-500/20">
+                                <p className="text-xs text-amber-400 uppercase tracking-wider mb-2">Sobre el track</p>
+                                <p className="text-slate-300 text-sm leading-relaxed">{selectedTrackForInfo.description}</p>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Play Button */}
+                    <button
+                        onClick={() => {
+                            setShowTrackInfoModal(false);
+                            // Small delay to allow modal to close before playing
+                            setTimeout(() => handlePlayToggle(selectedTrackForInfo), 100);
+                        }}
+                        className="w-full px-4 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-slate-900 font-bold hover:from-amber-400 hover:to-orange-400 transition-all flex items-center justify-center gap-2"
+                    >
+                        <span>▶</span>
+                        <span>Reproducir Track</span>
+                    </button>
+                </div>
+            </div>
+        )}
+    </>
     );
 }
 

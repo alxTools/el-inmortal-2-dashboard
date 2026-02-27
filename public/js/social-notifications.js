@@ -6,6 +6,30 @@
 (function() {
     'use strict';
 
+    // Mapeo de países a emojis de banderas
+    const countryEmojis = {
+        'México': '🇲🇽',
+        'España': '🇪🇸',
+        'Argentina': '🇦🇷',
+        'Colombia': '🇨🇴',
+        'Chile': '🇨🇱',
+        'Perú': '🇵🇪',
+        'Ecuador': '🇪🇨',
+        'Uruguay': '🇺🇾',
+        'Venezuela': '🇻🇪',
+        'Brasil': '🇧🇷',
+        'Puerto Rico': '🇵🇷',
+        'República Dominicana': '🇩🇴',
+        'Guatemala': '🇬🇹',
+        'Costa Rica': '🇨🇷',
+        'Panamá': '🇵🇦',
+        'Honduras': '🇭🇳',
+        'El Salvador': '🇸🇻',
+        'Nicaragua': '🇳🇮',
+        'Bolivia': '🇧🇴',
+        'Paraguay': '🇵🇾'
+    };
+
     // Pool de notificaciones
     const notifications = [
         { name: 'Juan', country: 'México', action: 'reservó', product: 'su Mini-Disc', time: 'hace 2 min' },
@@ -94,7 +118,7 @@
             </div>
             <div style="flex: 1;">
                 <p style="margin: 0; color: #e2e8f0; font-size: 13px; line-height: 1.4;">
-                    <strong style="color: #facc15;">${data.name}</strong> de ${data.country}
+                    <strong style="color: #facc15;">${data.name}</strong> ${countryEmojis[data.country] || data.country}
                     <br>
                     <span style="color: #94a3b8;">${data.action} ${data.product} ${data.time}</span>
                 </p>

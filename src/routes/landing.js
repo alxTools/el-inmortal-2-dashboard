@@ -1152,11 +1152,12 @@ router.get('/checkout', async (req, res) => {
         
         const alreadyPurchased = !!existingOrder;
         
+        console.log('[Checkout] Rendering with PayPal ID:', process.env.PAYPAL_CLIENT_ID ? 'Present' : 'Missing');
         res.render('landing/checkout', {
             title: 'Checkout - Mini-Disc El Inmortal 2',
             user: user,
             alreadyPurchased: alreadyPurchased,
-            paypalClientId: process.env.PAYPAL_CLIENT_ID,
+            paypalClientId: process.env.PAYPAL_CLIENT_ID || '',
             paypalMode: process.env.PAYPAL_MODE || 'sandbox'
         });
     } catch (error) {

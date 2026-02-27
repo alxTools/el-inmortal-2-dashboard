@@ -33,12 +33,13 @@ app.use(helmet({
         directives: {
             defaultSrc: ["'self'"],
             styleSrc: ["'self'", "'unsafe-inline'", "https:"],
-            scriptSrc: ["'self'", "'unsafe-inline'", "https://www.googletagmanager.com", "https://static.cloudflareinsights.com"],
+            scriptSrc: ["'self'", "'unsafe-inline'", "https://www.googletagmanager.com", "https://static.cloudflareinsights.com", "https://www.paypal.com", "https://www.sandbox.paypal.com"],
             scriptSrcAttr: ["'unsafe-inline'"],
             imgSrc: ["'self'", "data:", "blob:", "https:"],
             fontSrc: ["'self'", "data:", "https:"],
-            connectSrc: ["'self'", "data:", "https:", "blob:", "https://www.googletagmanager.com"],
+            connectSrc: ["'self'", "data:", "https:", "blob:", "https://www.googletagmanager.com", "https://www.paypal.com", "https://www.sandbox.paypal.com"],
             mediaSrc: ["'self'", "data:", "blob:"],
+            frameSrc: ["'self'", "https://www.paypal.com", "https://www.sandbox.paypal.com"],
         },
     },
 }));

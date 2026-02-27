@@ -81,10 +81,55 @@ let audioFilesCacheTime = 0;
 const CACHE_DURATION = 60000; // 1 minuto
 
 function getAvailableAudioFiles() {
-    const now = Date.now();
-    if (audioFilesCache && (now - audioFilesCacheTime) < CACHE_DURATION) {
-        return audioFilesCache;
+    try {
+        const audioDir = path.join(__dirname, '../../public/uploads/audio');
+        const landingDir = path.join(audioDir, 'landing');
+        
+        const files = [];
+        
+        // Primero buscar en directorio landing (archivos MP3 optimizados)
+        if (fs.existsSync(landingDir)) {
+            const landingFiles = fs.readdirSync(landingDir);
+            landingFiles
+                .filter(f => f.endsWith('_landing.mp3'))
+                .forEach(f => {
+                    const match = f.match(/(\d+)/);
+                    const trackNum = match ? match[1].padStart(2, '0') : '00';
+                    files.push({
+                        filename: f,
+                        path: `/uploads/audio/landing/${f}`,
+                        trackNum: trackNum,
+                        isLanding: true
+                    });
+                });
+        }
+        
+        // Luego buscar en directorio principal (archivos WAV originales)
+        if (fs.existsSync(audioDir)) {
+            const mainFiles = fs.readdirSync(audioDir);
+            mainFiles
+                .filter(f => (f.endsWith('.wav') || f.endsWith('.mp3')) && !f.includes('_landing'))
+                .forEach(f => {
+                    const match = f.match(/(\d+)/);
+                    const trackNum = match ? match[1].padStart(2, '0') : '00';
+                    // Solo agregar si no existe versión landing para este track
+                    if (!files.some(existing => existing.trackNum === trackNum)) {
+                        files.push({
+                            filename: f,
+                            path: `/uploads/audio/${f}`,
+                            trackNum: trackNum,
+                            isLanding: false
+                        });
+                    }
+                });
+        }
+        
+        return files.sort((a, b) => a.trackNum.localeCompare(b.trackNum));
+    } catch (err) {
+        console.error('Error reading audio directory:', err.message);
     }
+    return [];
+}
     
     try {
         const audioDir = path.join(__dirname, '../../public/uploads/audio');

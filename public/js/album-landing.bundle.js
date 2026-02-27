@@ -23495,7 +23495,7 @@ var AlbumLandingApp = (() => {
           " Galante El Emperador. Todos los derechos reservados."
         ] })
       ] }) }) }),
-      showReactionModal && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm", children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "glass-panel-enhanced rounded-3xl p-8 max-w-md w-full text-center", children: [
+      showReactionModal && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm", children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "glass-panel-enhanced rounded-3xl p-8 max-w-md w-full text-center", children: [
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "text-6xl mb-4", children: "\u{1F3A4}" }),
         /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("h3", { className: "text-2xl font-bold text-white mb-2", children: [
           "\xA1Track ",
@@ -23538,7 +23538,7 @@ var AlbumLandingApp = (() => {
           )
         ] })
       ] }) }),
-      showRewardModal && currentReward && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm", children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "glass-panel-enhanced rounded-3xl p-8 max-w-md w-full text-center", children: [
+      showRewardModal && currentReward && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm", children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "glass-panel-enhanced rounded-3xl p-8 max-w-md w-full text-center", children: [
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "text-6xl mb-4 animate-bounce", children: "\u{1F381}" }),
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { className: "text-2xl font-bold text-white mb-2", children: "\xA1Recompensa Desbloqueada!" }),
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-amber-400 font-semibold mb-4", children: currentReward.title }),

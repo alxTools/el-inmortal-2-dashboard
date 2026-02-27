@@ -2180,7 +2180,7 @@ function LandingApp({ data }) {
                             </div>
                             <div className="glass-panel rounded-2xl p-4">
                                 <p className="text-xs uppercase tracking-[0.2em] text-slate-300">Top 10 - Mas Escuchados</p>
-                                <div className="mt-3 space-y-2 text-sm text-slate-200 max-h-48 overflow-y-auto">
+                                <div className="mt-3 space-y-2 text-sm text-slate-200 max-h-48 min-h-48 overflow-y-auto">
                                     {topTracks.length > 0 ? (
                                         topTracks.map((track, index) => (
                                             <div key={track.id} className="flex items-center justify-between group cursor-pointer hover:bg-white/5 p-1 rounded transition" onClick={() => {
@@ -2688,15 +2688,18 @@ function LandingApp({ data }) {
 
                     {/* Play Button */}
                     <button
-                        onClick={() => {
+                        onClick={async () => {
                             setShowTrackInfoModal(false);
-                            // Small delay to allow modal to close before playing
-                            setTimeout(() => handlePlayToggle(selectedTrackForInfo), 100);
+                            // Wait for modal to close then play
+                            await new Promise(resolve => setTimeout(resolve, 150));
+                            if (selectedTrackForInfo && selectedTrackForInfo.audioUrl) {
+                                handlePlayToggle(selectedTrackForInfo);
+                            }
                         }}
                         className="w-full px-4 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-slate-900 font-bold hover:from-amber-400 hover:to-orange-400 transition-all flex items-center justify-center gap-2"
                     >
                         <span>▶</span>
-                        <span>Reproducir Track</span>
+                        <span>¡Vamos!</span>
                     </button>
                 </div>
             </div>

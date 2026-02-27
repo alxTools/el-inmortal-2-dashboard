@@ -1229,7 +1229,7 @@ router.get('/unlock/:code', async (req, res) => {
 router.get('/admin/config', async (req, res) => {
     // Verificar si es admin
     if (!req.session.user) {
-        return res.redirect('/login');
+        return res.redirect('/auth/login');
     }
     
     try {
@@ -1331,7 +1331,7 @@ router.get('/debug', async (req, res) => {
 // Vista de admin para ver usuarios (HTML)
 router.get('/admin/users', async (req, res) => {
     if (!req.session.user) {
-        return res.redirect('/login');
+        return res.redirect('/auth/login');
     }
     
     try {

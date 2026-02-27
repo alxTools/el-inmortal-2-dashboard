@@ -16,7 +16,7 @@ function requireAuth(req, res, next) {
     }
     
     // Redirect to login for web requests
-    return res.redirect('/login');
+    return res.redirect('/auth/login');
 }
 
 function requireAdmin(req, res, next) {
@@ -25,7 +25,7 @@ function requireAdmin(req, res, next) {
         if (wantsJson) {
             return res.status(401).json({ error: 'Unauthorized' });
         }
-        return res.redirect('/login');
+        return res.redirect('/auth/login');
     }
     
     const role = req.session.user.role;
@@ -50,7 +50,7 @@ function requireAdmin(req, res, next) {
 
 function requireSuperAdmin(req, res, next) {
     if (!req.session || !req.session.user) {
-        return res.redirect('/login');
+        return res.redirect('/auth/login');
     }
     
     if (req.session.user.role === 'super_admin') {
@@ -78,7 +78,7 @@ function requireFanOrAdmin(req, res, next) {
         if (wantsJson) {
             return res.status(401).json({ error: 'Unauthorized' });
         }
-        return res.redirect('/login');
+        return res.redirect('/auth/login');
     }
     
     const role = req.session.user.role;

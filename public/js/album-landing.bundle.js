@@ -22431,11 +22431,15 @@ var AlbumLandingApp = (() => {
     const [isGeneratingVideo, setIsGeneratingVideo] = (0, import_react.useState)(false);
     const [generatedVideo, setGeneratedVideo] = (0, import_react.useState)(null);
     const [currentTrack, setCurrentTrack] = (0, import_react.useState)(null);
+    const currentTrackRef = (0, import_react.useRef)(currentTrack);
     const [isPlaying, setIsPlaying] = (0, import_react.useState)(false);
     const [isLoading, setIsLoading] = (0, import_react.useState)(false);
     const [playError, setPlayError] = (0, import_react.useState)("");
     const [audioReady, setAudioReady] = (0, import_react.useState)(false);
     const audioRef = (0, import_react.useRef)(null);
+    (0, import_react.useEffect)(() => {
+      currentTrackRef.current = currentTrack;
+    }, [currentTrack]);
     const [showCartModal, setShowCartModal] = (0, import_react.useState)(false);
     const [cartItems, setCartItems] = (0, import_react.useState)([]);
     const [isCheckingOut, setIsCheckingOut] = (0, import_react.useState)(false);
@@ -22613,7 +22617,17 @@ var AlbumLandingApp = (() => {
       const handleEnded = () => {
         setIsPlaying(false);
         setIsLoading(false);
-        playNextTrack();
+        const track = currentTrackRef.current;
+        if (!track || !data.tracks.length) return;
+        const currentIndex = data.tracks.findIndex((t) => t.trackNumber === track.trackNumber);
+        if (currentIndex >= 0 && currentIndex < data.tracks.length - 1) {
+          const nextTrack = data.tracks[currentIndex + 1];
+          if (nextTrack && nextTrack.audioUrl) {
+            setTimeout(() => {
+              handlePlayToggle(nextTrack);
+            }, 100);
+          }
+        }
       };
       const handlePause = () => {
         setIsPlaying(false);

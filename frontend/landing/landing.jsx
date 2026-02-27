@@ -822,11 +822,17 @@ function LandingApp({ data }) {
     const [generatedVideo, setGeneratedVideo] = useState(null);
     
     const [currentTrack, setCurrentTrack] = useState(null);
+    const currentTrackRef = useRef(currentTrack);
     const [isPlaying, setIsPlaying] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [playError, setPlayError] = useState('');
     const [audioReady, setAudioReady] = useState(false);
     const audioRef = useRef(null);
+    
+    // Keep ref in sync with state for audio event handlers
+    useEffect(() => {
+        currentTrackRef.current = currentTrack;
+    }, [currentTrack]);
     
     // Carrito VIP (Mini-Disc)
     const [showCartModal, setShowCartModal] = useState(false);
@@ -1054,8 +1060,20 @@ function LandingApp({ data }) {
         const handleEnded = () => {
             setIsPlaying(false);
             setIsLoading(false);
-            // Reproducir siguiente track automáticamente
-            playNextTrack();
+            // Reproducir siguiente track automáticamente usando la ref para obtener el valor actual
+            const track = currentTrackRef.current;
+            if (!track || !data.tracks.length) return;
+            
+            const currentIndex = data.tracks.findIndex(t => t.trackNumber === track.trackNumber);
+            if (currentIndex >= 0 && currentIndex < data.tracks.length - 1) {
+                const nextTrack = data.tracks[currentIndex + 1];
+                if (nextTrack && nextTrack.audioUrl) {
+                    // Usar setTimeout para evitar problemas de sincronización
+                    setTimeout(() => {
+                        handlePlayToggle(nextTrack);
+                    }, 100);
+                }
+            }
         };
         const handlePause = () => {
             setIsPlaying(false);

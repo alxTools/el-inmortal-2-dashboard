@@ -22450,6 +22450,9 @@ var AlbumLandingApp = (() => {
     const [showRewardModal, setShowRewardModal] = (0, import_react.useState)(false);
     const [currentReward, setCurrentReward] = (0, import_react.useState)(null);
     const [collectedRewards, setCollectedRewards] = (0, import_react.useState)([]);
+    const [showStartModal, setShowStartModal] = (0, import_react.useState)(false);
+    const [showCompletionModal, setShowCompletionModal] = (0, import_react.useState)(false);
+    const [nextUnlockableTrack, setNextUnlockableTrack] = (0, import_react.useState)(1);
     const [showCartModal, setShowCartModal] = (0, import_react.useState)(false);
     const [cartItems, setCartItems] = (0, import_react.useState)([]);
     const [isCheckingOut, setIsCheckingOut] = (0, import_react.useState)(false);
@@ -22635,13 +22638,15 @@ var AlbumLandingApp = (() => {
         }
         const nextTrackNumber = track.trackNumber + 1;
         const hasMoreTracks = data.tracks.some((t) => t.trackNumber === nextTrackNumber);
-        setReactionTrack(track);
-        setShowReactionModal(true);
-        if (hasMoreTracks) {
+        const isLastTrack = !hasMoreTracks;
+        if (isLastTrack) {
+          console.log("[Audio] Album completed!");
+          setShowCompletionModal(true);
+        } else {
+          setReactionTrack(track);
+          setShowReactionModal(true);
           setCurrentUnlockIndex((prev) => Math.max(prev, nextTrackNumber - 1));
           console.log("[Audio] Unlocked track", nextTrackNumber);
-        } else {
-          console.log("[Audio] Album completed!");
         }
       };
       const handlePause = () => {
@@ -22809,11 +22814,7 @@ var AlbumLandingApp = (() => {
         }
       }
     };
-    const handleListenNow = async () => {
-      if (!isUnlocked) {
-        setIsModalOpen(true);
-        return;
-      }
+    const startAlbumPlayback = async () => {
       setHasStartedListening(true);
       const track1 = data.tracks.find((t) => t.trackNumber === 1);
       if (track1 && track1.audioUrl) {
@@ -22822,6 +22823,13 @@ var AlbumLandingApp = (() => {
       } else {
         setPlayError("Track 1 no disponible.");
       }
+    };
+    const handleListenNow = () => {
+      if (!isUnlocked) {
+        setIsModalOpen(true);
+        return;
+      }
+      setShowStartModal(true);
     };
     const playNextTrack = () => {
       if (!currentTrack || !data.tracks.length) return;
@@ -22946,7 +22954,10 @@ var AlbumLandingApp = (() => {
       }
     };
     const handleSubmitReaction = async () => {
+      console.log("[Reaction] Submitting reaction...");
+      const currentReactionTrack = reactionTrack;
       if (!reactionText.trim()) {
+        console.log("[Reaction] Empty reaction, skipping...");
         closeReactionModal();
         return;
       }
@@ -22959,20 +22970,43 @@ var AlbumLandingApp = (() => {
             "Accept": "application/json"
           },
           body: JSON.stringify({
-            track_id: reactionTrack.id,
-            track_number: reactionTrack.trackNumber,
+            track_id: currentReactionTrack.id,
+            track_number: currentReactionTrack.trackNumber,
             reaction: reactionText.trim()
           })
         });
         const result = await response.json();
         if (response.ok && result.success) {
-          generateReward(reactionTrack.trackNumber);
+          console.log("[Reaction] Success! Generating reward...");
+          generateReward(currentReactionTrack.trackNumber);
+        } else {
+          console.error("[Reaction] Server error:", result.error);
         }
       } catch (error) {
-        console.error("Error submitting reaction:", error);
+        console.error("[Reaction] Error submitting:", error);
       } finally {
         setIsSubmittingReaction(false);
-        closeReactionModal();
+        setShowReactionModal(false);
+        setReactionText("");
+        const completedTrack = currentReactionTrack;
+        setReactionTrack(null);
+        setTimeout(() => {
+          console.log("[Reaction] Continuing to next track...");
+          const currentIndex = data.tracks.findIndex((t) => t.trackNumber === completedTrack?.trackNumber);
+          console.log("[Reaction] Current index:", currentIndex, "Total tracks:", data.tracks.length);
+          if (currentIndex >= 0 && currentIndex < data.tracks.length - 1) {
+            const nextTrack = data.tracks[currentIndex + 1];
+            console.log("[Reaction] Next track:", nextTrack?.title);
+            if (nextTrack && nextTrack.audioUrl) {
+              console.log("[Reaction] Playing next track:", nextTrack.trackNumber);
+              handlePlayToggle(nextTrack);
+            } else {
+              console.error("[Reaction] Next track has no audio URL");
+            }
+          } else {
+            console.log("[Reaction] No more tracks or album completed");
+          }
+        }, 500);
       }
     };
     const generateReward = (trackNumber) => {
@@ -22994,19 +23028,36 @@ var AlbumLandingApp = (() => {
       setCollectedRewards((prev) => [...prev, reward]);
       setShowRewardModal(true);
     };
+    const continueToNextTrack = (completedTrackNumber) => {
+      console.log("[Reaction] Continuing from track", completedTrackNumber);
+      const currentIndex = data.tracks.findIndex((t) => t.trackNumber === completedTrackNumber);
+      console.log("[Reaction] Found index:", currentIndex);
+      if (currentIndex >= 0 && currentIndex < data.tracks.length - 1) {
+        const nextTrack = data.tracks[currentIndex + 1];
+        console.log("[Reaction] Next track to play:", nextTrack?.trackNumber, nextTrack?.title);
+        if (nextTrack && nextTrack.audioUrl) {
+          setTimeout(() => {
+            handlePlayToggle(nextTrack);
+          }, 300);
+        } else {
+          console.error("[Reaction] Next track has no audio URL");
+        }
+      } else if (currentIndex === data.tracks.length - 1) {
+        console.log("[Reaction] This was the last track!");
+      }
+    };
     const closeReactionModal = () => {
+      console.log("[Reaction] Closing modal...");
+      const completedTrackNumber = reactionTrack?.trackNumber;
       setShowReactionModal(false);
       setReactionTrack(null);
       setReactionText("");
-      const currentIndex = data.tracks.findIndex((t) => t.trackNumber === reactionTrack?.trackNumber);
-      if (currentIndex >= 0 && currentIndex < data.tracks.length - 1) {
-        const nextTrack = data.tracks[currentIndex + 1];
-        if (nextTrack && nextTrack.audioUrl) {
-          handlePlayToggle(nextTrack);
-        }
+      if (completedTrackNumber) {
+        continueToNextTrack(completedTrackNumber);
       }
     };
     const skipReaction = () => {
+      console.log("[Reaction] Skipping...");
       closeReactionModal();
     };
     const handlePhotoUpload = async (e) => {
@@ -23203,14 +23254,6 @@ var AlbumLandingApp = (() => {
         ] }) }),
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ScrollIndicator, {})
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("section", { id: "streaming", className: "relative z-10 py-16 px-6", children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "mx-auto max-w-4xl text-center", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h2", { className: "font-display text-3xl text-white md:text-4xl mb-8 reveal", children: "Escucha en tu plataforma favorita" }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex flex-wrap items-center justify-center gap-4 reveal reveal-delay-1", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("a", { href: data.streamingLinks.spotify || "#", className: "streaming-btn bg-[#1DB954]", title: "Spotify", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("svg", { className: "h-7 w-7", fill: "white", viewBox: "0 0 24 24", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z" }) }) }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("a", { href: data.streamingLinks.youtube || "#", className: "streaming-btn bg-[#FF0000]", title: "YouTube", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("svg", { className: "h-7 w-7", fill: "white", viewBox: "0 0 24 24", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "M12 0C5.376 0 0 5.376 0 12s5.376 12 12 12 12-5.376 12-12S18.624 0 12 0zm0 19.104c-3.924 0-7.104-3.18-7.104-7.104S8.076 4.896 12 4.896s7.104 3.18 7.104 7.104-3.18 7.104-7.104 7.104zm0-13.332c-3.432 0-6.228 2.796-6.228 6.228S8.568 18.228 12 18.228 18.228 15.432 18.228 12 15.432 5.772 12 5.772zM9.684 15.852V8.148L15.816 12l-6.132 3.852z" }) }) }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("a", { href: data.streamingLinks.appleMusic || "#", className: "streaming-btn bg-[#FA243C]", title: "Apple Music", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("svg", { className: "h-7 w-7", fill: "white", viewBox: "0 0 24 24", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "M23.994 6.124a9.23 9.23 0 00-.24-2.19c-.317-1.31-1.062-2.31-2.18-3.043a5.022 5.022 0 00-1.877-.726 10.496 10.496 0 00-1.564-.15c-.04-.003-.083-.01-.124-.013H5.986c-.152.01-.303.017-.455.026-.747.043-1.49.123-2.214.265-1.333.272-2.397.918-3.062 2.065a4.845 4.845 0 00-.676 1.992 9.51 9.51 0 00-.099 1.114c-.004.064-.01.13-.01.195v8.16c.01.12.017.242.024.363.04.718.106 1.435.238 2.144.24 1.27.793 2.273 1.805 3.02.913.672 1.955 1.012 3.082 1.147.737.09 1.48.153 2.22.177.18.01.363.014.543.014h11.19c.065-.003.133-.01.195-.012.798-.024 1.596-.086 2.385-.208 1.21-.19 2.235-.666 3.026-1.505.684-.726 1.078-1.59 1.23-2.59.06-.417.093-.84.108-1.265.01-.134.02-.269.02-.404V6.514c0-.135-.01-.269-.02-.39zm-6.5 6.044l-4.6 3.24c-.24.17-.54.186-.78.04-.06-.04-.11-.09-.15-.146V7.4c.02-.06.06-.12.1-.17.16-.16.4-.19.6-.08l4.59 3.23c.04.03.07.07.1.11.12.2.12.44-.02.64-.04.04-.08.08-.13.11l.19.14z" }) }) })
-        ] })
-      ] }) }),
       false,
       /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", { id: "tracklist", className: "relative z-10 mx-auto mt-10 w-full max-w-6xl px-6 pb-20 md:px-10", children: [
         /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "mb-6 flex flex-wrap items-center justify-between gap-4", children: [
@@ -23440,6 +23483,15 @@ var AlbumLandingApp = (() => {
           }
         }
       ),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("section", { id: "streaming", className: "relative z-10 py-16 px-6", children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "mx-auto max-w-4xl text-center", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h2", { className: "font-display text-3xl text-white md:text-4xl mb-4 reveal", children: "Escucha en tu plataforma favorita" }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-slate-300 mb-8 reveal reveal-delay-1", children: "Disponible en todas las plataformas digitales" }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex flex-wrap items-center justify-center gap-4 reveal reveal-delay-2", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("a", { href: data.streamingLinks.spotify || "#", className: "streaming-btn bg-[#1DB954] hover:scale-110 transition-transform", title: "Spotify", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("svg", { className: "h-7 w-7", fill: "white", viewBox: "0 0 24 24", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z" }) }) }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("a", { href: data.streamingLinks.youtube || "#", className: "streaming-btn bg-[#FF0000] hover:scale-110 transition-transform", title: "YouTube", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("svg", { className: "h-7 w-7", fill: "white", viewBox: "0 0 24 24", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" }) }) }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("a", { href: data.streamingLinks.appleMusic || "#", className: "streaming-btn bg-[#FA243C] hover:scale-110 transition-transform", title: "Apple Music", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("svg", { className: "h-7 w-7", fill: "white", viewBox: "0 0 24 24", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "M23.994 6.124a9.23 9.23 0 00-.24-2.19c-.317-1.31-1.062-2.31-2.18-3.043a5.022 5.022 0 00-1.877-.726 10.496 10.496 0 00-1.564-.15c-.04-.003-.083-.01-.124-.013H5.986c-.152.01-.303.017-.455.026-.747.043-1.49.123-2.214.265-1.333.272-2.397.918-3.062 2.065a4.845 4.845 0 00-.676 1.992 9.51 9.51 0 00-.099 1.114c-.004.064-.01.13-.01.195v8.16c.01.12.017.242.024.363.04.718.106 1.435.238 2.144.24 1.27.793 2.273 1.805 3.02.913.672 1.955 1.012 3.082 1.147.737.09 1.48.153 2.22.177.18.01.363.014.543.014h11.19c.065-.003.133-.01.195-.012.798-.024 1.596-.086 2.385-.208 1.21-.19 2.235-.666 3.026-1.505.684-.726 1.078-1.59 1.23-2.59.06-.417.093-.84.108-1.265.01-.134.02-.269.02-.404V6.514c0-.135-.01-.269-.02-.39zm-6.5 6.044l-4.6 3.24c-.24.17-.54.186-.78.04-.06-.04-.11-.09-.15-.146V7.4c.02-.06.06-.12.1-.17.16-.16.4-.19.6-.08l4.59 3.23c.04.03.07.07.1.11.12.2.12.44-.02.64-.04.04-.08.08-.13.11l.19.14z" }) }) })
+        ] })
+      ] }) }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("footer", { className: "relative z-10 border-t border-white/10 bg-slate-950/80 backdrop-blur-lg", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "mx-auto max-w-6xl px-6 py-12 md:px-10", children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex flex-col items-center gap-6 text-center", children: [
         /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("h3", { className: "font-display text-3xl text-white", children: [
           "Galante ",
@@ -23511,7 +23563,7 @@ var AlbumLandingApp = (() => {
             value: reactionText,
             onChange: (e) => setReactionText(e.target.value),
             placeholder: "Deja tu reacci\xF3n aqu\xED... (opcional)",
-            className: "w-full px-4 py-3 bg-slate-800/50 border border-slate-600 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:border-amber-400 resize-none mb-4",
+            className: "w-full px-4 py-3 bg-white border border-slate-300 rounded-xl text-black placeholder-slate-500 focus:outline-none focus:border-amber-400 resize-none mb-4",
             rows: 3
           }
         ),
@@ -23558,6 +23610,48 @@ var AlbumLandingApp = (() => {
             },
             className: "w-full px-4 py-3 rounded-xl bg-amber-500 text-slate-900 font-bold hover:bg-amber-400 transition-all",
             children: "\xA1Genial! Continuar \u2192"
+          }
+        )
+      ] }) }),
+      showStartModal && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm", children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "glass-panel-enhanced rounded-3xl p-8 max-w-md w-full text-center", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "text-6xl mb-4 animate-pulse", children: "\u{1F3B5}" }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { className: "text-2xl font-bold text-white mb-4", children: "\xA1Comienza la Experiencia!" }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "bg-gradient-to-br from-amber-500/20 to-purple-500/20 rounded-2xl p-6 mb-6 border border-amber-500/30", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "text-4xl mb-2", children: "\u{1F513}" }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-amber-300 font-semibold mb-2", children: "Desbloquea 21 Collectibles" }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-sm text-slate-300", children: "Escucha cada track y desbloquea recompensas exclusivas. El pr\xF3ximo collectible te espera despu\xE9s del Track 1." })
+        ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-slate-400 text-sm mb-6", children: "\u{1F381} Sorpresas exclusivas por cada reacci\xF3n que dejes" }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+          "button",
+          {
+            onClick: () => {
+              setShowStartModal(false);
+              startAlbumPlayback();
+            },
+            className: "w-full px-4 py-3 rounded-xl bg-amber-500 text-slate-900 font-bold hover:bg-amber-400 transition-all",
+            children: "\xA1Vamos! \u{1F680}"
+          }
+        )
+      ] }) }),
+      showCompletionModal && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm", children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "glass-panel-enhanced rounded-3xl p-8 max-w-md w-full text-center", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "text-6xl mb-4 animate-bounce", children: "\u{1F389}" }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { className: "text-2xl font-bold text-white mb-4", children: "\xA1Felicidades! \u{1F3C6}" }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "bg-gradient-to-br from-emerald-500/20 to-cyan-500/20 rounded-2xl p-6 mb-6 border border-emerald-500/30", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "text-4xl mb-2", children: "\u{1F48E}" }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-emerald-300 font-semibold mb-2", children: "\xC1lbum Completado" }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-sm text-slate-300", children: 'Has escuchado todos los 21 tracks de "El Inmortal 2". Eres uno de los primeros en experimentar este estreno mundial diferente.' })
+        ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "bg-slate-800/50 rounded-xl p-4 mb-6", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-amber-400 font-semibold mb-2", children: "\u{1F3B5} Pr\xF3ximamente en Spotify" }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-sm text-slate-400", children: "El \xE1lbum oficial se lanzar\xE1 pronto en todas las plataformas. T\xFA ya lo conoces completo. \xA1Gracias por ser parte de esta experiencia \xFAnica!" })
+        ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+          "button",
+          {
+            onClick: () => setShowCompletionModal(false),
+            className: "w-full px-4 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-slate-900 font-bold hover:from-amber-400 hover:to-orange-400 transition-all",
+            children: "\xA1Eres Legendario! \u{1F451}"
           }
         )
       ] }) })

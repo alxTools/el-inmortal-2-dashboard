@@ -2550,12 +2550,24 @@ function LandingApp({ data }) {
                     
                     <button
                         onClick={() => {
+                            if (!emailVerified) {
+                                setShowStartModal(false);
+                                setTimeout(() => {
+                                    setIsModalOpen(true);
+                                    setPlayError('Verifica tu email para comenzar. Revisa tu correo.');
+                                }, 300);
+                                return;
+                            }
                             setShowStartModal(false);
                             startAlbumPlayback();
                         }}
-                        className="w-full px-4 py-3 rounded-xl bg-amber-500 text-slate-900 font-bold hover:bg-amber-400 transition-all"
+                        className={`w-full px-4 py-3 rounded-xl font-bold transition-all ${
+                            emailVerified 
+                                ? 'bg-amber-500 text-slate-900 hover:bg-amber-400' 
+                                : 'bg-slate-600 text-slate-400 cursor-not-allowed'
+                        }`}
                     >
-                        ¡Vamos! 🚀
+                        {emailVerified ? '¡Vamos! 🚀' : 'Verifica tu Email Primero ✉️'}
                     </button>
                 </div>
             </div>

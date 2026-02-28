@@ -2249,8 +2249,8 @@ function LandingApp({ data }) {
                                                     // Sistema progresivo: track bloqueado si no ha iniciado o si el índice es mayor al permitido
                                                     isLocked = !hasStartedListening || trackIndex > currentUnlockIndex;
                                                 } else {
-                                                    // Sistema simple: todos bloqueados hasta verificar email
-                                                    isLocked = !isEmailVerified();
+                                                    // Sistema simple: todos bloqueados hasta verificar email con magic link
+                                                    isLocked = !emailVerified;
                                                 }
                                                 const isCurrentTrack = currentTrack && currentTrack.trackNumber === track.trackNumber;
                                                 

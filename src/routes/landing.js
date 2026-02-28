@@ -3,6 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const { getAll, getOne, query, run } = require('../config/database');
 const { sendWelcomeEmail, sendMiniDiscConfirmationEmail, sendWebhookToN8N } = require('../utils/emailHelper');
+const { syncLeadToEmailOctopus } = require('../utils/emailOctopusHelper');
 const { ensureLandingLeadsTable, saveNFCCode, syncToWordPress, getUnifiedStats, registerOrUpdateLead, verifyMagicToken, markEmailAsVerified } = require('../utils/landingDb');
 const { createPayPalOrder, capturePayPalOrder, getPayPalConfig } = require('../utils/paypalHelper');
 const { scheduleMiniDiscEmail } = require('../utils/scheduledEmails');
@@ -353,10 +354,10 @@ router.post('/subscribe', async (req, res) => {
         // Enviar email con MAGIC LINK y webhook en paralelo
         console.log('[Landing Subscribe] Paso 4: Enviando email con magic link...');
         
-        const [emailResult, webhookResult] = await Promise.allSettled([
-            sendWelcomeEmail({ 
-                to: email, 
-                name: fullName, 
+        const [emailResult, webhookResult, emailOctopusResult] = await Promise.allSettled([
+            sendWelcomeEmail({
+                to: email,
+                name: fullName,
                 country: country,
                 magicToken: userResult.magicToken,
                 userId: userResult.userId
@@ -372,11 +373,19 @@ router.post('/subscribe', async (req, res) => {
                 wordpressSync: syncResults,
                 isNewUser: userResult.isNew,
                 userId: userResult.userId
+            }),
+            syncLeadToEmailOctopus({
+                email,
+                fullName,
+                country,
+                sourceLabel,
+                userId: userResult.userId
             })
         ]);
 
         console.log('[Landing Subscribe] Email result:', emailResult.status === 'fulfilled' ? emailResult.value : emailResult.reason);
         console.log('[Landing Subscribe] Webhook result:', webhookResult.status === 'fulfilled' ? webhookResult.value : webhookResult.reason);
+        console.log('[Landing Subscribe] EmailOctopus result:', emailOctopusResult.status === 'fulfilled' ? emailOctopusResult.value : emailOctopusResult.reason);
 
         // Programar email de Mini-Disc para 30 minutos después (solo si es usuario nuevo)
         if (userResult.isNew && userResult.userId) {

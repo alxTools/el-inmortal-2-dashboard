@@ -2295,7 +2295,7 @@ function LandingApp({ data }) {
                                                             setShowTrackInfoModal(true);
                                                         }
                                                     }}
-                                                    className="rounded-full px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.12em] transition-all border border-blue-400/50 bg-blue-500/20 text-white hover:bg-blue-400/30 hover:border-blue-400 hover:text-white text-center"
+                                                    className="rounded-full px-3 py-1.5 text-[9px] font-medium uppercase tracking-[0.1em] transition-all border border-slate-500/30 bg-slate-700/30 text-slate-300 hover:bg-slate-600/40 hover:border-slate-400/50 hover:text-white text-center w-16"
                                                 >
                                                     Info
                                                 </button>

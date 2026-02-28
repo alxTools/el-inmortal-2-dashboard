@@ -2518,20 +2518,35 @@ function LandingApp({ data }) {
                         ¡Comienza la Experiencia!
                     </h3>
                     
-                    <div className="bg-gradient-to-br from-amber-500/20 to-purple-500/20 rounded-2xl p-6 mb-6 border border-amber-500/30">
-                        <div className="text-4xl mb-2">🔓</div>
-                        <p className="text-amber-300 font-semibold mb-2">
-                            Desbloquea 21 Collectibles
-                        </p>
-                        <p className="text-sm text-slate-300">
-                            Escucha cada track y desbloquea recompensas exclusivas. 
-                            El próximo collectible te espera después del Track 1.
-                        </p>
-                    </div>
+                    {REWARD_SYSTEM_ENABLED ? (
+                        <div className="bg-gradient-to-br from-amber-500/20 to-purple-500/20 rounded-2xl p-6 mb-6 border border-amber-500/30">
+                            <div className="text-4xl mb-2">🔓</div>
+                            <p className="text-amber-300 font-semibold mb-2">
+                                Desbloquea 21 Collectibles
+                            </p>
+                            <p className="text-sm text-slate-300">
+                                Escucha cada track y desbloquea recompensas exclusivas. 
+                                El próximo collectible te espera después del Track 1.
+                            </p>
+                        </div>
+                    ) : (
+                        <div className="bg-gradient-to-br from-amber-500/20 to-purple-500/20 rounded-2xl p-6 mb-6 border border-amber-500/30">
+                            <div className="text-4xl mb-2">🎧</div>
+                            <p className="text-amber-300 font-semibold mb-2">
+                                Escucha el Álbum Completo
+                            </p>
+                            <p className="text-sm text-slate-300">
+                                Disfruta de las 21 canciones de "El Inmortal 2". 
+                                Un estreno exclusivo antes que nadie.
+                            </p>
+                        </div>
+                    )}
 
-                    <p className="text-slate-400 text-sm mb-6">
-                        🎁 Sorpresas exclusivas por cada reacción que dejes
-                    </p>
+                    {REWARD_SYSTEM_ENABLED && (
+                        <p className="text-slate-400 text-sm mb-6">
+                            🎁 Sorpresas exclusivas por cada reacción que dejes
+                        </p>
+                    )}
                     
                     <button
                         onClick={() => {

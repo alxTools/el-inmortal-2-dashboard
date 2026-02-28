@@ -1117,20 +1117,23 @@ function LandingApp({ data }) {
                     setShowCompletionModal(true);
                 }
             } else {
-                // Desbloquear el siguiente track
-                setCurrentUnlockIndex(prev => Math.max(prev, nextTrackNumber - 1));
-                console.log('[Audio] Unlocked track', nextTrackNumber);
-                
-                // Solo mostrar modal de reacción si el sistema está activado
-                if (REWARD_SYSTEM_ENABLED) {
-                    setReactionTrack(track);
-                    setShowReactionModal(true);
-                } else {
-                    // Si el sistema está desactivado, continuar automáticamente
-                    setTimeout(() => {
-                        continueToNextTrack(track.trackNumber);
-                    }, 500);
+                // Solo ejecutar lógica de desbloqueo progresivo si está activado
+                if (LOCK_SYSTEM_ENABLED) {
+                    // Desbloquear el siguiente track
+                    setCurrentUnlockIndex(prev => Math.max(prev, nextTrackNumber - 1));
+                    console.log('[Audio] Unlocked track', nextTrackNumber);
+                    
+                    // Solo mostrar modal de reacción si el sistema está activado
+                    if (REWARD_SYSTEM_ENABLED) {
+                        setReactionTrack(track);
+                        setShowReactionModal(true);
+                    }
                 }
+                
+                // Continuar automáticamente al siguiente track
+                setTimeout(() => {
+                    continueToNextTrack(track.trackNumber);
+                }, 500);
             }
         };
         const handlePause = () => {
@@ -2071,7 +2074,7 @@ function LandingApp({ data }) {
                     </div>
                 </div>
 
-                {!isUnlocked ? (
+                {(LOCK_SYSTEM_ENABLED ? !isUnlocked : !emailVerified) ? (
                     <div className="tracklist-locked glass-panel-enhanced rounded-3xl border border-amber-300/20 p-10 md:p-16 text-center relative overflow-hidden">
                         {/* Background glow */}
                         <div className="absolute inset-0 bg-gradient-to-br from-amber-500/5 via-transparent to-cyan-500/5 pointer-events-none"></div>
@@ -2298,11 +2301,20 @@ function LandingApp({ data }) {
                                             {track.id && (
                                                 <button
                                                     onClick={() => {
-                                                        if (!isUnlocked) {
-                                                            setIsModalOpen(true);
+                                                        if (LOCK_SYSTEM_ENABLED) {
+                                                            if (!isUnlocked) {
+                                                                setIsModalOpen(true);
+                                                            } else {
+                                                                setSelectedTrackForInfo(track);
+                                                                setShowTrackInfoModal(true);
+                                                            }
                                                         } else {
-                                                            setSelectedTrackForInfo(track);
-                                                            setShowTrackInfoModal(true);
+                                                            if (!emailVerified) {
+                                                                setIsModalOpen(true);
+                                                            } else {
+                                                                setSelectedTrackForInfo(track);
+                                                                setShowTrackInfoModal(true);
+                                                            }
                                                         }
                                                     }}
                                                     className="rounded-full px-3 py-1.5 text-[9px] font-medium uppercase tracking-[0.1em] transition-all border border-slate-500/30 bg-slate-700/30 text-slate-300 hover:bg-slate-600/40 hover:border-slate-400/50 hover:text-white text-center w-16"
@@ -2673,7 +2685,17 @@ function LandingApp({ data }) {
                     </div>
                     
                     <button
-                        onClick={() => setShowWelcomeModal(false)}
+                        onClick={() => {
+                            setShowWelcomeModal(false);
+                            // Iniciar reproducción automáticamente del track 1
+                            setTimeout(() => {
+                                setHasStartedListening(true);
+                                const track1 = data.tracks.find(t => t.trackNumber === 1);
+                                if (track1 && track1.audioUrl) {
+                                    handlePlayToggle(track1);
+                                }
+                            }, 300);
+                        }}
                         className="w-full px-4 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-slate-900 font-bold hover:from-amber-400 hover:to-orange-400 transition-all"
                     >
                         ¡Comenzar! 🎵

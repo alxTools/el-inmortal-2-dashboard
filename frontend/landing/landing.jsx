@@ -360,7 +360,7 @@ function CartModal({ isOpen, onClose, cartItems, setCartItems, isCheckingOut, se
             id: 'cd',
             name: 'Mini-Disc Firmado',
             description: 'Edición física limitada con firma de Galante. Incluye envío.',
-            price: 15,
+            price: 25,
             icon: '💿',
             bonus: 'Incluye sticker exclusivo'
         },
@@ -368,7 +368,7 @@ function CartModal({ isOpen, onClose, cartItems, setCartItems, isCheckingOut, se
             id: 'cd-video',
             name: 'Mini-Disc + Video Saludo',
             description: 'Mini-Disc firmado + Video saludo personalizado de Galante (entrega 1 semana antes)',
-            price: 25,
+            price: 100,
             icon: '🎁',
             bonus: 'Video saludo exclusivo + Sticker + Acceso VIP'
         }

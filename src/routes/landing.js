@@ -461,7 +461,8 @@ router.get('/unlock', async (req, res) => {
     if (!token) {
         return res.status(400).render('error', {
             title: 'Link Inválido',
-            message: 'El link de verificación no es válido o ha expirado.'
+            message: 'El link de verificación no es válido o ha expirado.',
+            error: {}
         });
     }
     
@@ -472,7 +473,8 @@ router.get('/unlock', async (req, res) => {
         if (!user) {
             return res.status(400).render('error', {
                 title: 'Link Expirado',
-                message: 'Este link ha expirado o no es válido. Por favor regístrate de nuevo.'
+                message: 'Este link ha expirado o no es válido. Por favor regístrate de nuevo.',
+                error: {}
             });
         }
         
@@ -490,9 +492,11 @@ router.get('/unlock', async (req, res) => {
             userId = existingUser.id;
         } else {
             // Crear nuevo usuario fan
+            const name = user.full_name || user.email.split('@')[0];
+            const username = user.email.split('@')[0] + '_' + Math.floor(Math.random() * 10000);
             const result = await run(
-                'INSERT INTO users (email, name, role, created_at) VALUES (?, ?, ?, NOW())',
-                [user.email, user.full_name || user.email.split('@')[0], 'fan']
+                'INSERT INTO users (email, username, name, role, created_at) VALUES (?, ?, ?, ?, NOW())',
+                [user.email, username, name, 'fan']
             );
             userId = result.lastID;
         }
@@ -530,7 +534,8 @@ router.get('/unlock', async (req, res) => {
         console.error('[Landing Unlock] Error:', error);
         return res.status(500).render('error', {
             title: 'Error',
-            message: 'Ocurrió un error al procesar tu solicitud. Por favor intenta de nuevo.'
+            message: 'Ocurrió un error al procesar tu solicitud. Por favor intenta de nuevo.',
+            error: process.env.NODE_ENV === 'development' ? { message: error.message, stack: error.stack } : {}
         });
     }
 });

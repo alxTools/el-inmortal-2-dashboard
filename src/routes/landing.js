@@ -505,9 +505,11 @@ router.get('/unlock', async (req, res) => {
             // Crear nuevo usuario fan
             const name = user.full_name || user.email.split('@')[0];
             const username = user.email.split('@')[0] + '_' + Math.floor(Math.random() * 10000);
+            // Generar un password temporal aleatorio (los usuarios fans no necesitan password, usan magic link)
+            const tempPassword = require('crypto').randomBytes(32).toString('hex');
             const result = await run(
-                'INSERT INTO users (email, username, name, role, created_at) VALUES (?, ?, ?, ?, NOW())',
-                [user.email, username, name, 'fan']
+                'INSERT INTO users (email, username, name, role, password, created_at) VALUES (?, ?, ?, ?, ?, NOW())',
+                [user.email, username, name, 'fan', tempPassword]
             );
             userId = result.lastID;
         }

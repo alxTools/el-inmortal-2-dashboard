@@ -827,6 +827,7 @@ function LandingApp({ data }) {
     // Nuevos modales para gamificación
     const [showStartModal, setShowStartModal] = useState(false);
     const [showCompletionModal, setShowCompletionModal] = useState(false);
+    const [showWelcomeModal, setShowWelcomeModal] = useState(false);
     const [nextUnlockableTrack, setNextUnlockableTrack] = useState(1);
 
     // Modal de info de track
@@ -916,6 +917,8 @@ function LandingApp({ data }) {
         const shouldUnlock = urlParams.get('unlock') === '1' || urlParams.get('verified') === '1';
         // Email verified only when using magic link with verified=1
         const isEmailVerifiedFromUrl = urlParams.get('verified') === '1';
+        // Welcome parameter from successful magic link verification
+        const showWelcome = urlParams.get('welcome') === '1';
         
         if (shouldUnlock) {
             setIsUnlocked(true);
@@ -926,6 +929,13 @@ function LandingApp({ data }) {
             if (isEmailVerifiedFromUrl) {
                 setEmailVerified(true);
                 localStorage.setItem('ei2_email_verified', 'true');
+                
+                // Mostrar modal de bienvenida si viene del magic link
+                if (showWelcome) {
+                    setTimeout(() => {
+                        setShowWelcomeModal(true);
+                    }, 500);
+                }
             }
             
             // Leer email de la cookie
@@ -2618,6 +2628,55 @@ function LandingApp({ data }) {
                         className="w-full px-4 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-slate-900 font-bold hover:from-amber-400 hover:to-orange-400 transition-all"
                     >
                         ¡Eres Legendario! 👑
+                    </button>
+                </div>
+            </div>
+        )}
+
+        {/* Modal de Bienvenida después de verificar email */}
+        {showWelcomeModal && (
+            <div style={{
+                position: 'fixed',
+                top: 0, left: 0, right: 0, bottom: 0,
+                zIndex: 99999,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '1rem',
+                backgroundColor: 'rgba(0, 0, 0, 0.85)',
+                backdropFilter: 'blur(4px)'
+            }}>
+                <div className="glass-panel-enhanced rounded-3xl p-8 max-w-md w-full text-center">
+                    <div className="text-6xl mb-4 animate-bounce">🎊</div>
+                    <h3 className="text-2xl font-bold text-white mb-4">
+                        ¡Bienvenido a El Inmortal 2!
+                    </h3>
+                    
+                    <div className="bg-gradient-to-br from-amber-500/20 to-orange-500/20 rounded-2xl p-6 mb-6 border border-amber-500/30">
+                        <div className="text-4xl mb-2">🔓</div>
+                        <p className="text-amber-300 font-semibold mb-2">
+                            Acceso Desbloqueado
+                        </p>
+                        <p className="text-sm text-slate-300">
+                            Tu email ha sido verificado. Ahora tienes acceso completo a todas las 
+                            21 canciones de "El Inmortal 2" antes que nadie.
+                        </p>
+                    </div>
+
+                    <div className="bg-slate-800/50 rounded-xl p-4 mb-6">
+                        <p className="text-amber-400 font-semibold mb-2">
+                            🎧 Comienza la Experiencia
+                        </p>
+                        <p className="text-sm text-slate-400">
+                            Presiona "Escuchar Álbum" para comenzar a disfrutar del álbum completo.
+                        </p>
+                    </div>
+                    
+                    <button
+                        onClick={() => setShowWelcomeModal(false)}
+                        className="w-full px-4 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-slate-900 font-bold hover:from-amber-400 hover:to-orange-400 transition-all"
+                    >
+                        ¡Comenzar! 🎵
                     </button>
                 </div>
             </div>

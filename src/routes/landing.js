@@ -523,8 +523,8 @@ router.get('/unlock', async (req, res) => {
         
         console.log(`[Landing Unlock] ✅ Usuario ${user.email} verificado y desbloqueado como FAN (ID: ${userId})`);
         
-        // Redirigir al álbum (fan home)
-        res.redirect('/albums/1?verified=1');
+        // Redirigir al landing page con parámetro de éxito
+        res.redirect('/ei2?verified=1&welcome=1');
         
     } catch (error) {
         console.error('[Landing Unlock] Error:', error);

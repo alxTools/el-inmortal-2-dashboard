@@ -952,7 +952,12 @@ function LandingApp({ data }) {
             const storedUnlock = localStorage.getItem('landing_el_inmortal_unlock');
             const storedEmailVerified = localStorage.getItem('ei2_email_verified');
             
-            if (storedUnlock === '1') {
+            // Verificar desbloqueo según el sistema activado
+            const isUserVerified = LOCK_SYSTEM_ENABLED 
+                ? storedUnlock === '1'  // Sistema progresivo: necesita unlock
+                : storedEmailVerified === 'true';  // Sistema simple: necesita email verificado
+            
+            if (isUserVerified) {
                 setIsUnlocked(true);
                 localStorage.setItem('ei2_registered', 'true');
                 
@@ -969,7 +974,7 @@ function LandingApp({ data }) {
                     localStorage.setItem('ei2_email', email);
                 }
             } else {
-                // Mostrar modal después de 2 segundos
+                // Mostrar modal después de 2 segundos solo si no está verificado
                 const timer = setTimeout(() => {
                     setIsModalOpen(true);
                 }, 2000);

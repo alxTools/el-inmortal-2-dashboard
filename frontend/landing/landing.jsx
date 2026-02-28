@@ -2185,9 +2185,9 @@ function LandingApp({ data }) {
                                     )}
                                 </div>
                             </div>
-                            <div className="glass-panel rounded-2xl p-4">
-                                <p className="text-xs uppercase tracking-[0.2em] text-slate-300">Top 10 - Mas Escuchados</p>
-                                <div className="mt-3 space-y-2 text-sm text-slate-200 max-h-48 min-h-48 overflow-y-auto">
+                            <div className="glass-panel rounded-2xl p-4 h-auto">
+                                <p className="text-xs uppercase tracking-[0.2em] text-slate-300 mb-2">Top 10 - Mas Escuchados</p>
+                                <div className="space-y-2 text-sm text-slate-200 max-h-60 overflow-y-auto pr-1">
                                     {topTracks.length > 0 ? (
                                         topTracks.map((track, index) => (
                                             <div key={track.id} className="flex items-center justify-between group cursor-pointer hover:bg-white/5 p-1 rounded transition" onClick={() => {

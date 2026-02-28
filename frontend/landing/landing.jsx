@@ -322,7 +322,7 @@ function SubscribeModal({ isOpen, onClose, onSubmit, isSubmitting, error, detect
                     <button
                         type="submit"
                         className="modal-submit-btn"
-                        disabled={isSubmitting || !acceptEmails}
+                        disabled={isSubmitting}
                     >
                         {isSubmitting ? (
                             <>

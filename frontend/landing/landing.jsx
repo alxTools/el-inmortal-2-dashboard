@@ -839,6 +839,10 @@ function LandingApp({ data }) {
     const [cartItems, setCartItems] = useState([]);
     const [isCheckingOut, setIsCheckingOut] = useState(false);
 
+    // Modal de verificación de email
+    const [showEmailVerificationModal, setShowEmailVerificationModal] = useState(false);
+    const [registeredEmail, setRegisteredEmail] = useState('');
+
     // Detectar país por IP
     useEffect(() => {
         const detectCountry = async () => {
@@ -1440,11 +1444,12 @@ function LandingApp({ data }) {
             setIsUnlocked(true);
             setIsModalOpen(false);
             setSubmitError('');
+            setRegisteredEmail(email);
             
-            // Mostrar carrito VIP después de 1 segundo
+            // Mostrar modal de verificación de email primero
             setTimeout(() => {
-                setShowCartModal(true);
-            }, 1000);
+                setShowEmailVerificationModal(true);
+            }, 500);
         } catch (error) {
             console.error('[Landing] Error:', error);
             setSubmitError(error.message || 'No se pudo registrar tu email. Intenta otra vez.');
@@ -2713,6 +2718,55 @@ function LandingApp({ data }) {
                         className="w-full px-4 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-slate-900 font-bold hover:from-amber-400 hover:to-orange-400 transition-all"
                     >
                         ¡Comenzar! 🎵
+                    </button>
+                </div>
+            </div>
+        )}
+
+        {/* Modal de Verificación de Email */}
+        {showEmailVerificationModal && (
+            <div style={{
+                position: 'fixed',
+                top: 0, left: 0, right: 0, bottom: 0,
+                zIndex: 99999,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '1rem',
+                backgroundColor: 'rgba(0, 0, 0, 0.9)',
+                backdropFilter: 'blur(4px)'
+            }}>
+                <div className="glass-panel-enhanced rounded-3xl p-8 max-w-md w-full text-center">
+                    <div className="text-6xl mb-4">✉️</div>
+                    <h3 className="text-2xl font-bold text-white mb-4">
+                        ¡Revisa tu Email!
+                    </h3>
+                    
+                    <div className="bg-gradient-to-br from-amber-500/20 to-cyan-500/20 rounded-2xl p-6 mb-6 border border-amber-500/30">
+                        <p className="text-slate-300 mb-3">
+                            Te hemos enviado un email a:
+                        </p>
+                        <p className="text-amber-400 font-bold text-lg break-all">
+                            {registeredEmail}
+                        </p>
+                    </div>
+                    
+                    <p className="text-slate-400 text-sm mb-6">
+                        Haz clic en el link de verificación para desbloquear el álbum completo. 
+                        Si no lo ves, revisa tu carpeta de spam.
+                    </p>
+                    
+                    <button
+                        onClick={() => {
+                            setShowEmailVerificationModal(false);
+                            // Mostrar carrito VIP después de cerrar el modal de verificación
+                            setTimeout(() => {
+                                setShowCartModal(true);
+                            }, 300);
+                        }}
+                        className="w-full px-4 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-slate-900 font-bold hover:from-amber-400 hover:to-orange-400 transition-all"
+                    >
+                        Entendido 👍
                     </button>
                 </div>
             </div>

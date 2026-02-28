@@ -1224,20 +1224,30 @@ function LandingApp({ data }) {
     ];
 
     // Verificar si el email está verificado (tiene session o fan verificado)
+    // Verifica estado de React + localStorage para evitar condiciones de carrera
     const isEmailVerified = () => {
-        return isUnlocked && (document.cookie.includes('landing_el_inmortal_unlock=1') || localStorage.getItem('landing_el_inmortal_unlock') === '1');
+        const fromState = emailVerified || isUnlocked;
+        const fromCookie = typeof document !== 'undefined' && document.cookie.includes('landing_el_inmortal_unlock=1');
+        const fromLocalStorageUnlock = localStorage.getItem('landing_el_inmortal_unlock') === '1';
+        const fromLocalStorageEmail = localStorage.getItem('ei2_email_verified') === 'true';
+        
+        return fromState || fromCookie || fromLocalStorageUnlock || fromLocalStorageEmail;
     };
 
     const handlePlayToggle = async (track) => {
         // Verificar desbloqueo según el sistema activado
+        // Usar estado de React + localStorage como fallback para evitar condiciones de carrera
+        const isEmailVerifiedFromStorage = localStorage.getItem('ei2_email_verified') === 'true';
+        const isUnlockedFromStorage = localStorage.getItem('landing_el_inmortal_unlock') === '1';
+        
         if (LOCK_SYSTEM_ENABLED) {
-            if (!isUnlocked) {
+            if (!isUnlocked && !isUnlockedFromStorage) {
                 setIsModalOpen(true);
                 return;
             }
         } else {
             // Sistema simple: solo necesita email verificado
-            if (!emailVerified) {
+            if (!emailVerified && !isEmailVerifiedFromStorage) {
                 setIsModalOpen(true);
                 return;
             }

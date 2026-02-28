@@ -2706,6 +2706,13 @@ function LandingApp({ data }) {
                     {/* Play Button */}
                     <button
                         onClick={async () => {
+                            if (!emailVerified) {
+                                setShowTrackInfoModal(false);
+                                setTimeout(() => {
+                                    setPlayError('Verifica tu email para escuchar. Revisa tu correo.');
+                                }, 300);
+                                return;
+                            }
                             setShowTrackInfoModal(false);
                             // Wait for modal to close then play
                             await new Promise(resolve => setTimeout(resolve, 150));
@@ -2713,10 +2720,14 @@ function LandingApp({ data }) {
                                 handlePlayToggle(selectedTrackForInfo);
                             }
                         }}
-                        className="w-full px-4 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-slate-900 font-bold hover:from-amber-400 hover:to-orange-400 transition-all flex items-center justify-center gap-2"
+                        className={`w-full px-4 py-3 rounded-xl font-bold transition-all flex items-center justify-center gap-2 ${
+                            emailVerified 
+                                ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-slate-900 hover:from-amber-400 hover:to-orange-400' 
+                                : 'bg-slate-700 text-slate-400 cursor-not-allowed border border-slate-600'
+                        }`}
                     >
-                        <span>▶</span>
-                        <span>Escuchar Ahora</span>
+                        <span>{emailVerified ? '▶' : '✉️'}</span>
+                        <span>{emailVerified ? 'Escuchar Ahora' : 'Verifica tu Email para Escuchar'}</span>
                     </button>
                 </div>
             </div>

@@ -1220,9 +1220,18 @@ function LandingApp({ data }) {
     };
 
     const handlePlayToggle = async (track) => {
-        if (!isUnlocked) {
-            setIsModalOpen(true);
-            return;
+        // Verificar desbloqueo según el sistema activado
+        if (LOCK_SYSTEM_ENABLED) {
+            if (!isUnlocked) {
+                setIsModalOpen(true);
+                return;
+            }
+        } else {
+            // Sistema simple: solo necesita email verificado
+            if (!emailVerified) {
+                setIsModalOpen(true);
+                return;
+            }
         }
         
         if (!isEmailVerified()) {

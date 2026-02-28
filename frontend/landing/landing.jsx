@@ -5,6 +5,7 @@ import { createRoot } from 'react-dom/client';
 // CONFIGURATION - Sistema de Recompensas
 // ========================================
 const REWARD_SYSTEM_ENABLED = false; // Cambiar a true para activar el sistema de recompensas
+const LOCK_SYSTEM_ENABLED = false; // Cambiar a true para activar el sistema de bloqueo progresivo. Cuando está false: todos bloqueados hasta verificar email, luego todos liberados
 
 // ========================================
 // AUDIO WAVES BACKGROUND COMPONENT
@@ -1241,10 +1242,20 @@ function LandingApp({ data }) {
         
         // Verificar si el track está desbloqueado
         const trackIndex = data.tracks.findIndex(t => t.trackNumber === track.trackNumber);
-        if (trackIndex > currentUnlockIndex) {
-            setPlayError(`Escucha los tracks anteriores para desbloquear este. Siguiente: Track ${currentUnlockIndex + 1}`);
-            setTimeout(() => setPlayError(''), 3000);
-            return;
+        if (LOCK_SYSTEM_ENABLED) {
+            // Sistema progresivo: solo puede escuchar hasta currentUnlockIndex
+            if (trackIndex > currentUnlockIndex) {
+                setPlayError(`Escucha los tracks anteriores para desbloquear este. Siguiente: Track ${currentUnlockIndex + 1}`);
+                setTimeout(() => setPlayError(''), 3000);
+                return;
+            }
+        } else {
+            // Sistema simple: todos bloqueados hasta verificar email, luego todos liberados
+            if (!isEmailVerified()) {
+                setPlayError('Verifica tu email para escuchar todos los tracks.');
+                setTimeout(() => setPlayError(''), 3000);
+                return;
+            }
         }
         
         if (!track.audioUrl) {
@@ -2199,9 +2210,9 @@ function LandingApp({ data }) {
                                     )}
                                 </div>
                             </div>
-                            <div className="glass-panel rounded-2xl p-4 h-auto">
-                                <p className="text-xs uppercase tracking-[0.2em] text-slate-300 mb-2">Top 10 - Mas Escuchados</p>
-                                <div className="space-y-2 text-sm text-slate-200 max-h-60 overflow-y-auto pr-1">
+                            <div className="glass-panel rounded-2xl p-4 flex flex-col" style={{ height: '320px' }}>
+                                <p className="text-xs uppercase tracking-[0.2em] text-slate-300 mb-3 flex-shrink-0">Top 10 - Mas Escuchados</p>
+                                <div className="flex-1 overflow-y-auto pr-2 space-y-2 text-sm text-slate-200" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(250, 204, 21, 0.3) transparent' }}>
                                     {topTracks.length > 0 ? (
                                         topTracks.map((track, index) => (
                                             <div key={track.id} className="flex items-center justify-between group cursor-pointer hover:bg-white/5 p-1 rounded transition" onClick={() => {
@@ -2247,7 +2258,15 @@ function LandingApp({ data }) {
                                         <div className="pt-1 flex flex-col gap-2 shrink-0">
                                             {(() => {
                                                 const trackIndex = data.tracks.findIndex(t => t.trackNumber === track.trackNumber);
-                                                const isLocked = !hasStartedListening || trackIndex > currentUnlockIndex;
+                                                // Lógica de bloqueo según el sistema activado
+                                                let isLocked;
+                                                if (LOCK_SYSTEM_ENABLED) {
+                                                    // Sistema progresivo: track bloqueado si no ha iniciado o si el índice es mayor al permitido
+                                                    isLocked = !hasStartedListening || trackIndex > currentUnlockIndex;
+                                                } else {
+                                                    // Sistema simple: todos bloqueados hasta verificar email
+                                                    isLocked = !isEmailVerified();
+                                                }
                                                 const isCurrentTrack = currentTrack && currentTrack.trackNumber === track.trackNumber;
                                                 
                                                 return (
@@ -2291,7 +2310,7 @@ function LandingApp({ data }) {
                                                             setShowTrackInfoModal(true);
                                                         }
                                                     }}
-                                                    className="rounded-full px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.12em] transition-all border border-cyan-500/50 bg-cyan-500/20 text-slate-900 hover:bg-cyan-400/30 hover:border-cyan-500 text-center"
+                                                    className="rounded-full px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.12em] transition-all border border-blue-400/50 bg-blue-500/20 text-white hover:bg-blue-400/30 hover:border-blue-400 hover:text-white text-center"
                                                 >
                                                     Info
                                                 </button>

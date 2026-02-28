@@ -93,7 +93,8 @@ function getAvailableAudioFiles() {
             landingFiles
                 .filter(f => f.endsWith('_landing.mp3'))
                 .forEach(f => {
-                    const match = f.match(/(\d+)/);
+                    // Buscar número de track después del timestamp (ej: 1771886533652_03_...)
+                    const match = f.match(/^\d+_(\d+)/);
                     const trackNum = match ? match[1].padStart(2, '0') : '00';
                     files.push({
                         filename: f,
@@ -110,7 +111,8 @@ function getAvailableAudioFiles() {
             mainFiles
                 .filter(f => (f.endsWith('.wav') || f.endsWith('.mp3')) && !f.includes('_landing'))
                 .forEach(f => {
-                    const match = f.match(/(\d+)/);
+                    // Buscar número de track después del timestamp (ej: 1771886533652_03_...)
+                    const match = f.match(/^\d+_(\d+)/);
                     const trackNum = match ? match[1].padStart(2, '0') : '00';
                     // Solo agregar si no existe versión landing para este track
                     if (!files.some(existing => existing.trackNum === trackNum)) {

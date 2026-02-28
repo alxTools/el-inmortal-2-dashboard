@@ -1235,25 +1235,37 @@ function LandingApp({ data }) {
     };
 
     const handlePlayToggle = async (track) => {
+        console.log('[handlePlayToggle] Called for track:', track?.trackNumber, track?.title);
+        
         // Verificar desbloqueo según el sistema activado
         // Usar estado de React + localStorage como fallback para evitar condiciones de carrera
         const isEmailVerifiedFromStorage = localStorage.getItem('ei2_email_verified') === 'true';
         const isUnlockedFromStorage = localStorage.getItem('landing_el_inmortal_unlock') === '1';
         
+        console.log('[handlePlayToggle] LOCK_SYSTEM_ENABLED:', LOCK_SYSTEM_ENABLED);
+        console.log('[handlePlayToggle] emailVerified (state):', emailVerified);
+        console.log('[handlePlayToggle] isEmailVerifiedFromStorage:', isEmailVerifiedFromStorage);
+        console.log('[handlePlayToggle] isUnlockedFromStorage:', isUnlockedFromStorage);
+        
         if (LOCK_SYSTEM_ENABLED) {
             if (!isUnlocked && !isUnlockedFromStorage) {
+                console.log('[handlePlayToggle] Not unlocked, showing modal');
                 setIsModalOpen(true);
                 return;
             }
         } else {
             // Sistema simple: solo necesita email verificado
             if (!emailVerified && !isEmailVerifiedFromStorage) {
+                console.log('[handlePlayToggle] Email not verified, showing modal');
                 setIsModalOpen(true);
                 return;
             }
         }
         
+        console.log('[handlePlayToggle] Verification passed, continuing...');
+        
         if (!isEmailVerified()) {
+            console.log('[handlePlayToggle] isEmailVerified() returned false');
             setPlayError('Verifica tu email para escuchar. Revisa tu correo por el magic link.');
             setTimeout(() => setPlayError(''), 5000);
             return;
@@ -1646,10 +1658,12 @@ function LandingApp({ data }) {
         
         if (currentIndex >= 0 && currentIndex < data.tracks.length - 1) {
             const nextTrack = data.tracks[currentIndex + 1];
-            console.log('[Reaction] Next track to play:', nextTrack?.trackNumber, nextTrack?.title);
+            console.log('[Reaction] Next track to play:', nextTrack?.trackNumber, nextTrack?.title, 'URL:', nextTrack?.audioUrl);
             if (nextTrack && nextTrack.audioUrl) {
+                console.log('[Reaction] Calling handlePlayToggle for track', nextTrack.trackNumber);
                 // Pequeño delay para asegurar que el modal se cerró
                 setTimeout(() => {
+                    console.log('[Reaction] Executing handlePlayToggle...');
                     handlePlayToggle(nextTrack);
                 }, 300);
             } else {

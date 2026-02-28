@@ -250,20 +250,12 @@ function formatTrackNumber(value) {
 function SubscribeModal({ isOpen, onClose, onSubmit, isSubmitting, error, detectedCountry }) {
     const [email, setEmail] = useState('');
     const [fullName, setFullName] = useState('');
-    const [country, setCountry] = useState(detectedCountry || '');
-    const [acceptEmails, setAcceptEmails] = useState(true);
-
-    useEffect(() => {
-        if (detectedCountry && !country) {
-            setCountry(detectedCountry);
-        }
-    }, [detectedCountry]);
 
     if (!isOpen) return null;
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        onSubmit({ email, fullName, country });
+        onSubmit({ email, fullName, country: detectedCountry || 'Unknown' });
     };
 
     return (
@@ -318,31 +310,6 @@ function SubscribeModal({ isOpen, onClose, onSubmit, isSubmitting, error, detect
                             onChange={(e) => setEmail(e.target.value)}
                             required
                         />
-                    </div>
-
-                    <div className="form-group">
-                        <label htmlFor="modal-country">País *</label>
-                        <input
-                            id="modal-country"
-                            type="text"
-                            placeholder="Tu país"
-                            value={country}
-                            onChange={(e) => setCountry(e.target.value)}
-                            required
-                        />
-                        <small className="form-hint">Detectado automáticamente, puedes cambiarlo</small>
-                    </div>
-
-                    <div className="form-checkbox">
-                        <input
-                            type="checkbox"
-                            id="accept-emails"
-                            checked={acceptEmails}
-                            onChange={(e) => setAcceptEmails(e.target.checked)}
-                        />
-                        <label htmlFor="accept-emails">
-                            Acepto recibir emails con noticias, lanzamientos y contenido exclusivo de Galante el Emperador
-                        </label>
                     </div>
 
                     {error && (

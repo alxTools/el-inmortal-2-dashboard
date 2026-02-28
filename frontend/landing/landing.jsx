@@ -804,6 +804,7 @@ function LandingApp({ data }) {
     const [countdown, setCountdown] = useState(() => getCountdown(data.releaseDate));
     const [filter, setFilter] = useState('all');
     const [isUnlocked, setIsUnlocked] = useState(false);
+    const [emailVerified, setEmailVerified] = useState(false); // Nuevo: verificación real del email
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [submitError, setSubmitError] = useState('');
@@ -940,17 +941,26 @@ function LandingApp({ data }) {
         };
     }, []);
 
-    // Verificar si está desbloqueado
+    // Verificar si está desbloqueado y si el email está verificado
     useEffect(() => {
         const urlParams = new URLSearchParams(window.location.search);
         
         // Check for unlock (old flow) or verified (magic link flow)
         const shouldUnlock = urlParams.get('unlock') === '1' || urlParams.get('verified') === '1';
+        // Email verified only when using magic link with verified=1
+        const isEmailVerifiedFromUrl = urlParams.get('verified') === '1';
         
         if (shouldUnlock) {
             setIsUnlocked(true);
             localStorage.setItem('landing_el_inmortal_unlock', '1');
             localStorage.setItem('ei2_registered', 'true');
+            
+            // Marcar email como verificado solo si vino del magic link (verified=1)
+            if (isEmailVerifiedFromUrl) {
+                setEmailVerified(true);
+                localStorage.setItem('ei2_email_verified', 'true');
+            }
+            
             // Leer email de la cookie
             const emailCookie = document.cookie.split('; ').find(row => row.startsWith('landing_email='));
             if (emailCookie) {
@@ -963,9 +973,17 @@ function LandingApp({ data }) {
         } else {
             // Check localStorage as fallback (for returning users)
             const storedUnlock = localStorage.getItem('landing_el_inmortal_unlock');
+            const storedEmailVerified = localStorage.getItem('ei2_email_verified');
+            
             if (storedUnlock === '1') {
                 setIsUnlocked(true);
                 localStorage.setItem('ei2_registered', 'true');
+                
+                // Restaurar estado de email verificado
+                if (storedEmailVerified === 'true') {
+                    setEmailVerified(true);
+                }
+                
                 // Leer email de la cookie
                 const emailCookie = document.cookie.split('; ').find(row => row.startsWith('landing_email='));
                 if (emailCookie) {
@@ -2352,12 +2370,12 @@ function LandingApp({ data }) {
                         </p>
                         <div className="flex flex-wrap justify-center gap-4 mb-8">
                             <div className="text-center px-4">
-                                <p className="text-2xl font-bold text-amber-400">$15</p>
+                                <p className="text-2xl font-bold text-amber-400">$25</p>
                                 <p className="text-xs text-slate-400">Mini-Disc Firmado</p>
                             </div>
                             <div className="w-px bg-white/10"></div>
                             <div className="text-center px-4">
-                                <p className="text-2xl font-bold text-amber-400">$25</p>
+                                <p className="text-2xl font-bold text-amber-400">$100</p>
                                 <p className="text-xs text-slate-400">+ Video Saludo</p>
                             </div>
                         </div>
@@ -2716,7 +2734,7 @@ function LandingApp({ data }) {
                         className="w-full px-4 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-slate-900 font-bold hover:from-amber-400 hover:to-orange-400 transition-all flex items-center justify-center gap-2"
                     >
                         <span>▶</span>
-                        <span>¡Vamos!</span>
+                        <span>Escuchar Ahora</span>
                     </button>
                 </div>
             </div>

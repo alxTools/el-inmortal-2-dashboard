@@ -1271,8 +1271,11 @@ function LandingApp({ data }) {
             return;
         }
         
+        console.log('[handlePlayToggle] hasStartedListening:', hasStartedListening);
+        
         // Verificar si ya inició con "Escuchar Álbum"
         if (!hasStartedListening) {
+            console.log('[handlePlayToggle] hasStartedListening is false, showing error');
             setPlayError('Presiona "Escuchar Álbum" para comenzar la experiencia.');
             setTimeout(() => setPlayError(''), 3000);
             return;
@@ -1661,7 +1664,10 @@ function LandingApp({ data }) {
             console.log('[Reaction] Next track to play:', nextTrack?.trackNumber, nextTrack?.title, 'URL:', nextTrack?.audioUrl);
             if (nextTrack && nextTrack.audioUrl) {
                 console.log('[Reaction] Calling handlePlayToggle for track', nextTrack.trackNumber);
-                // Pequeño delay para asegurar que el modal se cerró
+                // Forzar hasStartedListening a true ya que ya escuchó un track completo
+                setHasStartedListening(true);
+                console.log('[Reaction] Forced hasStartedListening to true');
+                // Pequeño delay para asegurar que el estado se actualice
                 setTimeout(() => {
                     console.log('[Reaction] Executing handlePlayToggle...');
                     handlePlayToggle(nextTrack);

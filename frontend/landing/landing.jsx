@@ -2,6 +2,11 @@ import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { createRoot } from 'react-dom/client';
 
 // ========================================
+// CONFIGURATION - Sistema de Recompensas
+// ========================================
+const REWARD_SYSTEM_ENABLED = false; // Cambiar a true para activar el sistema de recompensas
+
+// ========================================
 // AUDIO WAVES BACKGROUND COMPONENT
 // ========================================
 function AudioWavesBackground() {
@@ -1110,17 +1115,26 @@ function LandingApp({ data }) {
             const isLastTrack = !hasMoreTracks;
             
             if (isLastTrack) {
-                // Álbum completado - mostrar modal de felicitación
+                // Álbum completado
                 console.log('[Audio] Album completed!');
-                setShowCompletionModal(true);
+                if (REWARD_SYSTEM_ENABLED) {
+                    setShowCompletionModal(true);
+                }
             } else {
-                // Mostrar modal de reacción
-                setReactionTrack(track);
-                setShowReactionModal(true);
-                
-                // Desbloquear el siguiente track inmediatamente
+                // Desbloquear el siguiente track
                 setCurrentUnlockIndex(prev => Math.max(prev, nextTrackNumber - 1));
                 console.log('[Audio] Unlocked track', nextTrackNumber);
+                
+                // Solo mostrar modal de reacción si el sistema está activado
+                if (REWARD_SYSTEM_ENABLED) {
+                    setReactionTrack(track);
+                    setShowReactionModal(true);
+                } else {
+                    // Si el sistema está desactivado, continuar automáticamente
+                    setTimeout(() => {
+                        continueToNextTrack(track.trackNumber);
+                    }, 500);
+                }
             }
         };
         const handlePause = () => {

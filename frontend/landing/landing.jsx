@@ -970,6 +970,12 @@ function LandingApp({ data }) {
                     setEmailVerified(true);
                 }
                 
+                // Restaurar estado de "comenzó a escuchar"
+                const storedStartedListening = localStorage.getItem('ei2_started_listening');
+                if (storedStartedListening === 'true') {
+                    setHasStartedListening(true);
+                }
+                
                 // Leer email de la cookie
                 const emailCookie = document.cookie.split('; ').find(row => row.startsWith('landing_email='));
                 if (emailCookie) {
@@ -1274,7 +1280,11 @@ function LandingApp({ data }) {
         console.log('[handlePlayToggle] hasStartedListening:', hasStartedListening);
         
         // Verificar si ya inició con "Escuchar Álbum"
-        if (!hasStartedListening) {
+        // Usar localStorage como respaldo para evitar condiciones de carrera
+        const hasStartedFromStorage = localStorage.getItem('ei2_started_listening') === 'true';
+        console.log('[handlePlayToggle] hasStartedFromStorage:', hasStartedFromStorage);
+        
+        if (!hasStartedListening && !hasStartedFromStorage) {
             console.log('[handlePlayToggle] hasStartedListening is false, showing error');
             setPlayError('Presiona "Escuchar Álbum" para comenzar la experiencia.');
             setTimeout(() => setPlayError(''), 3000);
@@ -1385,6 +1395,7 @@ function LandingApp({ data }) {
     const startAlbumPlayback = async () => {
         // Marcar que ha iniciado la experiencia
         setHasStartedListening(true);
+        localStorage.setItem('ei2_started_listening', 'true');
         
         // Encontrar el track 1
         const track1 = data.tracks.find(t => t.trackNumber === 1);
@@ -1666,6 +1677,7 @@ function LandingApp({ data }) {
                 console.log('[Reaction] Calling handlePlayToggle for track', nextTrack.trackNumber);
                 // Forzar hasStartedListening a true ya que ya escuchó un track completo
                 setHasStartedListening(true);
+                localStorage.setItem('ei2_started_listening', 'true');
                 console.log('[Reaction] Forced hasStartedListening to true');
                 // Pequeño delay para asegurar que el estado se actualice
                 setTimeout(() => {
@@ -2739,6 +2751,7 @@ function LandingApp({ data }) {
                             // Iniciar reproducción automáticamente del track 1
                             setTimeout(() => {
                                 setHasStartedListening(true);
+                                localStorage.setItem('ei2_started_listening', 'true');
                                 const track1 = data.tracks.find(t => t.trackNumber === 1);
                                 if (track1 && track1.audioUrl) {
                                     handlePlayToggle(track1);

@@ -2378,7 +2378,7 @@ function LandingApp({ data }) {
                                                             }
                                                         }
                                                     }}
-                                                    className="rounded-full px-3 py-1.5 text-[9px] font-medium uppercase tracking-[0.1em] transition-all border border-amber-400/50 bg-amber-400/20 text-amber-300 hover:bg-amber-400/40 hover:border-amber-400 hover:text-amber-200 text-center w-16 shadow-[0_0_10px_rgba(251,191,36,0.2)]"
+                                                    className="rounded-full px-3 py-1.5 text-[9px] font-medium uppercase tracking-[0.1em] transition-all border border-amber-500 bg-amber-400 text-slate-900 hover:bg-amber-300 hover:border-amber-400 hover:text-slate-900 text-center w-16 shadow-[0_0_10px_rgba(251,191,36,0.3)]"
                                                 >
                                                     Info
                                                 </button>

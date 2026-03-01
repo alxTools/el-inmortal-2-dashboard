@@ -52,3 +52,23 @@ coverage/
 .eslintcache
 
 .vercel
+
+# Local runtime and generated proxy artifacts
+n8n_data/
+cloudflared.deb
+opencode.json
+scripts/proxy/generated/
+scripts/proxy/PIA_accounts.pdf
+scripts/proxy/pia-accounts.csv
+scripts/proxy/pia-accounts-inventory.csv
+
+# Local uploaded media assets
+public/uploads/audio/
+public/uploads/misc/
+
+# Local scratch files
+t*corriendo*
+
+# Python cache
+__pycache__/
+*.pyc

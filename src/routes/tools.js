@@ -7,6 +7,7 @@ const router = express.Router();
 const ytdl = require('youtube-dl-exec');
 const multer = require('multer');
 const execAsync = promisify(exec);
+const proxyGeneratedRoot = path.join(__dirname, '../../scripts/proxy/generated');
 
 const {
     ensureYoutubeMetadataTables,
@@ -35,6 +36,63 @@ function normalizeDropboxUrl(rawUrl) {
     }
 
     return parsed.toString();
+}
+
+function safeReadJson(filePath) {
+    try {
+        return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    } catch (_) {
+        return null;
+    }
+}
+
+function getProxyPoolSnapshot(poolName) {
+    const poolDir = path.join(proxyGeneratedRoot, poolName);
+    const latestPath = path.join(poolDir, 'proxy-check-latest.json');
+    const payload = safeReadJson(latestPath);
+
+    if (!payload || !Array.isArray(payload.results)) {
+        return null;
+    }
+
+    const items = payload.results.map((item) => ({
+        name: item.name,
+        host: item.host,
+        port: item.port,
+        proxyUser: item.proxy_user,
+        proxyPass: item.proxy_pass,
+        vpnIp: item.vpn_ip,
+        ready: Boolean(item.ready),
+        city: item.city || '',
+        cc: item.cc || '',
+        serverName: item.server_name || '',
+        dockerHealth: item.docker_health || '',
+        error: item.error || ''
+    }));
+
+    const readyCount = items.filter((x) => x.ready).length;
+
+    return {
+        pool: poolName,
+        checkedAtUtc: payload.checked_at_utc || null,
+        total: items.length,
+        ready: readyCount,
+        down: items.length - readyCount,
+        items
+    };
+}
+
+function listAvailableProxyPools() {
+    if (!fs.existsSync(proxyGeneratedRoot)) {
+        return [];
+    }
+
+    const entries = fs.readdirSync(proxyGeneratedRoot, { withFileTypes: true });
+    return entries
+        .filter((entry) => entry.isDirectory())
+        .map((entry) => entry.name)
+        .filter((name) => fs.existsSync(path.join(proxyGeneratedRoot, name, 'proxy-check-latest.json')))
+        .sort();
 }
 
 // Configure multer for video uploads
@@ -274,6 +332,41 @@ router.post('/youtube-metadata-audit/update', async (req, res) => {
         console.error('YouTube metadata update error:', error);
         return res.redirect(`/tools/youtube-metadata-audit?runId=${runId}&flash=${encodeURIComponent(`update_error:${error.message}`)}`);
     }
+});
+
+router.get('/proxy/mission-control', (req, res) => {
+    const pools = listAvailableProxyPools();
+    const selected = String(req.query.pool || pools[0] || 'pia15-vpx');
+
+    res.render('tools/proxy-mission-control', {
+        title: 'Proxy Mission Control - El Inmortal 2 Dashboard',
+        pools,
+        selectedPool: selected
+    });
+});
+
+router.get('/proxy/status', (req, res) => {
+    const requestedPools = String(req.query.pools || '')
+        .split(',')
+        .map((x) => x.trim())
+        .filter(Boolean);
+
+    const pools = requestedPools.length ? requestedPools : listAvailableProxyPools();
+    const snapshots = pools
+        .map((pool) => getProxyPoolSnapshot(pool))
+        .filter(Boolean);
+
+    const total = snapshots.reduce((acc, s) => acc + s.total, 0);
+    const ready = snapshots.reduce((acc, s) => acc + s.ready, 0);
+
+    res.json({
+        ok: true,
+        generatedAt: new Date().toISOString(),
+        total,
+        ready,
+        down: total - ready,
+        pools: snapshots
+    });
 });
 
 router.get('/proxy/video', async (req, res) => {

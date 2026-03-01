@@ -291,12 +291,14 @@ function SubscribeModal({ isOpen, onClose, onSubmit, isSubmitting, error, detect
                         <label htmlFor="modal-name">Nombre completo *</label>
                         <input
                             id="modal-name"
+                            name="fullName"
                             type="text"
                             placeholder="Tu nombre"
                             value={fullName}
                             onChange={(e) => setFullName(e.target.value)}
                             required
                             autoFocus
+                            autoComplete="name"
                         />
                     </div>
 
@@ -304,11 +306,13 @@ function SubscribeModal({ isOpen, onClose, onSubmit, isSubmitting, error, detect
                         <label htmlFor="modal-email">Email *</label>
                         <input
                             id="modal-email"
+                            name="email"
                             type="email"
                             placeholder="tu@email.com"
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
                             required
+                            autoComplete="email"
                         />
                     </div>
 
@@ -1986,6 +1990,8 @@ function LandingApp({ data }) {
                                                     <span className="text-sm">Click para subir foto</span>
                                                 </div>
                                                 <input
+                                                    id="fan-photo-upload"
+                                                    name="fanPhoto"
                                                     type="file"
                                                     accept="image/*"
                                                     onChange={handlePhotoUpload}
@@ -2202,6 +2208,8 @@ function LandingApp({ data }) {
                                 {/* Formulario de comentario */}
                                 <form onSubmit={handleCommentSubmit} className="mb-3">
                                     <textarea
+                                        id="fan-comment"
+                                        name="comment"
                                         value={newComment}
                                         onChange={(e) => setNewComment(e.target.value)}
                                         placeholder="Deja tu comentario..."
@@ -2507,6 +2515,8 @@ function LandingApp({ data }) {
                     </p>
                     
                     <textarea
+                        id="track-reaction"
+                        name="reaction"
                         value={reactionText}
                         onChange={(e) => setReactionText(e.target.value)}
                         placeholder="Deja tu reacción aquí... (opcional)"

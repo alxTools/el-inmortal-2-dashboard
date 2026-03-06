@@ -12,7 +12,7 @@ def run(cmd):
 
 def main():
     parser = argparse.ArgumentParser(description="Select diverse US PIA server names from gluetun database")
-    parser.add_argument("--container", default="pia15-vpx-01", help="Running gluetun container name")
+    parser.add_argument("--container", default="pia15-box1-us-01", help="Running gluetun container name")
     parser.add_argument("--count", type=int, default=15)
     parser.add_argument("--print-regions", action="store_true")
     args = parser.parse_args()

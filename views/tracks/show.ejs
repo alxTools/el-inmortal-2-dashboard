@@ -144,7 +144,14 @@
                         <p><strong>👥 Featuring:</strong> <%= track.features %></p>
                     <% } %>
                     <% if (track.duration) { %>
-                        <p><strong>⏱️ Duración:</strong> <%= track.duration %></p>
+                        <% const durationRaw = String(track.duration || '').trim(); %>
+                        <% const durationPretty = /^\d+:[0-5]\d$/.test(durationRaw)
+                            ? durationRaw
+                            : (durationRaw && Number.isFinite(Number(durationRaw))
+                                ? `${Math.floor(Number(durationRaw) / 60)}:${String(Math.round(Number(durationRaw) % 60)).padStart(2, '0')}`
+                                : durationRaw);
+                        %>
+                        <p><strong>⏱️ Duración:</strong> <%= durationPretty %></p>
                     <% } %>
                     <% if (track.recording_date) { %>
                         <p><strong>📅 Fecha de grabación:</strong> <%= new Date(track.recording_date).toLocaleDateString('es-ES') %></p>

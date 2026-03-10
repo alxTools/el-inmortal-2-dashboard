@@ -237,6 +237,20 @@ body::before {
   animation: titleGlow 3s ease-in-out infinite;
 }
 
+.dashboard-brand-logo-wrap {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.dashboard-brand-logo {
+  width: min(540px, 85vw);
+  max-height: 140px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 24px rgba(255, 215, 0, 0.22));
+}
+
 @keyframes titleGlow {
   0%, 100% { filter: brightness(1); }
   50% { filter: brightness(1.1); }
@@ -1209,6 +1223,11 @@ body::before {
   .header h1 {
     font-size: 2rem;
     letter-spacing: 2px;
+  }
+
+  .dashboard-brand-logo {
+    width: min(360px, 90vw);
+    max-height: 110px;
   }
   
   .countdown-main {

@@ -43,8 +43,8 @@
 
                 <div class="form-row">
                     <div class="form-group">
-                        <label>Duración (segundos)</label>
-                        <input type="number" id="durationInput" name="duration" min="0" step="1" placeholder="Se detecta automáticamente del audio">
+                        <label>Duración (mm:ss)</label>
+                        <input type="text" id="durationInput" name="duration" inputmode="numeric" placeholder="03:45">
                         <small id="durationAutoStatus" style="color: #888; display: block; margin-top: 6px;">
                             Se llenará automáticamente al seleccionar un archivo de audio.
                         </small>
@@ -129,8 +129,8 @@
 
                 try {
                     const durationSeconds = await extractAudioDurationSeconds(file);
-                    durationInput.value = String(durationSeconds);
-                    status.textContent = `Duración detectada: ${formatDurationPreview(durationSeconds)} (${durationSeconds}s)`;
+                    durationInput.value = formatDurationPreview(durationSeconds);
+                    status.textContent = `Duración detectada: ${formatDurationPreview(durationSeconds)}`;
                     status.style.color = '#22c55e';
                 } catch (error) {
                     status.textContent = `No se pudo detectar duración automática: ${error.message}`;

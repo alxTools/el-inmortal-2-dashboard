@@ -324,8 +324,14 @@
                         </td>
                         <td style="text-align: center; color: #888; font-size: 0.9em;">
                             <% if (track.duration) { %>
-                                <% const mins = Math.floor(track.duration / 60); const secs = track.duration % 60; %>
-                                <%= mins %>:<%= secs.toString().padStart(2, '0') %>
+                                <% const durationRaw = String(track.duration || '').trim(); %>
+                                <% const durationPretty = /^\d+:[0-5]\d$/.test(durationRaw)
+                                    ? durationRaw
+                                    : (durationRaw && Number.isFinite(Number(durationRaw))
+                                        ? `${Math.floor(Number(durationRaw) / 60)}:${String(Math.round(Number(durationRaw) % 60)).padStart(2, '0')}`
+                                        : '-');
+                                %>
+                                <%= durationPretty %>
                             <% } else { %>
                                 -
                             <% } %>

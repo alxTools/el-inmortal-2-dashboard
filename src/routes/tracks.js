@@ -55,11 +55,18 @@ function normalizeIdArray(value) {
     return [...new Set(ids)];
 }
 
-function normalizeDurationSeconds(value) {
+function normalizeDurationText(value) {
     if (value === undefined || value === null || value === '') return null;
 
+    const formatSeconds = (secondsValue) => {
+        const total = Math.max(0, Math.round(secondsValue));
+        const minutes = Math.floor(total / 60);
+        const seconds = total % 60;
+        return `${minutes}:${String(seconds).padStart(2, '0')}`;
+    };
+
     if (typeof value === 'number' && Number.isFinite(value)) {
-        return Math.max(0, Math.round(value));
+        return formatSeconds(value);
     }
 
     const text = String(value).trim();
@@ -69,7 +76,7 @@ function normalizeDurationSeconds(value) {
     if (mmssMatch) {
         const minutes = Number(mmssMatch[1]);
         const seconds = Number(mmssMatch[2]);
-        return (minutes * 60) + seconds;
+        return formatSeconds((minutes * 60) + seconds);
     }
 
     const parsed = Number(text.replace(',', '.'));
@@ -77,7 +84,7 @@ function normalizeDurationSeconds(value) {
         return null;
     }
 
-    return Math.round(parsed);
+    return formatSeconds(parsed);
 }
 
 async function ensureTrackCreditsTables() {
@@ -251,7 +258,7 @@ router.post('/', upload.single('audio_file'), [
 
     try {
         const { track_number, title, producer_id, recording_date, duration, lyrics } = req.body;
-        const normalizedFormDuration = normalizeDurationSeconds(duration);
+        const normalizedFormDuration = normalizeDurationText(duration);
         
         // Si se subió audio, procesarlo
         let audioFilePath = null;
@@ -273,7 +280,7 @@ router.post('/', upload.single('audio_file'), [
             try {
                 console.log(`[Tracks] Analyzing audio for: ${title}`);
                 const analysis = await analyzeAndDescribeAudio(localFilePath, title, producerName);
-                detectedDuration = normalizeDurationSeconds(analysis.duration);
+                detectedDuration = normalizeDurationText(analysis.duration);
                 audioDescription = analysis.description;
                 console.log(`[Tracks] ✅ Audio analyzed - Duration: ${detectedDuration}`);
             } catch (analysisError) {
@@ -422,10 +429,10 @@ router.put('/:id', async (req, res) => {
 
         const primaryProducerId = toPositiveInt(producer_id);
         const rawDurationText = duration === undefined || duration === null ? '' : String(duration).trim();
-        const parsedDuration = normalizeDurationSeconds(rawDurationText);
+        const parsedDuration = normalizeDurationText(rawDurationText);
         const durationToSave = rawDurationText === ''
             ? null
-            : (parsedDuration !== null ? parsedDuration : normalizeDurationSeconds(track.duration));
+            : (parsedDuration !== null ? parsedDuration : normalizeDurationText(track.duration));
 
         await run(
             `UPDATE tracks 

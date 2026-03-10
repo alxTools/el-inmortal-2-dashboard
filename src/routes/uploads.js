@@ -7,6 +7,36 @@ const { getAll, getOne, run } = require('../config/database');
 const { uploadToDrive, isGoogleDrivePath } = require('../utils/googleDriveHelper');
 const { analyzeAndDescribeAudio } = require('../utils/audioHelper');
 
+function normalizeDurationText(value) {
+    if (value === undefined || value === null || value === '') return null;
+
+    const formatSeconds = (secondsValue) => {
+        const total = Math.max(0, Math.round(secondsValue));
+        const minutes = Math.floor(total / 60);
+        const seconds = total % 60;
+        return `${minutes}:${String(seconds).padStart(2, '0')}`;
+    };
+
+    if (typeof value === 'number' && Number.isFinite(value)) {
+        return formatSeconds(value);
+    }
+
+    const text = String(value).trim();
+    if (!text) return null;
+
+    const mmssMatch = text.match(/^(\d+):([0-5]\d)$/);
+    if (mmssMatch) {
+        return `${Number(mmssMatch[1])}:${mmssMatch[2]}`;
+    }
+
+    const numeric = Number(text.replace(',', '.'));
+    if (!Number.isFinite(numeric) || numeric < 0) {
+        return null;
+    }
+
+    return formatSeconds(numeric);
+}
+
 // Helper function to log activity
 async function logActivity(action, entityType, entityId, details) {
     try {
@@ -126,7 +156,7 @@ router.post('/track/:id/audio', upload.single('audio_file'), async (req, res) =>
         try {
             console.log(`[UPLOADS] Analyzing audio for: ${trackTitle}`);
             const analysis = await analyzeAndDescribeAudio(localFilePath, trackTitle, producer);
-            duration = analysis.duration;
+            duration = normalizeDurationText(analysis.duration);
             audioDescription = analysis.description;
             console.log(`[UPLOADS] ✅ Audio analyzed - Duration: ${duration}`);
         } catch (analysisError) {
@@ -134,7 +164,7 @@ router.post('/track/:id/audio', upload.single('audio_file'), async (req, res) =>
             // Si falla el análisis, solo extraemos duración
             try {
                 const { getAudioDuration } = require('../utils/audioHelper');
-                duration = await getAudioDuration(localFilePath);
+                duration = normalizeDurationText(await getAudioDuration(localFilePath));
             } catch (e) {
                 console.warn(`[UPLOADS] Could not extract duration either`);
             }
@@ -389,7 +419,7 @@ router.post('/track/:id/audio/replace', upload.single('audio_file'), async (req,
         let duration = null;
         try {
             const newFileFullPath = path.join(process.cwd(), 'public', newFilePath);
-            duration = await getAudioDuration(newFileFullPath);
+            duration = normalizeDurationText(await getAudioDuration(newFileFullPath));
             console.log(`[UPLOADS] Audio duration extracted: ${duration}`);
         } catch (durationError) {
             console.warn(`[UPLOADS] Could not extract duration: ${durationError.message}`);

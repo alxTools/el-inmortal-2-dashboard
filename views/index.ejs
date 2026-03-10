@@ -10,7 +10,14 @@
     <%- include('partials/navbar') %>
 
     <header class="header">
-        <h1>El Inmortal 2</h1>
+        <div class="dashboard-brand-logo-wrap">
+            <img
+                src="/images/galante_signature.png"
+                onerror="this.src='/images/logo.png'"
+                alt="Galante"
+                class="dashboard-brand-logo"
+            >
+        </div>
         <div class="subtitle">Galante el Emperador</div>
     </header>
 
@@ -142,6 +149,10 @@
                     <div class="quick-link-icon">💿</div>
                     <div>Mini-Disc Fulfillment</div>
                 </a>
+                <a href="/tools/minidisc-generator" class="quick-link">
+                    <div class="quick-link-icon">🔎</div>
+                    <div>Mini-Disc Generator</div>
+                </a>
                 <a href="/tools/exports" class="quick-link">
                     <div class="quick-link-icon">📦</div>
                     <div>Exports</div>
@@ -182,6 +193,10 @@
                 <a href="/tools/minidisc-orders" class="quick-link">
                     <div class="quick-link-icon">💿</div>
                     <div>Gestionar Ordenes Mini-Disc</div>
+                </a>
+                <a href="/tools/minidisc-generator" class="quick-link">
+                    <div class="quick-link-icon">🔎</div>
+                    <div>Generador Mini-Disc Spotify</div>
                 </a>
                 <a href="/tools/exports" class="quick-link">
                     <div class="quick-link-icon">📦</div>

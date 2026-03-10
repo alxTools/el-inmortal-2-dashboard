@@ -89,8 +89,15 @@
 
                 <div class="form-row">
                     <div class="form-group">
-                        <label>Duración</label>
-                        <input type="number" id="durationInput" name="duration" min="0" step="1" value="<%= track.duration || '' %>">
+                        <label>Duración (mm:ss)</label>
+                        <% const durationRaw = String(track.duration || '').trim(); %>
+                        <% const durationDisplay = /^\d+:[0-5]\d$/.test(durationRaw)
+                            ? durationRaw
+                            : (durationRaw && Number.isFinite(Number(durationRaw))
+                                ? `${Math.floor(Number(durationRaw) / 60)}:${String(Math.round(Number(durationRaw) % 60)).padStart(2, '0')}`
+                                : durationRaw);
+                        %>
+                        <input type="text" id="durationInput" name="duration" inputmode="numeric" value="<%= durationDisplay %>" placeholder="03:45">
                         <small id="durationAutoStatus" style="color: #888; display: block; margin-top: 6px;">
                             Se actualiza automáticamente al seleccionar/subir audio.
                         </small>
@@ -344,16 +351,37 @@
             return `${minutes}:${String(seconds).padStart(2, '0')}`;
         }
 
-        function applyDurationToField(durationSeconds, sourceLabel) {
+        function parseDurationToSeconds(value) {
+            if (value === undefined || value === null || value === '') return null;
+
+            if (typeof value === 'number' && Number.isFinite(value)) {
+                return Math.max(0, Math.round(value));
+            }
+
+            const text = String(value).trim();
+            if (!text) return null;
+
+            const mmssMatch = text.match(/^(\d+):([0-5]\d)$/);
+            if (mmssMatch) {
+                return (Number(mmssMatch[1]) * 60) + Number(mmssMatch[2]);
+            }
+
+            const numeric = Number(text.replace(',', '.'));
+            if (!Number.isFinite(numeric) || numeric < 0) return null;
+            return Math.round(numeric);
+        }
+
+        function applyDurationToField(durationValue, sourceLabel) {
             const durationInput = document.getElementById('durationInput');
             const status = document.getElementById('durationAutoStatus');
 
             if (!durationInput || !status) return;
+            const durationSeconds = parseDurationToSeconds(durationValue);
             if (!Number.isFinite(durationSeconds) || durationSeconds < 0) return;
 
             const rounded = Math.round(durationSeconds);
-            durationInput.value = String(rounded);
-            status.textContent = `Duración detectada (${sourceLabel}): ${formatDurationPreview(rounded)} (${rounded}s)`;
+            durationInput.value = formatDurationPreview(rounded);
+            status.textContent = `Duración detectada (${sourceLabel}): ${formatDurationPreview(rounded)}`;
             status.style.color = '#22c55e';
         }
 
@@ -631,7 +659,7 @@
                     statusText.textContent = '✅ ' + (result.message || 'Subida completada!');
                     statusText.style.color = '#28a745';
                     if (result.duration !== undefined && result.duration !== null) {
-                        applyDurationToField(Number(result.duration), 'upload');
+                        applyDurationToField(result.duration, 'upload');
                     }
                     setTimeout(() => location.reload(), 1500);
                 } else {
@@ -800,7 +828,7 @@
                 
                 if (response.ok && result.success) {
                     if (result.duration !== undefined && result.duration !== null) {
-                        applyDurationToField(Number(result.duration), 'reemplazo');
+                        applyDurationToField(result.duration, 'reemplazo');
                     }
                     alert('✅ ' + (result.message || 'Audio reemplazado exitosamente!'));
                     location.reload();

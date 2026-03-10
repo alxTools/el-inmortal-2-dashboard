@@ -65,6 +65,7 @@
                                         type="button"
                                         class="btn-small send-split-email-btn"
                                         data-track-id="<%= sheet.track_id %>"
+                                        data-track-title="<%= String(sheet.track_title || '').replace(/\"/g, '&quot;') %>"
                                         style="background: rgba(59,130,246,0.16); border-color: rgba(59,130,246,0.55); color: #bfdbfe;"
                                     >📧 Email</button>
                                 </div>
@@ -77,18 +78,170 @@
         </div>
     </div>
 
+    <div id="emailPreviewModal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 1200; padding: 18px; overflow-y: auto;">
+        <div style="max-width: 880px; margin: 40px auto; background: #0f172a; border: 1px solid rgba(255,215,0,0.35); border-radius: 14px; padding: 18px; box-shadow: 0 20px 50px rgba(0,0,0,0.45);">
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px;">
+                <h3 style="margin: 0; color: #ffd700;">📧 Preview de Email Splitsheet</h3>
+                <button type="button" id="closeEmailPreviewModalBtn" class="btn-small">Cerrar</button>
+            </div>
+
+            <div style="display: grid; gap: 8px; margin-bottom: 14px; color: #cbd5e1; font-size: 0.92em;">
+                <div><strong>Track:</strong> <span id="previewTrackLabel">-</span></div>
+                <div><strong>Subject:</strong> <span id="previewSubjectLabel">-</span></div>
+                <div><strong>Productores:</strong> <span id="previewProducerRecipients">-</span></div>
+                <div><strong>Artista:</strong> <span id="previewArtistRecipient">-</span></div>
+            </div>
+
+            <div class="form-row" style="margin-bottom: 10px;">
+                <div class="form-group">
+                    <label for="previewProducerEmailInput">Override Email Productor (opcional)</label>
+                    <input id="previewProducerEmailInput" type="email" placeholder="ejemplo@correo.com">
+                </div>
+                <div class="form-group">
+                    <label for="previewArtistEmailInput">Email Artista</label>
+                    <input id="previewArtistEmailInput" type="email" placeholder="galante@...">
+                </div>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 12px;">
+                <label for="previewMessageInput">Mensaje adicional (opcional)</label>
+                <textarea id="previewMessageInput" rows="3" placeholder="Mensaje opcional para incluir en el email..."></textarea>
+            </div>
+
+            <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px;">
+                <button type="button" id="refreshEmailPreviewBtn" class="btn-small">🔄 Actualizar Preview</button>
+                <button type="button" id="sendEmailFromPreviewBtn" class="btn" style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); border: none;">📤 Enviar Ahora</button>
+                <span id="emailPreviewStatus" style="align-self: center; color: #9ca3af; font-size: 0.9em;"></span>
+            </div>
+
+            <div style="border: 1px solid rgba(255,255,255,0.15); border-radius: 10px; overflow: hidden; background: #fff;">
+                <div style="padding: 8px 12px; background: #111827; color: #e5e7eb; font-size: 0.85em;">Preview HTML</div>
+                <div id="emailPreviewBody" style="max-height: 380px; overflow: auto; padding: 14px; color: #111827;"></div>
+            </div>
+        </div>
+    </div>
+
     <%- include('../partials/footer') %>
 
     <script>
-        async function sendSplitsheetEmail(trackId) {
+        const emailPreviewModal = document.getElementById('emailPreviewModal');
+        const closeEmailPreviewModalBtn = document.getElementById('closeEmailPreviewModalBtn');
+        const previewTrackLabel = document.getElementById('previewTrackLabel');
+        const previewSubjectLabel = document.getElementById('previewSubjectLabel');
+        const previewProducerRecipients = document.getElementById('previewProducerRecipients');
+        const previewArtistRecipient = document.getElementById('previewArtistRecipient');
+        const previewProducerEmailInput = document.getElementById('previewProducerEmailInput');
+        const previewArtistEmailInput = document.getElementById('previewArtistEmailInput');
+        const previewMessageInput = document.getElementById('previewMessageInput');
+        const refreshEmailPreviewBtn = document.getElementById('refreshEmailPreviewBtn');
+        const sendEmailFromPreviewBtn = document.getElementById('sendEmailFromPreviewBtn');
+        const emailPreviewStatus = document.getElementById('emailPreviewStatus');
+        const emailPreviewBody = document.getElementById('emailPreviewBody');
+
+        let activeTrackId = null;
+        let activeTrackTitle = '';
+
+        function setPreviewStatus(message, color = '#9ca3af') {
+            emailPreviewStatus.textContent = message || '';
+            emailPreviewStatus.style.color = color;
+        }
+
+        function buildPreviewQuery() {
+            const params = new URLSearchParams();
+            const producerEmail = String(previewProducerEmailInput.value || '').trim();
+            const artistEmail = String(previewArtistEmailInput.value || '').trim();
+            const message = String(previewMessageInput.value || '').trim();
+
+            if (producerEmail) params.set('producerEmail', producerEmail);
+            if (artistEmail) params.set('artistEmail', artistEmail);
+            if (message) params.set('message', message);
+            return params.toString();
+        }
+
+        async function loadEmailPreview() {
+            if (!activeTrackId) return;
+
+            setPreviewStatus('Cargando preview...', '#facc15');
+            sendEmailFromPreviewBtn.disabled = true;
+
             try {
-                const response = await fetch(`/splitsheets/${trackId}/send`, {
+                const query = buildPreviewQuery();
+                const response = await fetch(`/splitsheets/${activeTrackId}/email-preview${query ? `?${query}` : ''}`, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                });
+
+                const result = await response.json();
+                if (!response.ok || !result.success) {
+                    throw new Error(result.error || result.details || 'No se pudo cargar preview');
+                }
+
+                previewTrackLabel.textContent = `#${result.track?.track_number || '-'} - ${result.track?.title || activeTrackTitle || '-'}`;
+                previewSubjectLabel.textContent = result.subject || '-';
+                previewProducerRecipients.textContent = (result.producerRecipients || []).join(', ') || '-';
+                previewArtistRecipient.textContent = result.artistRecipient || '-';
+                emailPreviewBody.innerHTML = result.html || '<p style="color:#6b7280;">Sin contenido</p>';
+
+                if (!String(previewArtistEmailInput.value || '').trim() && result.artistRecipient) {
+                    previewArtistEmailInput.value = result.artistRecipient;
+                }
+
+                sendEmailFromPreviewBtn.disabled = false;
+                setPreviewStatus('Preview listo. Puedes enviar.', '#86efac');
+            } catch (error) {
+                console.error('Error loading email preview:', error);
+                emailPreviewBody.innerHTML = '<p style="color:#dc2626;">No se pudo cargar el preview.</p>';
+                setPreviewStatus(error.message, '#fda4af');
+            }
+        }
+
+        function openEmailPreview(trackId, trackTitle) {
+            activeTrackId = trackId;
+            activeTrackTitle = trackTitle || '';
+            previewTrackLabel.textContent = activeTrackTitle || '-';
+            previewSubjectLabel.textContent = '-';
+            previewProducerRecipients.textContent = '-';
+            previewArtistRecipient.textContent = '-';
+            emailPreviewBody.innerHTML = '';
+            previewProducerEmailInput.value = '';
+            previewArtistEmailInput.value = '';
+            previewMessageInput.value = '';
+            setPreviewStatus('');
+
+            emailPreviewModal.style.display = 'block';
+            document.body.style.overflow = 'hidden';
+            loadEmailPreview();
+        }
+
+        function closeEmailPreviewModal() {
+            emailPreviewModal.style.display = 'none';
+            document.body.style.overflow = '';
+            activeTrackId = null;
+            activeTrackTitle = '';
+        }
+
+        async function sendSplitsheetEmailFromPreview() {
+            if (!activeTrackId) return;
+
+            const payload = {
+                producerEmail: String(previewProducerEmailInput.value || '').trim() || null,
+                artistEmail: String(previewArtistEmailInput.value || '').trim() || null,
+                message: String(previewMessageInput.value || '').trim() || null
+            };
+
+            try {
+                sendEmailFromPreviewBtn.disabled = true;
+                setPreviewStatus('Enviando email...', '#facc15');
+
+                const response = await fetch(`/splitsheets/${activeTrackId}/send`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         'Accept': 'application/json'
                     },
-                    body: JSON.stringify({})
+                    body: JSON.stringify(payload)
                 });
 
                 const result = await response.json();
@@ -96,19 +249,35 @@
                     throw new Error(result.error || result.details || 'No se pudo enviar');
                 }
 
+                setPreviewStatus(result.message, '#86efac');
                 alert(`✅ ${result.message}`);
+                closeEmailPreviewModal();
                 window.location.reload();
             } catch (error) {
                 console.error('Error sending splitsheet email:', error);
+                setPreviewStatus(error.message, '#fda4af');
                 alert(`❌ ${error.message}`);
+            } finally {
+                sendEmailFromPreviewBtn.disabled = false;
             }
         }
+
+        closeEmailPreviewModalBtn.addEventListener('click', closeEmailPreviewModal);
+        emailPreviewModal.addEventListener('click', (event) => {
+            if (event.target === emailPreviewModal) {
+                closeEmailPreviewModal();
+            }
+        });
+
+        refreshEmailPreviewBtn.addEventListener('click', loadEmailPreview);
+        sendEmailFromPreviewBtn.addEventListener('click', sendSplitsheetEmailFromPreview);
 
         document.querySelectorAll('.send-split-email-btn').forEach((button) => {
             button.addEventListener('click', () => {
                 const trackId = button.getAttribute('data-track-id');
+                const trackTitle = button.getAttribute('data-track-title') || '';
                 if (!trackId) return;
-                sendSplitsheetEmail(trackId);
+                openEmailPreview(trackId, trackTitle);
             });
         });
     </script>

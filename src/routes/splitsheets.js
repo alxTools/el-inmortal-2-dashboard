@@ -4,6 +4,12 @@ const { getAll, getOne, run } = require('../config/database');
 const nodemailer = require('nodemailer');
 const PDFDocument = require('pdfkit');
 
+function createHttpError(status, message) {
+    const error = new Error(message);
+    error.httpStatus = status;
+    return error;
+}
+
 function toPercentage(value) {
     const parsed = Number(value);
     if (!Number.isFinite(parsed)) return null;
@@ -229,6 +235,93 @@ async function getTrackComposers(trackId) {
          ORDER BY c.name`,
         [trackId]
     );
+}
+
+async function prepareSplitsheetEmailPayload(trackId, { producerEmail, artistEmail, message } = {}) {
+    const track = await getOne(
+        'SELECT id, title, track_number FROM tracks WHERE id = ?',
+        [trackId]
+    );
+
+    if (!track) {
+        throw createHttpError(404, 'Track no encontrado');
+    }
+
+    const producerSplits = await getSplitsheetsByTrackId(trackId);
+    if (!producerSplits.length) {
+        throw createHttpError(422, 'No hay splitsheets para este track');
+    }
+
+    const composers = await getTrackComposers(trackId);
+
+    const explicitProducerEmail = String(producerEmail || '').trim();
+    const producerRecipients = explicitProducerEmail
+        ? [explicitProducerEmail]
+        : [...new Set(
+            producerSplits
+                .map((row) => String(row.producer_email || '').trim())
+                .filter(Boolean)
+        )];
+
+    if (!producerRecipients.length) {
+        throw createHttpError(400, 'No hay emails de productores para enviar');
+    }
+
+    const artistRecipient = String(
+        artistEmail || process.env.SPLITSHEET_ARTIST_EMAIL || 'galante@el-emperador.com'
+    ).trim();
+
+    const appUrl = String(process.env.APP_URL || process.env.BASE_URL || 'https://ei2.galantealx.com')
+        .trim()
+        .replace(/\/$/, '');
+    const representativeSplitsheetId = producerSplits[0].id;
+    const splitsheetPdfUrl = `${appUrl}/splitsheets/${representativeSplitsheetId}/pdf`;
+    const splitsheetEditUrl = `${appUrl}/splitsheets/${representativeSplitsheetId}/edit`;
+
+    const producerBreakdownHtml = producerSplits
+        .map((row) => `<li><strong>${htmlEscape(row.producer_name)}</strong>: ${row.producer_percentage}%</li>`)
+        .join('');
+    const composerBreakdownHtml = composers.length
+        ? composers.map((row) => `<li>${htmlEscape(row.name)}</li>`).join('')
+        : '<li>No hay compositores asignados</li>';
+
+    const sanitizedMessage = String(message || '').trim();
+    const subject = `Splitsheet - ${track.title}`;
+    const copySubject = `Copia: Splitsheet - ${track.title}`;
+
+    const emailContent = `
+        <h2>Splitsheet Agreement - ${htmlEscape(track.title)}</h2>
+        <p><strong>Tema:</strong> #${track.track_number || '-'} - ${htmlEscape(track.title)}</p>
+        <p><strong>Artista:</strong> Galante el Emperador</p>
+
+        <h3>División de Productores</h3>
+        <ul>${producerBreakdownHtml}</ul>
+
+        <h3>Compositores</h3>
+        <ul>${composerBreakdownHtml}</ul>
+
+        ${sanitizedMessage ? `<p><strong>Mensaje:</strong><br>${htmlEscape(sanitizedMessage)}</p>` : ''}
+
+        <p><strong>Ver versión PDF:</strong> <a href="${splitsheetPdfUrl}">${splitsheetPdfUrl}</a></p>
+        <p><strong>Ver/Editar en dashboard:</strong> <a href="${splitsheetEditUrl}">${splitsheetEditUrl}</a></p>
+
+        <hr>
+        <p style="font-size: 0.9em; color: #666;">Este es un email automático de El Inmortal 2 Dashboard.</p>
+    `;
+
+    return {
+        track,
+        producerSplits,
+        producerRecipients,
+        artistRecipient,
+        subject,
+        copySubject,
+        emailContent,
+        links: {
+            pdf: splitsheetPdfUrl,
+            edit: splitsheetEditUrl
+        }
+    };
 }
 
 async function syncTrackSplitsheetFlags(trackId) {
@@ -794,55 +887,48 @@ router.put('/:id', async (req, res) => {
     }
 });
 
+// GET email preview payload for modal confirmation
+router.get('/:trackId/email-preview', async (req, res) => {
+    try {
+        await ensureSplitsheetInfra();
+
+        const trackId = req.params.trackId;
+        const payload = await prepareSplitsheetEmailPayload(trackId, {
+            producerEmail: req.query.producerEmail,
+            artistEmail: req.query.artistEmail,
+            message: req.query.message
+        });
+
+        return res.json({
+            success: true,
+            track: payload.track,
+            producerRecipients: payload.producerRecipients,
+            artistRecipient: payload.artistRecipient,
+            subject: payload.subject,
+            copySubject: payload.copySubject,
+            html: payload.emailContent,
+            links: payload.links,
+            producerCount: payload.producerRecipients.length
+        });
+    } catch (error) {
+        console.error('Error generating email preview:', error);
+        return res.status(error.httpStatus || 500).json({
+            error: error.message || 'Error preparando preview de email'
+        });
+    }
+});
+
 // POST send splitsheet via email
 router.post('/:trackId/send', async (req, res) => {
     try {
         await ensureSplitsheetInfra();
 
         const trackId = req.params.trackId;
-        const { producerEmail, artistEmail, message } = req.body;
-
-        const track = await getOne(
-            'SELECT id, title, track_number FROM tracks WHERE id = ?',
-            [trackId]
-        );
-
-        if (!track) {
-            return res.status(404).json({ error: 'Track no encontrado' });
-        }
-
-        const producerSplits = await getSplitsheetsByTrackId(trackId);
-        if (!producerSplits.length) {
-            return res.status(422).json({ error: 'No hay splitsheets para este track' });
-        }
-
-        const composers = await getTrackComposers(trackId);
-
-        const explicitProducerEmail = String(producerEmail || '').trim();
-        const producerRecipients = explicitProducerEmail
-            ? [explicitProducerEmail]
-            : [...new Set(
-                producerSplits
-                    .map((row) => String(row.producer_email || '').trim())
-                    .filter(Boolean)
-            )];
-
-        if (!producerRecipients.length) {
-            return res.status(400).json({ error: 'No hay emails de productores para enviar' });
-        }
-
-        const toArtist = String(artistEmail || process.env.SPLITSHEET_ARTIST_EMAIL || 'galante@el-emperador.com').trim();
-        const appUrl = String(process.env.APP_URL || process.env.BASE_URL || 'https://ei2.galantealx.com').trim().replace(/\/$/, '');
-        const representativeSplitsheetId = producerSplits[0].id;
-        const splitsheetPdfUrl = `${appUrl}/splitsheets/${representativeSplitsheetId}/pdf`;
-        const splitsheetEditUrl = `${appUrl}/splitsheets/${representativeSplitsheetId}/edit`;
-
-        const producerBreakdownHtml = producerSplits
-            .map((row) => `<li><strong>${htmlEscape(row.producer_name)}</strong>: ${row.producer_percentage}%</li>`)
-            .join('');
-        const composerBreakdownHtml = composers.length
-            ? composers.map((row) => `<li>${htmlEscape(row.name)}</li>`).join('')
-            : '<li>No hay compositores asignados</li>';
+        const payload = await prepareSplitsheetEmailPayload(trackId, {
+            producerEmail: req.body.producerEmail,
+            artistEmail: req.body.artistEmail,
+            message: req.body.message
+        });
 
         const transporter = nodemailer.createTransporter({
             host: process.env.SMTP_HOST || 'smtp.gmail.com',
@@ -854,46 +940,26 @@ router.post('/:trackId/send', async (req, res) => {
             }
         });
 
-        const emailContent = `
-            <h2>Splitsheet Agreement - ${htmlEscape(track.title)}</h2>
-            <p><strong>Tema:</strong> #${track.track_number || '-'} - ${htmlEscape(track.title)}</p>
-            <p><strong>Artista:</strong> Galante el Emperador</p>
-
-            <h3>División de Productores</h3>
-            <ul>${producerBreakdownHtml}</ul>
-
-            <h3>Compositores</h3>
-            <ul>${composerBreakdownHtml}</ul>
-
-            ${message ? `<p><strong>Mensaje:</strong><br>${htmlEscape(message)}</p>` : ''}
-
-            <p><strong>Ver versión PDF:</strong> <a href="${splitsheetPdfUrl}">${splitsheetPdfUrl}</a></p>
-            <p><strong>Ver/Editar en dashboard:</strong> <a href="${splitsheetEditUrl}">${splitsheetEditUrl}</a></p>
-
-            <hr>
-            <p style="font-size: 0.9em; color: #666;">Este es un email automático de El Inmortal 2 Dashboard.</p>
-        `;
-
         const emailPromises = [];
 
-        for (const recipient of producerRecipients) {
+        for (const recipient of payload.producerRecipients) {
             emailPromises.push(
                 transporter.sendMail({
                     from: '"El Inmortal 2" <splits@galanteelemperador.com>',
                     to: recipient,
-                    subject: `Splitsheet - ${track.title}`,
-                    html: emailContent
+                    subject: payload.subject,
+                    html: payload.emailContent
                 })
             );
         }
 
-        if (toArtist) {
+        if (payload.artistRecipient) {
             emailPromises.push(
                 transporter.sendMail({
                     from: '"El Inmortal 2" <splits@galanteelemperador.com>',
-                    to: toArtist,
-                    subject: `Copia: Splitsheet - ${track.title}`,
-                    html: emailContent
+                    to: payload.artistRecipient,
+                    subject: payload.copySubject,
+                    html: payload.emailContent
                 })
             );
         }
@@ -908,17 +974,21 @@ router.post('/:trackId/send', async (req, res) => {
         `, [trackId]);
 
         await syncTrackSplitsheetFlags(trackId);
-        
-        res.json({ 
-            success: true, 
-            message: `Emails enviados exitosamente a ${producerRecipients.length} productor(es)`
+
+        return res.json({
+            success: true,
+            message: `Emails enviados exitosamente a ${payload.producerRecipients.length} productor(es)`,
+            recipients: {
+                producers: payload.producerRecipients,
+                artist: payload.artistRecipient || null
+            }
         });
-        
+
     } catch (error) {
         console.error('Error sending email:', error);
-        res.status(500).json({ 
-            error: 'Error enviando emails',
-            details: error.message 
+        return res.status(error.httpStatus || 500).json({ 
+            error: error.message || 'Error enviando emails',
+            details: error.message
         });
     }
 });

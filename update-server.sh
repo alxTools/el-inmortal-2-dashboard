@@ -19,13 +19,37 @@ Uso:
       Modo update (actual): stash + pull + build + restart
 
   ./update-server.sh --push
-      Modo push: sube los cambios del servidor sin hacer pull
+      Modo push: commit/push + build + restart (sin pull)
 
 Opciones:
   --push           Activa modo push (no hace pull)
   -m, --message    Mensaje de commit para --push
   -h, --help       Muestra esta ayuda
 EOF
+}
+
+build_landing() {
+    echo "🔨 Compilando landing page..."
+    npm run landing:build
+}
+
+restart_app() {
+    if command -v pm2 &> /dev/null; then
+        echo "🚀 Reiniciando con PM2..."
+        pm2 restart el-inmortal-2 || pm2 start src/app.js --name el-inmortal-2
+        echo "✅ ¡Servidor corriendo con PM2!"
+        echo ""
+        pm2 status
+    else
+        echo "🚀 Reiniciando proceso de Node.js..."
+        pkill -f "node src/app.js"
+        sleep 2
+        nohup npm start > /dev/null 2>&1 &
+        echo "✅ ¡Servidor corriendo!"
+        echo ""
+        sleep 2
+        ps aux | grep "node src/app.js" | grep -v grep
+    fi
 }
 
 while [[ $# -gt 0 ]]; do
@@ -91,6 +115,14 @@ if [[ "$MODE" == "push" ]]; then
         exit 1
     fi
 
+    build_landing
+    restart_app
+
+    echo ""
+    echo "🌐 El sitio debería estar disponible en: https://ei2.galantealx.com"
+    echo ""
+    echo "💡 Si hay problemas, revisa los logs con: pm2 logs el-inmortal-2"
+
     exit 0
 fi
 
@@ -103,25 +135,8 @@ git stash
 echo "⬇️  Descargando actualizaciones desde GitHub..."
 git pull
 
-echo "🔨 Compilando landing page..."
-npm run landing:build
-
-if command -v pm2 &> /dev/null; then
-    echo "🚀 Reiniciando con PM2..."
-    pm2 restart el-inmortal-2 || pm2 start src/app.js --name el-inmortal-2
-    echo "✅ ¡Servidor actualizado y corriendo con PM2!"
-    echo ""
-    pm2 status
-else
-    echo "🚀 Reiniciando proceso de Node.js..."
-    pkill -f "node src/app.js"
-    sleep 2
-    nohup npm start > /dev/null 2>&1 &
-    echo "✅ ¡Servidor actualizado y corriendo!"
-    echo ""
-    sleep 2
-    ps aux | grep "node src/app.js" | grep -v grep
-fi
+build_landing
+restart_app
 
 echo ""
 echo "🌐 El sitio debería estar disponible en: https://ei2.galantealx.com"

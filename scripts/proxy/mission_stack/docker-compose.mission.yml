@@ -1,0 +1,48 @@
+version: "3.7"
+
+x-orchestrator-common: &orchestrator_common
+  build:
+    context: ./
+    dockerfile: orchestrator.Dockerfile
+  working_dir: /workspace
+  volumes:
+    - ../../:/workspace
+    - /var/run/docker.sock:/var/run/docker.sock
+  environment:
+    ROOT_DIR: /workspace
+    CSV_PATH: /workspace/scripts/proxy/pia-accounts-inventory.csv
+
+services:
+  mission-deployer-full:
+    <<: *orchestrator_common
+    command: ["bash", "scripts/proxy/mission_stack/deploy_full.sh"]
+    restart: "no"
+
+  mission-healer-full:
+    <<: *orchestrator_common
+    command: ["bash", "scripts/proxy/mission_stack/healer_loop.sh", "--pools-file", "scripts/proxy/mission_stack/pools-full.txt", "--interval", "180"]
+    restart: unless-stopped
+    depends_on:
+      - mission-deployer-full
+
+  mission-deployer-test:
+    <<: *orchestrator_common
+    command: ["bash", "scripts/proxy/mission_stack/deploy_test.sh"]
+    restart: "no"
+
+  mission-healer-test:
+    <<: *orchestrator_common
+    command: ["bash", "scripts/proxy/mission_stack/healer_loop.sh", "--pools-file", "scripts/proxy/mission_stack/pools-test.txt", "--interval", "120"]
+    restart: unless-stopped
+    depends_on:
+      - mission-deployer-test
+
+  master-controller:
+    build:
+      context: ../opencode_cluster
+      dockerfile: controller.Dockerfile
+    working_dir: /app
+    command: ["health", "--workers", "/app/workers.json", "--timeout", "30"]
+    restart: unless-stopped
+    volumes:
+      - ../opencode_cluster/workers.example.json:/app/workers.json:ro

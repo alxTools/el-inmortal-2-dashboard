@@ -52,6 +52,76 @@ Outputs are written to the pool directory:
 
 Import `foxyproxy-ready-latest.json` in Firefox FoxyProxy.
 
+## Interactive TUI (Deploy X Boxes)
+
+For fresh VM workflows where you want to deploy multiple boxes from your
+credentials CSV in one run, use:
+
+```bash
+python3 scripts/proxy/deploy_boxes_tui.py
+```
+
+The TUI lets you choose:
+
+- CSV source (for example `pia-accounts-inventory.csv`)
+- Start account index and number of boxes
+- Tunnels per box (1-20)
+- Base port range planning
+- Project naming prefix
+- Proxy username prefix template
+- Region/country/explicit server name selection
+- Optional post-deploy health check (`--heal`) for each box
+
+It writes outputs under `scripts/proxy/generated/<project>/` so Mission Control
+can read the latest snapshots automatically.
+
+Non-interactive mode (useful in cloud-init/SSH automation), example for 20 boxes:
+
+```bash
+python3 scripts/proxy/deploy_boxes_tui.py \
+  --non-interactive \
+  --csv-path scripts/proxy/pia-accounts-inventory.csv \
+  --start-index 1 \
+  --boxes 20 \
+  --tunnels-per-box 15 \
+  --first-base-port 3128 \
+  --project-prefix pia15 \
+  --proxy-prefix-template vpx{n} \
+  --fixed-proxy-pass x0 \
+  --mode region \
+  --mode-value "US East" \
+  --heal \
+  --auto-continue
+```
+
+## OpenCode Worker Cluster (Web Scraping + MCP Tavily)
+
+If you want one master controller to orchestrate many workers across VMs,
+including scraping dependencies and Tavily MCP, use:
+
+- `scripts/proxy/opencode_cluster/README.md`
+
+This includes:
+
+- Worker image with OpenCode `serve`, Playwright/Chromium, scraping libs
+- Tavily MCP wiring for OpenCode
+- Master controller that broadcasts/chains commands to all workers
+- VM bootstrap script for deploying worker containers fast
+
+## Mission Stack (Compose: Full + Test)
+
+To orchestrate full deploy + healer + master controller from one compose stack:
+
+- `scripts/proxy/mission_stack/README.md`
+
+Included:
+
+- Full mode: 10 US + 6 LATAM + 4 EU
+- Test mode: 3 boxes total (US/EU/LATAM) with 1 tunnel each
+- Continuous healer loop for generated pools
+- Master controller service for worker-fleet missions
+- `AGENT.md` and `RULES.md` mission docs
+
 ## Mission Control Dashboard
 
 Open in browser:

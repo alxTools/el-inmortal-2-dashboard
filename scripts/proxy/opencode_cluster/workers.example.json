@@ -1,0 +1,14 @@
+[
+  {
+    "name": "worker-01",
+    "url": "http://10.0.0.11:4096",
+    "username": "opencode",
+    "password": "CHANGE_ME"
+  },
+  {
+    "name": "worker-02",
+    "url": "http://10.0.0.12:4096",
+    "username": "opencode",
+    "password": "CHANGE_ME"
+  }
+]

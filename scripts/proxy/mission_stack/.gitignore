@@ -1,0 +1,5 @@
+pools-full.txt
+pools-test.txt
+workers.json
+hosts.json
+.env

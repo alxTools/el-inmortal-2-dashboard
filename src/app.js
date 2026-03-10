@@ -257,6 +257,11 @@ app.get('/admin', (req, res) => {
     res.redirect('/auth/login');
 });
 
+// Alias de acceso rapido para el tool de Mini-Disc
+app.get('/minidisc-orders', (req, res) => {
+    return res.redirect('/tools/minidisc-orders');
+});
+
 // Protected routes with role-based access
 // Admin-only routes
 app.use('/tracks', requireAdmin, tracksRouter);

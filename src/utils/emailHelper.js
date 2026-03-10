@@ -623,9 +623,165 @@ async function sendMiniDiscConfirmationEmail({ to, name, orderId, amount, nfcCod
     }
 }
 
+/**
+ * Envia email cuando el Mini-Disc fue despachado
+ * @param {Object} options
+ * @param {string} options.to - Email del destinatario
+ * @param {string} options.name - Nombre del destinatario
+ * @param {string} options.orderId - ID de la orden de PayPal
+ * @param {string} options.trackingNumber - Numero de tracking
+ * @param {string} [options.nfcCode] - Codigo NFC unico
+ * @param {string} [options.nfcLink] - Link NFC unico
+ */
+async function sendMiniDiscShippedEmail({ to, name, orderId, trackingNumber, nfcCode, nfcLink }) {
+    try {
+        const tenantId = process.env.MS_GRAPH_TENANT_ID;
+        const clientId = process.env.MS_GRAPH_CLIENT_ID;
+        const clientSecret = process.env.MS_GRAPH_CLIENT_SECRET;
+        const senderUser = process.env.MS_GRAPH_SENDER_USER || 'info@galantealx.com';
+
+        if (!tenantId || !clientId || !clientSecret) {
+            console.log('[Email] Microsoft Graph no configurado');
+            return { success: false, skipped: true, reason: 'not_configured' };
+        }
+
+        const normalizedTracking = String(trackingNumber || '').trim();
+        if (!normalizedTracking) {
+            return { success: false, error: 'tracking_required' };
+        }
+
+        const tokenUrl = `https://login.microsoftonline.com/${encodeURIComponent(tenantId)}/oauth2/v2.0/token`;
+        const form = new FormData();
+        form.set('grant_type', 'client_credentials');
+        form.set('client_id', clientId);
+        form.set('client_secret', clientSecret);
+        form.set('scope', 'https://graph.microsoft.com/.default');
+
+        const tokenRes = await fetch(tokenUrl, { method: 'POST', body: form });
+        if (!tokenRes.ok) {
+            const tokenErr = await tokenRes.text();
+            console.error('[Email] Error obteniendo token para email de envio:', tokenErr);
+            throw new Error('auth_failed');
+        }
+
+        const tokenData = await tokenRes.json();
+        const accessToken = tokenData.access_token;
+
+        const safeOrderId = String(orderId || '').trim() || 'N/A';
+        const safeName = String(name || '').trim() || 'Fan';
+        const safeNfcCode = String(nfcCode || '').trim();
+        const safeNfcLink = String(nfcLink || '').trim();
+        const hasNfc = Boolean(safeNfcCode || safeNfcLink);
+
+        const subject = `📦 Tu Mini-Disc ya fue enviado - Tracking ${normalizedTracking}`;
+
+        const nfcBlock = hasNfc
+            ? `
+            <div style="background:rgba(250,204,21,0.08);border:1px solid rgba(250,204,21,0.25);border-radius:12px;padding:20px;margin:20px 0;">
+                <h4 style="color:#facc15;font-size:16px;margin:0 0 10px 0;">Tu acceso NFC</h4>
+                <p style="color:#94a3b8;font-size:14px;margin:0;line-height:1.6;">
+                    ${safeNfcCode ? `<strong>Codigo:</strong> ${safeNfcCode}<br>` : ''}
+                    ${safeNfcLink ? `<strong>Link:</strong> <a href="${safeNfcLink}" style="color:#facc15;text-decoration:none;">${safeNfcLink}</a>` : ''}
+                </p>
+            </div>
+            `
+            : '';
+
+        const htmlBody = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Tu Mini-Disc fue enviado</title>
+        </head>
+        <body style="margin:0;padding:0;background-color:#060b15;font-family:Arial,sans-serif;">
+            <table width="100%" cellpadding="0" cellspacing="0" style="background:linear-gradient(135deg, #060b15 0%, #0f172a 100%);">
+                <tr>
+                    <td align="center" style="padding:40px 20px;">
+                        <table width="600" cellpadding="0" cellspacing="0" style="background:rgba(15,23,42,0.95);border-radius:20px;overflow:hidden;border:1px solid rgba(14,165,233,0.35);">
+                            <tr>
+                                <td style="background:linear-gradient(135deg, rgba(14,165,233,0.18), rgba(15,23,42,0.85));padding:36px 30px;text-align:center;border-bottom:2px solid rgba(14,165,233,0.4);">
+                                    <div style="font-size:56px;margin-bottom:12px;">📦</div>
+                                    <h1 style="color:#38bdf8;font-size:28px;margin:0;font-weight:bold;letter-spacing:1px;">TU ORDEN VA EN CAMINO</h1>
+                                    <p style="color:#e2e8f0;margin:10px 0 0 0;font-size:15px;">Mini-Disc El Inmortal 2</p>
+                                </td>
+                            </tr>
+
+                            <tr>
+                                <td style="padding:36px 30px;">
+                                    <h2 style="color:#ffffff;font-size:22px;margin:0 0 14px 0;">Hola ${safeName} 👋</h2>
+
+                                    <p style="color:#94a3b8;font-size:16px;line-height:1.7;margin:0 0 20px 0;">
+                                        Tu Mini-Disc fue despachado exitosamente. Aqui tienes los datos para darle seguimiento al envio.
+                                    </p>
+
+                                    <div style="background:rgba(2,132,199,0.12);border:1px solid rgba(56,189,248,0.35);border-radius:14px;padding:22px;margin:20px 0;">
+                                        <h3 style="color:#7dd3fc;font-size:17px;margin:0 0 12px 0;">Detalles de envio</h3>
+                                        <p style="color:#dbeafe;font-size:14px;margin:0;line-height:1.8;">
+                                            <strong>Orden #:</strong> ${safeOrderId}<br>
+                                            <strong>Tracking:</strong> ${normalizedTracking}<br>
+                                            <strong>Fecha:</strong> ${new Date().toLocaleDateString('es-ES')}
+                                        </p>
+                                    </div>
+
+                                    ${nfcBlock}
+
+                                    <p style="color:#94a3b8;font-size:14px;line-height:1.6;margin:24px 0 0 0;">
+                                        Si necesitas ayuda con tu envio, responde este correo y te apoyamos rapido.
+                                    </p>
+
+                                    <p style="color:#64748b;font-size:13px;margin:22px 0 0 0;border-top:1px solid rgba(255,255,255,0.08);padding-top:16px;">
+                                        Gracias por apoyar este lanzamiento.
+                                    </p>
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+            </table>
+        </body>
+        </html>
+        `;
+
+        const emailPayload = {
+            message: {
+                subject,
+                body: { contentType: 'HTML', content: htmlBody },
+                toRecipients: [{ emailAddress: { address: to } }]
+            }
+        };
+
+        const sendRes = await fetch(
+            `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(senderUser)}/sendMail`,
+            {
+                method: 'POST',
+                headers: {
+                    Authorization: `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(emailPayload)
+            }
+        );
+
+        if (!sendRes.ok) {
+            const sendErr = await sendRes.text();
+            console.error('[Email] Error enviando email de envio:', sendErr);
+            throw new Error('send_failed');
+        }
+
+        console.log('[Email] Email de envio Mini-Disc enviado a:', to);
+        return { success: true, to, trackingNumber: normalizedTracking };
+    } catch (error) {
+        console.error('[Email] Error en sendMiniDiscShippedEmail:', error);
+        return { success: false, error: error.message };
+    }
+}
+
 module.exports = {
     sendWelcomeEmail,
     sendMiniDiscOfferEmail,
     sendMiniDiscConfirmationEmail,
+    sendMiniDiscShippedEmail,
     sendWebhookToN8N
 };

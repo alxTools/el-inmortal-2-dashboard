@@ -3,11 +3,15 @@ const path = require('path');
 const fs = require('fs');
 const { exec, spawn } = require('child_process');
 const { promisify } = require('util');
+const { getAll, getOne, run } = require('../config/database');
 const router = express.Router();
 const ytdl = require('youtube-dl-exec');
 const multer = require('multer');
 const execAsync = promisify(exec);
 const proxyGeneratedRoot = path.join(__dirname, '../../scripts/proxy/generated');
+const { ensureLandingLeadsTable } = require('../utils/landingDb');
+const { syncUserToNotion } = require('../utils/notionHelper');
+const { sendMiniDiscShippedEmail } = require('../utils/emailHelper');
 
 const {
     ensureYoutubeMetadataTables,
@@ -95,6 +99,46 @@ function listAvailableProxyPools() {
         .sort();
 }
 
+function redirectMiniDiscOrders(res, type, message) {
+    const flash = encodeURIComponent(`${type}:${message}`);
+    return res.redirect(`/tools/minidisc-orders?flash=${flash}`);
+}
+
+function parseMiniDiscFlash(raw) {
+    const value = String(raw || '').trim();
+    if (!value) return null;
+
+    const separatorIdx = value.indexOf(':');
+    if (separatorIdx <= 0) {
+        return { type: 'info', message: value };
+    }
+
+    const type = value.slice(0, separatorIdx).trim().toLowerCase();
+    const message = value.slice(separatorIdx + 1).trim();
+    return {
+        type: ['success', 'error', 'warn', 'info'].includes(type) ? type : 'info',
+        message: message || value
+    };
+}
+
+async function syncMiniDiscOrderToNotion(orderId) {
+    if (process.env.NOTION_SYNC_ENABLED !== 'true') {
+        return { skipped: true, reason: 'disabled' };
+    }
+
+    try {
+        const user = await getOne('SELECT * FROM landing_email_leads WHERE id = ?', [orderId]);
+        if (!user) {
+            return { skipped: true, reason: 'user_not_found' };
+        }
+
+        return await syncUserToNotion(user);
+    } catch (error) {
+        console.error('[MiniDisc Orders] Error sincronizando Notion:', error.message);
+        return { success: false, error: error.message };
+    }
+}
+
 // Configure multer for video uploads
 const uploadDir = path.join(__dirname, '../../temp');
 if (!fs.existsSync(uploadDir)) {
@@ -156,6 +200,266 @@ router.get('/exports', async (req, res) => {
         title: 'Exports - El Inmortal 2 Dashboard',
         exportsList
     });
+});
+
+router.get('/minidisc-orders', async (req, res) => {
+    try {
+        await ensureLandingLeadsTable();
+
+        const orders = await getAll(
+            `SELECT
+                id,
+                email,
+                full_name,
+                country,
+                created_at,
+                paypal_order_id,
+                paypal_payment_status,
+                paypal_payer_email,
+                nfc_unique_code,
+                nfc_link,
+                package_shipped,
+                tracking_number
+             FROM landing_email_leads
+             WHERE paypal_payment_status = 'captured'
+             ORDER BY package_shipped ASC, created_at DESC`
+        );
+
+        const normalizedOrders = (orders || []).map((order) => ({
+            ...order,
+            package_shipped: Number(order.package_shipped) === 1,
+            tracking_number: String(order.tracking_number || '').trim()
+        }));
+
+        const pendingOrders = normalizedOrders.filter((order) => !order.package_shipped);
+        const completedOrders = normalizedOrders.filter((order) => order.package_shipped);
+
+        res.render('tools/minidisc-orders', {
+            title: 'Mini-Disc Orders - El Inmortal 2 Dashboard',
+            pendingOrders,
+            completedOrders,
+            stats: {
+                total: normalizedOrders.length,
+                pending: pendingOrders.length,
+                completed: completedOrders.length
+            },
+            flash: parseMiniDiscFlash(req.query.flash)
+        });
+    } catch (error) {
+        console.error('[MiniDisc Orders] Error cargando panel:', error);
+        res.render('tools/minidisc-orders', {
+            title: 'Mini-Disc Orders - El Inmortal 2 Dashboard',
+            pendingOrders: [],
+            completedOrders: [],
+            stats: { total: 0, pending: 0, completed: 0 },
+            flash: {
+                type: 'error',
+                message: `No se pudo cargar el panel: ${error.message}`
+            }
+        });
+    }
+});
+
+router.get('/minidisc-order', (_req, res) => {
+    return res.redirect('/tools/minidisc-orders');
+});
+
+router.get('/minidisc-fulfillment', (_req, res) => {
+    return res.redirect('/tools/minidisc-orders');
+});
+
+router.post('/minidisc-orders/:id/complete', async (req, res) => {
+    const orderId = Number(req.params.id || 0);
+    const trackingNumber = String(req.body.tracking_number || '').trim();
+
+    if (!orderId) {
+        return redirectMiniDiscOrders(res, 'error', 'ID de orden invalido.');
+    }
+
+    if (!trackingNumber) {
+        return redirectMiniDiscOrders(res, 'error', 'El tracking es obligatorio para completar la orden.');
+    }
+
+    try {
+        await ensureLandingLeadsTable();
+
+        const order = await getOne(
+            `SELECT
+                id,
+                email,
+                full_name,
+                paypal_order_id,
+                paypal_payment_status,
+                package_shipped,
+                tracking_number,
+                nfc_unique_code,
+                nfc_link
+             FROM landing_email_leads
+             WHERE id = ?`,
+            [orderId]
+        );
+
+        if (!order) {
+            return redirectMiniDiscOrders(res, 'error', 'Orden no encontrada.');
+        }
+
+        if (order.paypal_payment_status !== 'captured') {
+            return redirectMiniDiscOrders(res, 'error', 'Solo se pueden completar ordenes con pago capturado.');
+        }
+
+        const wasShipped = Number(order.package_shipped) === 1;
+        const previousTracking = String(order.tracking_number || '').trim();
+        if (wasShipped && previousTracking === trackingNumber) {
+            return redirectMiniDiscOrders(res, 'warn', 'La orden ya estaba completada con ese tracking.');
+        }
+
+        await run(
+            `UPDATE landing_email_leads
+             SET package_shipped = 1,
+                 tracking_number = ?
+             WHERE id = ?`,
+            [trackingNumber, orderId]
+        );
+
+        const emailResult = await sendMiniDiscShippedEmail({
+            to: order.email,
+            name: order.full_name,
+            orderId: order.paypal_order_id,
+            trackingNumber,
+            nfcCode: order.nfc_unique_code,
+            nfcLink: order.nfc_link
+        });
+
+        const notionSync = await syncMiniDiscOrderToNotion(orderId);
+        if (notionSync?.success) {
+            console.log('[MiniDisc Orders] Notion actualizado para orden:', orderId);
+        }
+
+        if (!emailResult.success) {
+            return redirectMiniDiscOrders(
+                res,
+                'warn',
+                `Orden completada, pero el email no se pudo enviar (${emailResult.error || 'error_desconocido'}). Usa Reenviar Email.`
+            );
+        }
+
+        return redirectMiniDiscOrders(
+            res,
+            'success',
+            `Orden #${orderId} completada y notificacion enviada a ${order.email}.`
+        );
+    } catch (error) {
+        console.error('[MiniDisc Orders] Error completando orden:', error);
+        return redirectMiniDiscOrders(res, 'error', `No se pudo completar la orden: ${error.message}`);
+    }
+});
+
+router.post('/minidisc-orders/:id/reopen', async (req, res) => {
+    const orderId = Number(req.params.id || 0);
+    if (!orderId) {
+        return redirectMiniDiscOrders(res, 'error', 'ID de orden invalido.');
+    }
+
+    try {
+        await ensureLandingLeadsTable();
+
+        const order = await getOne(
+            'SELECT id, paypal_payment_status FROM landing_email_leads WHERE id = ?',
+            [orderId]
+        );
+
+        if (!order) {
+            return redirectMiniDiscOrders(res, 'error', 'Orden no encontrada.');
+        }
+
+        if (order.paypal_payment_status !== 'captured') {
+            return redirectMiniDiscOrders(res, 'error', 'La orden no tiene pago capturado.');
+        }
+
+        await run(
+            `UPDATE landing_email_leads
+             SET package_shipped = 0,
+                 tracking_number = NULL
+             WHERE id = ?`,
+            [orderId]
+        );
+
+        const notionSync = await syncMiniDiscOrderToNotion(orderId);
+        if (notionSync?.success) {
+            console.log('[MiniDisc Orders] Notion actualizado al reabrir orden:', orderId);
+        }
+
+        return redirectMiniDiscOrders(res, 'success', `Orden #${orderId} movida a pendientes.`);
+    } catch (error) {
+        console.error('[MiniDisc Orders] Error reabriendo orden:', error);
+        return redirectMiniDiscOrders(res, 'error', `No se pudo reabrir la orden: ${error.message}`);
+    }
+});
+
+router.post('/minidisc-orders/:id/resend-email', async (req, res) => {
+    const orderId = Number(req.params.id || 0);
+    if (!orderId) {
+        return redirectMiniDiscOrders(res, 'error', 'ID de orden invalido.');
+    }
+
+    try {
+        await ensureLandingLeadsTable();
+
+        const order = await getOne(
+            `SELECT
+                id,
+                email,
+                full_name,
+                paypal_order_id,
+                paypal_payment_status,
+                package_shipped,
+                tracking_number,
+                nfc_unique_code,
+                nfc_link
+             FROM landing_email_leads
+             WHERE id = ?`,
+            [orderId]
+        );
+
+        if (!order) {
+            return redirectMiniDiscOrders(res, 'error', 'Orden no encontrada.');
+        }
+
+        if (order.paypal_payment_status !== 'captured') {
+            return redirectMiniDiscOrders(res, 'error', 'La orden no tiene pago capturado.');
+        }
+
+        if (Number(order.package_shipped) !== 1) {
+            return redirectMiniDiscOrders(res, 'error', 'Solo se puede reenviar email para ordenes completas.');
+        }
+
+        const trackingNumber = String(order.tracking_number || '').trim();
+        if (!trackingNumber) {
+            return redirectMiniDiscOrders(res, 'error', 'No hay tracking guardado para esta orden.');
+        }
+
+        const emailResult = await sendMiniDiscShippedEmail({
+            to: order.email,
+            name: order.full_name,
+            orderId: order.paypal_order_id,
+            trackingNumber,
+            nfcCode: order.nfc_unique_code,
+            nfcLink: order.nfc_link
+        });
+
+        if (!emailResult.success) {
+            return redirectMiniDiscOrders(
+                res,
+                'error',
+                `No se pudo reenviar el email (${emailResult.error || 'error_desconocido'}).`
+            );
+        }
+
+        return redirectMiniDiscOrders(res, 'success', `Email reenviado a ${order.email}.`);
+    } catch (error) {
+        console.error('[MiniDisc Orders] Error reenviando email:', error);
+        return redirectMiniDiscOrders(res, 'error', `No se pudo reenviar el email: ${error.message}`);
+    }
 });
 
 router.get('/exports/download/:filename', (req, res) => {

@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %></title>
+    <link rel="stylesheet" href="/css/dashboard.css">
+    <style>
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 12px;
+            margin: 12px 0 22px;
+        }
+
+        .summary-card {
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            background: rgba(255, 255, 255, 0.04);
+            border-radius: 12px;
+            padding: 14px;
+        }
+
+        .summary-label {
+            color: #9ca3af;
+            font-size: 0.82rem;
+            margin-bottom: 6px;
+        }
+
+        .summary-value {
+            color: #f9fafb;
+            font-size: 1.35rem;
+            font-weight: 700;
+        }
+
+        .flash {
+            border-radius: 10px;
+            padding: 10px 12px;
+            margin: 0 0 14px;
+            font-size: 0.92rem;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            background: rgba(255, 255, 255, 0.06);
+            color: #e5e7eb;
+        }
+
+        .flash-success {
+            border-color: rgba(34, 197, 94, 0.5);
+            background: rgba(34, 197, 94, 0.14);
+            color: #86efac;
+        }
+
+        .flash-error {
+            border-color: rgba(248, 113, 113, 0.5);
+            background: rgba(248, 113, 113, 0.12);
+            color: #fecaca;
+        }
+
+        .flash-warn {
+            border-color: rgba(245, 158, 11, 0.5);
+            background: rgba(245, 158, 11, 0.14);
+            color: #fde68a;
+        }
+
+        .table-wrap {
+            overflow-x: auto;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            background: rgba(0, 0, 0, 0.18);
+        }
+
+        .orders-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+            min-width: 1020px;
+        }
+
+        .orders-table th,
+        .orders-table td {
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            text-align: left;
+            padding: 10px 8px;
+            vertical-align: top;
+        }
+
+        .orders-table th {
+            color: #facc15;
+            font-size: 0.77rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            background: rgba(250, 204, 21, 0.1);
+        }
+
+        .code {
+            font-family: monospace;
+            font-size: 0.78rem;
+            color: #cbd5e1;
+            word-break: break-all;
+        }
+
+        .status-badge-local {
+            display: inline-block;
+            border-radius: 999px;
+            font-size: 0.72rem;
+            padding: 4px 8px;
+            border: 1px solid rgba(255, 255, 255, 0.25);
+        }
+
+        .status-pending-local {
+            color: #fcd34d;
+            border-color: rgba(245, 158, 11, 0.5);
+            background: rgba(245, 158, 11, 0.12);
+        }
+
+        .status-complete-local {
+            color: #86efac;
+            border-color: rgba(34, 197, 94, 0.5);
+            background: rgba(34, 197, 94, 0.12);
+        }
+
+        .action-stack {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            min-width: 220px;
+        }
+
+        .inline-form {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .tracking-input {
+            background: rgba(0, 0, 0, 0.25);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: #f8fafc;
+            border-radius: 8px;
+            padding: 8px 10px;
+            min-width: 160px;
+            font-size: 0.82rem;
+        }
+
+        .btn-inline {
+            border: 1px solid rgba(255, 255, 255, 0.24);
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.08);
+            color: #f8fafc;
+            cursor: pointer;
+            padding: 7px 10px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .btn-primary-inline {
+            border-color: rgba(34, 197, 94, 0.45);
+            background: rgba(34, 197, 94, 0.2);
+            color: #bbf7d0;
+        }
+
+        .btn-secondary-inline {
+            border-color: rgba(148, 163, 184, 0.45);
+            background: rgba(148, 163, 184, 0.2);
+            color: #e2e8f0;
+        }
+
+        .empty {
+            color: #94a3b8;
+            padding: 24px 10px;
+            text-align: center;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+    <%- include('../partials/navbar') %>
+
+    <div class="container" style="padding-top: 30px;">
+        <section class="section">
+            <div class="section-header">
+                <h2><span class="section-icon">💿</span> Mini-Disc Orders</h2>
+                <a href="/tools" class="btn btn-secondary">Volver a Tools</a>
+            </div>
+
+            <p style="color:#9ca3af; margin-bottom: 10px;">
+                Gestiona fulfillment de compras capturadas, marca envio con tracking y notifica al comprador automaticamente.
+            </p>
+
+            <% if (flash && flash.message) { %>
+                <div class="flash flash-<%= flash.type || 'info' %>">
+                    <%= flash.message %>
+                </div>
+            <% } %>
+
+            <div class="summary-grid">
+                <div class="summary-card">
+                    <div class="summary-label">Total capturadas</div>
+                    <div class="summary-value"><%= stats.total %></div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-label">Pendientes</div>
+                    <div class="summary-value"><%= stats.pending %></div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-label">Completas</div>
+                    <div class="summary-value"><%= stats.completed %></div>
+                </div>
+            </div>
+
+            <h3 style="color:#fbbf24; margin: 18px 0 10px;">Pendientes (sin enviar)</h3>
+            <div class="table-wrap">
+                <table class="orders-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Cliente</th>
+                            <th>Fecha</th>
+                            <th>PayPal</th>
+                            <th>NFC</th>
+                            <th>Estado</th>
+                            <th>Accion</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% if (pendingOrders.length === 0) { %>
+                            <tr><td colspan="7" class="empty">No hay ordenes pendientes.</td></tr>
+                        <% } %>
+
+                        <% pendingOrders.forEach((order) => { %>
+                            <tr>
+                                <td>#<%= order.id %></td>
+                                <td>
+                                    <strong><%= order.full_name || 'Sin nombre' %></strong><br>
+                                    <a href="mailto:<%= order.email %>" style="color:#7dd3fc;"><%= order.email %></a>
+                                    <% if (order.country) { %>
+                                        <br><span style="color:#94a3b8;"><%= order.country %></span>
+                                    <% } %>
+                                </td>
+                                <td><%= new Date(order.created_at).toLocaleString('es-PR') %></td>
+                                <td>
+                                    <span class="code"><%= order.paypal_order_id || '-' %></span><br>
+                                    <span style="color:#86efac;"><%= order.paypal_payment_status %></span>
+                                </td>
+                                <td>
+                                    <% if (order.nfc_unique_code) { %>
+                                        <span class="code"><%= order.nfc_unique_code %></span>
+                                    <% } else { %>
+                                        <span style="color:#94a3b8;">-</span>
+                                    <% } %>
+                                </td>
+                                <td>
+                                    <span class="status-badge-local status-pending-local">Pendiente</span>
+                                </td>
+                                <td>
+                                    <div class="action-stack">
+                                        <form method="POST" action="/tools/minidisc-orders/<%= order.id %>/complete" class="inline-form">
+                                            <input
+                                                class="tracking-input"
+                                                type="text"
+                                                name="tracking_number"
+                                                placeholder="Tracking obligatorio"
+                                                required
+                                            >
+                                            <button type="submit" class="btn-inline btn-primary-inline">Completar + Notificar</button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                        <% }) %>
+                    </tbody>
+                </table>
+            </div>
+
+            <h3 style="color:#86efac; margin: 24px 0 10px;">Completas (enviadas)</h3>
+            <div class="table-wrap">
+                <table class="orders-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Cliente</th>
+                            <th>Fecha</th>
+                            <th>PayPal</th>
+                            <th>Tracking</th>
+                            <th>Estado</th>
+                            <th>Accion</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% if (completedOrders.length === 0) { %>
+                            <tr><td colspan="7" class="empty">No hay ordenes completadas.</td></tr>
+                        <% } %>
+
+                        <% completedOrders.forEach((order) => { %>
+                            <tr>
+                                <td>#<%= order.id %></td>
+                                <td>
+                                    <strong><%= order.full_name || 'Sin nombre' %></strong><br>
+                                    <a href="mailto:<%= order.email %>" style="color:#7dd3fc;"><%= order.email %></a>
+                                </td>
+                                <td><%= new Date(order.created_at).toLocaleString('es-PR') %></td>
+                                <td>
+                                    <span class="code"><%= order.paypal_order_id || '-' %></span><br>
+                                    <span style="color:#86efac;"><%= order.paypal_payment_status %></span>
+                                </td>
+                                <td><span class="code"><%= order.tracking_number || '-' %></span></td>
+                                <td>
+                                    <span class="status-badge-local status-complete-local">Completa</span>
+                                </td>
+                                <td>
+                                    <div class="action-stack">
+                                        <form method="POST" action="/tools/minidisc-orders/<%= order.id %>/resend-email" class="inline-form">
+                                            <button type="submit" class="btn-inline btn-secondary-inline">Reenviar Email</button>
+                                        </form>
+
+                                        <form method="POST" action="/tools/minidisc-orders/<%= order.id %>/reopen" class="inline-form">
+                                            <button type="submit" class="btn-inline">Reabrir a Pendiente</button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                        <% }) %>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </div>
+
+    <%- include('../partials/footer') %>
+</body>
+</html>

@@ -172,17 +172,40 @@
                 </div>
                 
                 <% 
-                const tracksWithoutLyrics = tracks.filter(t => t.audio_file_path && (!t.lyrics || t.lyrics.trim().length < 50));
+                const tracksWithAudio = tracks.filter(t => t.audio_file_path);
+                const tracksWithoutLyrics = tracksWithAudio.filter(t => !t.lyrics || t.lyrics.trim().length < 50);
                 %>
-                <% if (tracksWithoutLyrics.length > 0) { %>
+                <% if (tracks.length > 0) { %>
                 <div style="margin-top: 20px; padding: 15px; background: rgba(255, 215, 0, 0.1); border-radius: 10px; border: 1px solid rgba(255, 215, 0, 0.3);">
                     <p style="margin-bottom: 10px; color: #ffd700;">
-                        📝 <%= tracksWithoutLyrics.length %> temas sin letras completas
+                        📝 <%= tracksWithoutLyrics.length %> de <%= tracksWithAudio.length %> temas con audio sin letras completas
                     </p>
-                    <button id="generateAllLyricsBtn" class="btn" style="background: linear-gradient(45deg, #ffd700, #ffed4e); color: #1a1a2e; font-weight: bold;">
-                        ✨ Generar Todas las Letras
+                    <% if (tracksWithAudio.length > 0) { %>
+                    <button
+                        id="generateAllLyricsBtn"
+                        class="btn"
+                        data-missing-count="<%= tracksWithoutLyrics.length %>"
+                        data-audio-count="<%= tracksWithAudio.length %>"
+                        style="background: linear-gradient(45deg, #ffd700, #ffed4e); color: #1a1a2e; font-weight: bold;"
+                    >
+                        ✨ Generar Letras del Álbum
                     </button>
+                    <% } else { %>
+                    <button
+                        id="generateAllLyricsBtn"
+                        class="btn"
+                        disabled
+                        style="background: rgba(255, 255, 255, 0.2); color: #999; border: 1px solid rgba(255, 255, 255, 0.25); cursor: not-allowed;"
+                    >
+                        ✨ Generar Letras del Álbum
+                    </button>
+                    <% } %>
                     <span id="generationStatus" style="margin-left: 15px; color: #888; display: none;"></span>
+                    <% if (tracksWithAudio.length === 0) { %>
+                    <div style="margin-top: 8px; color: #9ca3af; font-size: 0.85em;">
+                        Sube al menos un audio al álbum para habilitar la generación automática de letras.
+                    </div>
+                    <% } %>
                 </div>
                 <% } %>
             </div>
@@ -316,8 +339,14 @@
         document.getElementById('generateAllLyricsBtn')?.addEventListener('click', async function() {
             const btn = this;
             const status = document.getElementById('generationStatus');
+            const missingCount = Number(btn.getAttribute('data-missing-count') || 0);
+            const audioCount = Number(btn.getAttribute('data-audio-count') || 0);
+
+            if (btn.disabled) {
+                return;
+            }
             
-            if (!confirm('¿Generar letras automáticamente para todos los temas sin letras?\n\nEsto puede tomar varios minutos dependiendo de la cantidad de temas.')) {
+            if (!confirm(`¿Generar letras automáticamente para este álbum?\n\nTemas con audio: ${audioCount}\nTemas pendientes de letra: ${missingCount}\n\nEsto puede tomar varios minutos dependiendo de la cantidad de temas.`)) {
                 return;
             }
             

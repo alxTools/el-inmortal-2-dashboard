@@ -44,10 +44,30 @@
                                 <% } else { %>
                                     <span class="status-badge status-urgent">⚠️ Pendiente</span>
                                 <% } %>
+                                <div style="margin-top: 6px; display: flex; flex-wrap: wrap; gap: 6px; font-size: 0.72em;">
+                                    <span style="padding: 2px 6px; border-radius: 999px; background: rgba(255,255,255,0.08); color: <%= sheet.producer_confirmed_at ? '#34d399' : '#fda4af' %>;">
+                                        Prod <%= sheet.producer_confirmed_at ? '✓' : '⏳' %>
+                                    </span>
+                                    <span style="padding: 2px 6px; border-radius: 999px; background: rgba(255,255,255,0.08); color: <%= sheet.composer_confirmed_at ? '#34d399' : '#fda4af' %>;">
+                                        Comp <%= sheet.composer_confirmed_at ? '✓' : '⏳' %>
+                                    </span>
+                                    <span style="padding: 2px 6px; border-radius: 999px; background: rgba(255,255,255,0.08); color: <%= sheet.artist_confirmed_at ? '#34d399' : '#fda4af' %>;">
+                                        Art <%= sheet.artist_confirmed_at ? '✓' : '⏳' %>
+                                    </span>
+                                </div>
                             </td>
                             <td><%= sheet.sent_date ? new Date(sheet.sent_date).toLocaleDateString() : '-' %></td>
                             <td>
-                                <a href="/splitsheets/<%= sheet.id %>/edit" class="btn-small">Editar</a>
+                                <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                                    <a href="/splitsheets/<%= sheet.id %>/edit" class="btn-small">Editar</a>
+                                    <a href="/splitsheets/<%= sheet.id %>/pdf" target="_blank" rel="noreferrer" class="btn-small">PDF Pro</a>
+                                    <button
+                                        type="button"
+                                        class="btn-small send-split-email-btn"
+                                        data-track-id="<%= sheet.track_id %>"
+                                        style="background: rgba(59,130,246,0.16); border-color: rgba(59,130,246,0.55); color: #bfdbfe;"
+                                    >📧 Email</button>
+                                </div>
                             </td>
                         </tr>
                         <% }) %>
@@ -58,5 +78,39 @@
     </div>
 
     <%- include('../partials/footer') %>
+
+    <script>
+        async function sendSplitsheetEmail(trackId) {
+            try {
+                const response = await fetch(`/splitsheets/${trackId}/send`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({})
+                });
+
+                const result = await response.json();
+                if (!response.ok || !result.success) {
+                    throw new Error(result.error || result.details || 'No se pudo enviar');
+                }
+
+                alert(`✅ ${result.message}`);
+                window.location.reload();
+            } catch (error) {
+                console.error('Error sending splitsheet email:', error);
+                alert(`❌ ${error.message}`);
+            }
+        }
+
+        document.querySelectorAll('.send-split-email-btn').forEach((button) => {
+            button.addEventListener('click', () => {
+                const trackId = button.getAttribute('data-track-id');
+                if (!trackId) return;
+                sendSplitsheetEmail(trackId);
+            });
+        });
+    </script>
 </body>
 </html>

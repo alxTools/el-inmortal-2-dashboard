@@ -12,11 +12,71 @@
     <div class="container" style="padding-top: 40px; max-width: 900px;">
         <h1 style="color: #ffd700; margin-bottom: 24px;">✏️ Editar Splitsheet</h1>
 
+        <% if (flash) { %>
+            <div style="margin-bottom: 14px; padding: 10px 12px; border: 1px solid rgba(34, 197, 94, 0.5); background: rgba(34, 197, 94, 0.12); border-radius: 8px; color: #86efac;">
+                <%= flash %>
+            </div>
+        <% } %>
+
         <div class="section" style="margin-bottom: 20px;">
             <div style="display: grid; gap: 8px; color: #d1d5db;">
                 <div><strong>Tema:</strong> #<%= splitsheet.track_number %> - <%= splitsheet.track_title %></div>
                 <div><strong>Track ID:</strong> <%= splitsheet.track_id %></div>
                 <div><strong>Productores actuales:</strong> <%= (producerSplits || []).length %></div>
+            </div>
+
+            <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px;">
+                <a href="/splitsheets/<%= splitsheet.id %>/pdf" target="_blank" rel="noreferrer" class="btn">📄 Ver PDF Pro</a>
+                <button type="button" id="sendSplitsheetEmailBtn" class="btn" style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); border: none;">📧 Enviar por Email</button>
+                <span id="emailActionStatus" style="align-self: center; color: #9ca3af; font-size: 0.9em;"></span>
+            </div>
+        </div>
+
+        <div class="section" style="margin-bottom: 20px;">
+            <h3 style="color: #ffd700; margin-bottom: 10px;">✅ Confirmaciones Legales</h3>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px;">
+                <span style="padding: 5px 10px; border-radius: 999px; background: rgba(255,255,255,0.08); color: <%= confirmationState?.producerConfirmed ? '#34d399' : '#fda4af' %>;">
+                    Productores: <%= confirmationState?.producerConfirmed ? 'Confirmado' : 'Pendiente' %>
+                </span>
+                <span style="padding: 5px 10px; border-radius: 999px; background: rgba(255,255,255,0.08); color: <%= confirmationState?.composerConfirmed ? '#34d399' : '#fda4af' %>;">
+                    Compositores: <%= confirmationState?.composerConfirmed ? 'Confirmado' : 'Pendiente' %>
+                </span>
+                <span style="padding: 5px 10px; border-radius: 999px; background: rgba(255,255,255,0.08); color: <%= confirmationState?.artistConfirmed ? '#34d399' : '#fda4af' %>;">
+                    Artista: <%= confirmationState?.artistConfirmed ? 'Confirmado' : 'Pendiente' %>
+                </span>
+                <span style="padding: 5px 10px; border-radius: 999px; background: rgba(255,255,255,0.08); color: <%= confirmationState?.trackConfirmed ? '#34d399' : '#fda4af' %>;">
+                    Track Final: <%= confirmationState?.trackConfirmed ? 'CONFIRMADO' : 'AUN PENDIENTE' %>
+                </span>
+            </div>
+
+            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                <button
+                    type="button"
+                    class="btn-small confirm-role-btn"
+                    data-role="producer"
+                    data-confirmed="<%= confirmationState?.producerConfirmed ? '0' : '1' %>"
+                    style="background: <%= confirmationState?.producerConfirmed ? 'rgba(255,107,107,0.16)' : 'rgba(34,197,94,0.16)' %>; border-color: <%= confirmationState?.producerConfirmed ? 'rgba(255,107,107,0.55)' : 'rgba(34,197,94,0.55)' %>; color: <%= confirmationState?.producerConfirmed ? '#fda4af' : '#86efac' %>;"
+                >
+                    <%= confirmationState?.producerConfirmed ? '↩️ Desconfirmar Productores' : '✅ Confirmar Productores' %>
+                </button>
+                <button
+                    type="button"
+                    class="btn-small confirm-role-btn"
+                    data-role="composer"
+                    data-confirmed="<%= confirmationState?.composerConfirmed ? '0' : '1' %>"
+                    style="background: <%= confirmationState?.composerConfirmed ? 'rgba(255,107,107,0.16)' : 'rgba(34,197,94,0.16)' %>; border-color: <%= confirmationState?.composerConfirmed ? 'rgba(255,107,107,0.55)' : 'rgba(34,197,94,0.55)' %>; color: <%= confirmationState?.composerConfirmed ? '#fda4af' : '#86efac' %>;"
+                >
+                    <%= confirmationState?.composerConfirmed ? '↩️ Desconfirmar Compositores' : '✅ Confirmar Compositores' %>
+                </button>
+                <button
+                    type="button"
+                    class="btn-small confirm-role-btn"
+                    data-role="artist"
+                    data-confirmed="<%= confirmationState?.artistConfirmed ? '0' : '1' %>"
+                    style="background: <%= confirmationState?.artistConfirmed ? 'rgba(255,107,107,0.16)' : 'rgba(34,197,94,0.16)' %>; border-color: <%= confirmationState?.artistConfirmed ? 'rgba(255,107,107,0.55)' : 'rgba(34,197,94,0.55)' %>; color: <%= confirmationState?.artistConfirmed ? '#fda4af' : '#86efac' %>;"
+                >
+                    <%= confirmationState?.artistConfirmed ? '↩️ Desconfirmar Artista' : '✅ Confirmar Artista' %>
+                </button>
             </div>
         </div>
 
@@ -63,6 +123,15 @@
                                     <% }) %>
                                 </select>
                                 <input name="producer_percentages[]" class="producer-percentage" type="number" min="0" max="100" value="<%= entry.producer_percentage %>" style="width: 120px;" placeholder="%" required>
+                                <button
+                                    type="button"
+                                    class="btn-small toggle-producer-confirm-btn"
+                                    data-producer-id="<%= entry.producer_id %>"
+                                    data-confirmed="<%= entry.producer_confirmed_at ? '0' : '1' %>"
+                                    style="background: <%= entry.producer_confirmed_at ? 'rgba(255,107,107,0.14)' : 'rgba(34,197,94,0.16)' %>; border-color: <%= entry.producer_confirmed_at ? 'rgba(255,107,107,0.45)' : 'rgba(34,197,94,0.45)' %>; color: <%= entry.producer_confirmed_at ? '#fda4af' : '#86efac' %>;"
+                                >
+                                    <%= entry.producer_confirmed_at ? '↩️ Prod' : '✅ Prod' %>
+                                </button>
                                 <button type="button" class="btn-small remove-producer-btn" style="background: rgba(255, 107, 107, 0.15); border-color: rgba(255, 107, 107, 0.45); color: #ff9b9b;">✕</button>
                             </div>
                         <% }) %>
@@ -107,6 +176,8 @@
     <%- include('../partials/footer') %>
 
     <script>
+        const splitsheetId = <%= Number(splitsheet.id) %>;
+        const trackId = <%= Number(splitsheet.track_id) %>;
         const producerOptions = <%- JSON.stringify((producers || []).map((producer) => ({ id: producer.id, name: producer.name }))) %>;
         const composerOptions = <%- JSON.stringify((composers || []).map((composer) => ({ id: composer.id, name: composer.name }))) %>;
 
@@ -117,6 +188,71 @@
         const composerContainer = document.getElementById('composerContainer');
         const noProducerRowsText = document.getElementById('noProducerRowsText');
         const noComposerRowsText = document.getElementById('noComposerRowsText');
+        const emailActionStatus = document.getElementById('emailActionStatus');
+
+        async function sendSplitsheetEmail() {
+            try {
+                if (emailActionStatus) {
+                    emailActionStatus.textContent = 'Enviando email...';
+                    emailActionStatus.style.color = '#facc15';
+                }
+
+                const response = await fetch(`/splitsheets/${trackId}/send`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({})
+                });
+
+                const result = await response.json();
+                if (!response.ok || !result.success) {
+                    throw new Error(result.error || result.details || 'No se pudo enviar email');
+                }
+
+                if (emailActionStatus) {
+                    emailActionStatus.textContent = result.message;
+                    emailActionStatus.style.color = '#86efac';
+                }
+                alert(`✅ ${result.message}`);
+                window.location.reload();
+            } catch (error) {
+                console.error('Error sending splitsheet email:', error);
+                if (emailActionStatus) {
+                    emailActionStatus.textContent = error.message;
+                    emailActionStatus.style.color = '#fda4af';
+                }
+                alert(`❌ ${error.message}`);
+            }
+        }
+
+        async function toggleRoleConfirmation(role, confirmed, producerId = null) {
+            try {
+                const response = await fetch(`/splitsheets/${splitsheetId}/confirm-role`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        role,
+                        confirmed,
+                        producer_id: producerId
+                    })
+                });
+
+                const result = await response.json();
+                if (!response.ok || !result.success) {
+                    throw new Error(result.error || result.details || 'No se pudo actualizar confirmación');
+                }
+
+                window.location.reload();
+            } catch (error) {
+                console.error('Error toggling role confirmation:', error);
+                alert(`❌ ${error.message}`);
+            }
+        }
 
         function asInt(value) {
             const n = Number(value);
@@ -245,6 +381,32 @@
 
         document.getElementById('addComposerBtn').addEventListener('click', () => {
             addComposerRow();
+        });
+
+        const sendSplitsheetEmailBtn = document.getElementById('sendSplitsheetEmailBtn');
+        if (sendSplitsheetEmailBtn) {
+            sendSplitsheetEmailBtn.addEventListener('click', sendSplitsheetEmail);
+        }
+
+        document.querySelectorAll('.confirm-role-btn').forEach((button) => {
+            button.addEventListener('click', () => {
+                const role = String(button.getAttribute('data-role') || '').trim();
+                const confirmed = String(button.getAttribute('data-confirmed') || '1').trim();
+                if (!role) return;
+                toggleRoleConfirmation(role, confirmed);
+            });
+        });
+
+        document.querySelectorAll('.toggle-producer-confirm-btn').forEach((button) => {
+            button.addEventListener('click', () => {
+                const producerId = Number(button.getAttribute('data-producer-id') || 0);
+                const confirmed = String(button.getAttribute('data-confirmed') || '1').trim();
+                if (!producerId) {
+                    alert('Guarda el splitsheet antes de confirmar un productor nuevo.');
+                    return;
+                }
+                toggleRoleConfirmation('producer', confirmed, producerId);
+            });
         });
 
         document.querySelectorAll('.remove-producer-btn').forEach((button) => {

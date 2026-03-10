@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { getAll, getOne, run } = require('../config/database');
 const nodemailer = require('nodemailer');
+const PDFDocument = require('pdfkit');
 
 function toPercentage(value) {
     const parsed = Number(value);
@@ -100,6 +101,81 @@ async function ensureTrackCreditsTables() {
     `);
 }
 
+async function ensureSplitsheetWorkflowColumns() {
+    const columns = await getAll(
+        `SELECT column_name
+         FROM information_schema.columns
+         WHERE table_schema = DATABASE()
+           AND table_name = 'splitsheets'`
+    );
+
+    const existing = new Set(
+        columns
+            .map((row) => String(row.column_name || row.COLUMN_NAME || '').toLowerCase())
+            .filter(Boolean)
+    );
+
+    const needed = [
+        ['producer_confirmed_at', 'DATETIME NULL'],
+        ['artist_confirmed_at', 'DATETIME NULL'],
+        ['composer_confirmed_at', 'DATETIME NULL']
+    ];
+
+    for (const [columnName, definition] of needed) {
+        if (existing.has(columnName.toLowerCase())) continue;
+        try {
+            await run(`ALTER TABLE splitsheets ADD COLUMN ${columnName} ${definition}`);
+        } catch (error) {
+            if (error.code !== 'ER_DUP_FIELDNAME') {
+                throw error;
+            }
+        }
+    }
+}
+
+async function ensureSplitsheetInfra() {
+    await ensureTrackCreditsTables();
+    await ensureSplitsheetWorkflowColumns();
+}
+
+function formatDateTime(value) {
+    if (!value) return 'Pendiente';
+    const dateObj = new Date(value);
+    if (Number.isNaN(dateObj.getTime())) return 'Pendiente';
+    return dateObj.toLocaleString('es-PR');
+}
+
+function htmlEscape(value) {
+    return String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function getConfirmationState(rows) {
+    const total = rows.length;
+    const producerConfirmedCount = rows.filter((row) => row.producer_confirmed_at).length;
+    const artistConfirmedCount = rows.filter((row) => row.artist_confirmed_at).length;
+    const composerConfirmedCount = rows.filter((row) => row.composer_confirmed_at).length;
+
+    const producerConfirmed = total > 0 && producerConfirmedCount === total;
+    const artistConfirmed = total > 0 && artistConfirmedCount === total;
+    const composerConfirmed = total > 0 && composerConfirmedCount === total;
+
+    return {
+        total,
+        producerConfirmedCount,
+        artistConfirmedCount,
+        composerConfirmedCount,
+        producerConfirmed,
+        artistConfirmed,
+        composerConfirmed,
+        trackConfirmed: producerConfirmed && artistConfirmed && composerConfirmed
+    };
+}
+
 async function filterExistingIds(tableName, ids) {
     if (!ids.length) return [];
 
@@ -144,21 +220,63 @@ async function getSplitsheetsByTrackId(trackId) {
     );
 }
 
+async function getTrackComposers(trackId) {
+    return await getAll(
+        `SELECT c.id, c.name, c.email
+         FROM track_composers tc
+         JOIN composers c ON c.id = tc.composer_id
+         WHERE tc.track_id = ?
+         ORDER BY c.name`,
+        [trackId]
+    );
+}
+
 async function syncTrackSplitsheetFlags(trackId) {
     const summary = await getOne(
         `SELECT
             COUNT(*) AS total,
-            SUM(CASE WHEN status = 'confirmed' THEN 1 ELSE 0 END) AS confirmed
+            SUM(CASE WHEN producer_confirmed_at IS NOT NULL THEN 1 ELSE 0 END) AS producer_confirmed,
+            SUM(CASE WHEN artist_confirmed_at IS NOT NULL THEN 1 ELSE 0 END) AS artist_confirmed,
+            SUM(CASE WHEN composer_confirmed_at IS NOT NULL THEN 1 ELSE 0 END) AS composer_confirmed
          FROM splitsheets
          WHERE track_id = ?`,
         [trackId]
     );
 
     const total = Number(summary?.total || 0);
-    const confirmed = Number(summary?.confirmed || 0);
+    const producerConfirmed = Number(summary?.producer_confirmed || 0);
+    const artistConfirmed = Number(summary?.artist_confirmed || 0);
+    const composerConfirmed = Number(summary?.composer_confirmed || 0);
 
     const splitsheetSent = total > 0 ? 1 : 0;
-    const splitsheetConfirmed = total > 0 && confirmed === total ? 1 : 0;
+    const splitsheetConfirmed =
+        total > 0 &&
+        producerConfirmed === total &&
+        artistConfirmed === total &&
+        composerConfirmed === total
+            ? 1
+            : 0;
+
+    if (splitsheetConfirmed) {
+        await run(
+            `UPDATE splitsheets
+             SET status = 'confirmed',
+                 confirmed_date = COALESCE(confirmed_date, NOW())
+             WHERE track_id = ?`,
+            [trackId]
+        );
+    } else {
+        await run(
+            `UPDATE splitsheets
+             SET status = CASE
+                 WHEN sent_date IS NOT NULL THEN 'sent'
+                 ELSE 'pending'
+             END
+             WHERE track_id = ?
+               AND status = 'confirmed'`,
+            [trackId]
+        );
+    }
 
     await run(
         'UPDATE tracks SET splitsheet_sent = ?, splitsheet_confirmed = ? WHERE id = ?',
@@ -169,8 +287,22 @@ async function syncTrackSplitsheetFlags(trackId) {
 // GET splitsheets dashboard
 router.get('/', async (req, res) => {
     try {
+        await ensureSplitsheetInfra();
+
         const splitsheets = await getAll(`
-            SELECT s.*, t.title as track_title, t.track_number, p.name as producer_name, p.email as producer_email
+            SELECT
+                s.*,
+                t.title as track_title,
+                t.track_number,
+                p.name as producer_name,
+                p.email as producer_email,
+                CASE
+                    WHEN s.producer_confirmed_at IS NOT NULL
+                     AND s.artist_confirmed_at IS NOT NULL
+                     AND s.composer_confirmed_at IS NOT NULL
+                    THEN 1
+                    ELSE 0
+                END AS all_roles_confirmed
             FROM splitsheets s
             JOIN tracks t ON s.track_id = t.id
             JOIN producers p ON s.producer_id = p.id
@@ -226,6 +358,212 @@ router.get('/generate/:trackId', async (req, res) => {
     }
 });
 
+// GET professional PDF view for a splitsheet track package
+router.get('/:id/pdf', async (req, res) => {
+    try {
+        await ensureSplitsheetInfra();
+
+        const splitsheet = await getSplitsheetById(req.params.id);
+        if (!splitsheet) {
+            return res.status(404).render('error', {
+                title: '404',
+                message: 'Splitsheet no encontrado',
+                error: {}
+            });
+        }
+
+        const track = await getOne('SELECT id, track_number, title FROM tracks WHERE id = ?', [splitsheet.track_id]);
+        const producerSplits = await getSplitsheetsByTrackId(splitsheet.track_id);
+        const composers = await getTrackComposers(splitsheet.track_id);
+        const confirmationState = getConfirmationState(producerSplits);
+        const artistPercentage = Number(producerSplits[0]?.artist_percentage || 50);
+
+        const fileSafeTrack = String(track?.title || 'track')
+            .replace(/[^a-zA-Z0-9-_]+/g, '-')
+            .replace(/-+/g, '-')
+            .replace(/^-|-$/g, '')
+            .toLowerCase() || 'track';
+        const filename = `splitsheet-${track?.track_number || 'x'}-${fileSafeTrack}.pdf`;
+
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+
+        const doc = new PDFDocument({ size: 'A4', margin: 48 });
+        doc.pipe(res);
+
+        doc.rect(40, 36, 515, 86).fill('#0f172a');
+        doc.fillColor('#facc15').fontSize(11).text('EL INMORTAL 2 - RIGHTS MANAGEMENT', 56, 56);
+        doc.fillColor('#ffffff').fontSize(24).text('SPLITSHEET AGREEMENT', 56, 74);
+
+        let y = 146;
+        doc.fillColor('#111827').fontSize(11);
+        doc.text(`Tema: #${track?.track_number || '-'} - ${track?.title || 'Sin título'}`, 48, y);
+        y += 18;
+        doc.text('Artista: Galante el Emperador', 48, y);
+        y += 18;
+        doc.text(`Fecha de emisión: ${new Date().toLocaleDateString('es-PR')}`, 48, y);
+        y += 24;
+
+        doc.fillColor('#0f172a').fontSize(13).text('Participaciones', 48, y);
+        y += 18;
+
+        doc.fillColor('#111827').fontSize(11);
+        doc.text(`Artista (Master + Publishing): ${artistPercentage}%`, 52, y);
+        y += 18;
+
+        producerSplits.forEach((row, index) => {
+            if (y > 710) {
+                doc.addPage();
+                y = 56;
+            }
+
+            const producerStatus = row.producer_confirmed_at
+                ? `Confirmado ${formatDateTime(row.producer_confirmed_at)}`
+                : 'Pendiente de confirmación';
+
+            doc.text(
+                `${index + 1}. ${row.producer_name || 'Productor'} - ${row.producer_percentage}% (${producerStatus})`,
+                52,
+                y,
+                { width: 500 }
+            );
+            y += 18;
+        });
+
+        y += 12;
+        if (y > 700) {
+            doc.addPage();
+            y = 56;
+        }
+
+        doc.fillColor('#0f172a').fontSize(13).text('Compositores', 48, y);
+        y += 18;
+        doc.fillColor('#111827').fontSize(11);
+        if (!composers.length) {
+            doc.text('No hay compositores asignados.', 52, y);
+            y += 18;
+        } else {
+            composers.forEach((composer, idx) => {
+                if (y > 710) {
+                    doc.addPage();
+                    y = 56;
+                }
+                doc.text(`${idx + 1}. ${composer.name}${composer.email ? ` (${composer.email})` : ''}`, 52, y, { width: 500 });
+                y += 18;
+            });
+        }
+
+        y += 12;
+        if (y > 700) {
+            doc.addPage();
+            y = 56;
+        }
+
+        doc.fillColor('#0f172a').fontSize(13).text('Estado de Confirmaciones', 48, y);
+        y += 18;
+        doc.fillColor('#111827').fontSize(11);
+        doc.text(`Productores: ${confirmationState.producerConfirmed ? 'Confirmado' : 'Pendiente'}`, 52, y);
+        y += 16;
+        doc.text(`Compositores: ${confirmationState.composerConfirmed ? 'Confirmado' : 'Pendiente'}`, 52, y);
+        y += 16;
+        doc.text(`Artista: ${confirmationState.artistConfirmed ? 'Confirmado' : 'Pendiente'}`, 52, y);
+        y += 16;
+        doc.text(`Track final: ${confirmationState.trackConfirmed ? 'CONFIRMADO' : 'AUN PENDIENTE'}`, 52, y);
+
+        y += 26;
+        doc.fontSize(9).fillColor('#4b5563').text(
+            'Documento generado automáticamente por El Inmortal 2 Dashboard. Esta versión resume participaciones y estado legal de aprobación.',
+            48,
+            y,
+            { width: 500 }
+        );
+
+        doc.end();
+    } catch (error) {
+        console.error('Error generating splitsheet PDF:', error);
+        return res.status(500).send('Error generando PDF del splitsheet');
+    }
+});
+
+// POST confirm or unconfirm role (artist/composer/producer)
+router.post('/:id/confirm-role', async (req, res) => {
+    try {
+        await ensureSplitsheetInfra();
+
+        const splitsheet = await getSplitsheetById(req.params.id);
+        if (!splitsheet) {
+            return res.status(404).json({ error: 'Splitsheet no encontrado' });
+        }
+
+        const role = String(req.body.role || '').trim().toLowerCase();
+        const roleColumns = {
+            producer: 'producer_confirmed_at',
+            artist: 'artist_confirmed_at',
+            composer: 'composer_confirmed_at'
+        };
+
+        const columnName = roleColumns[role];
+        if (!columnName) {
+            return res.status(422).json({ error: 'Role inválido. Usa producer, artist o composer.' });
+        }
+
+        const confirmedRaw = String(req.body.confirmed ?? '1').trim().toLowerCase();
+        const shouldConfirm = !['0', 'false', 'off', 'no'].includes(confirmedRaw);
+        const producerId = toPositiveInt(req.body.producer_id);
+
+        if (shouldConfirm) {
+            if (role === 'producer' && producerId) {
+                await run(
+                    `UPDATE splitsheets
+                     SET ${columnName} = COALESCE(${columnName}, NOW())
+                     WHERE track_id = ? AND producer_id = ?`,
+                    [splitsheet.track_id, producerId]
+                );
+            } else {
+                await run(
+                    `UPDATE splitsheets
+                     SET ${columnName} = COALESCE(${columnName}, NOW())
+                     WHERE track_id = ?`,
+                    [splitsheet.track_id]
+                );
+            }
+        } else {
+            if (role === 'producer' && producerId) {
+                await run(
+                    `UPDATE splitsheets
+                     SET ${columnName} = NULL
+                     WHERE track_id = ? AND producer_id = ?`,
+                    [splitsheet.track_id, producerId]
+                );
+            } else {
+                await run(
+                    `UPDATE splitsheets
+                     SET ${columnName} = NULL
+                     WHERE track_id = ?`,
+                    [splitsheet.track_id]
+                );
+            }
+        }
+
+        await syncTrackSplitsheetFlags(splitsheet.track_id);
+
+        const updatedRows = await getSplitsheetsByTrackId(splitsheet.track_id);
+        const confirmationState = getConfirmationState(updatedRows);
+
+        return res.json({
+            success: true,
+            message: shouldConfirm ? 'Confirmación actualizada' : 'Confirmación removida',
+            confirmationState
+        });
+    } catch (error) {
+        console.error('Error updating role confirmation:', error);
+        return res.status(500).json({
+            error: 'Error actualizando confirmación',
+            details: error.message
+        });
+    }
+});
+
 // GET edit a splitsheet
 router.get('/:id/edit', async (req, res) => {
     try {
@@ -239,7 +577,7 @@ router.get('/:id/edit', async (req, res) => {
             });
         }
 
-        await ensureTrackCreditsTables();
+        await ensureSplitsheetInfra();
 
         const producers = await getAll('SELECT id, name, email FROM producers ORDER BY name');
         const composers = await getAll('SELECT id, name, email FROM composers ORDER BY name');
@@ -256,6 +594,8 @@ router.get('/:id/edit', async (req, res) => {
         const artistPercentage = Number(producerSplits[0]?.artist_percentage || splitsheet.artist_percentage || 50);
         const status = String(producerSplits[0]?.status || splitsheet.status || 'pending');
         const notes = String(producerSplits[0]?.notes || splitsheet.notes || '');
+        const confirmationState = getConfirmationState(producerSplits);
+        const flash = String(req.query.flash || '').trim();
 
         return res.render('splitsheets/edit', {
             title: `Editar Splitsheet - ${splitsheet.track_title}`,
@@ -267,6 +607,8 @@ router.get('/:id/edit', async (req, res) => {
             artistPercentage,
             status,
             notes,
+            confirmationState,
+            flash,
             validationError: ''
         });
     } catch (error) {
@@ -293,7 +635,7 @@ router.put('/:id', async (req, res) => {
             });
         }
 
-        await ensureTrackCreditsTables();
+        await ensureSplitsheetInfra();
 
         const artistPercentage = toPercentage(req.body.artist_percentage);
         const status = String(req.body.status || 'pending').trim();
@@ -308,6 +650,15 @@ router.put('/:id', async (req, res) => {
                 producerId: toPositiveInt(existing.producer_id),
                 producerPercentage: toPercentage(req.body.producer_percentage)
             }];
+
+        const currentRows = await getSplitsheetsByTrackId(existing.track_id);
+        const producerConfirmationMap = new Map(
+            currentRows.map((row) => [Number(row.producer_id), row.producer_confirmed_at || null])
+        );
+        const existingArtistConfirmedAt = currentRows.find((row) => row.artist_confirmed_at)?.artist_confirmed_at || null;
+        const existingComposerConfirmedAt = currentRows.find((row) => row.composer_confirmed_at)?.composer_confirmed_at || null;
+        const existingSentDate = currentRows.find((row) => row.sent_date)?.sent_date || null;
+        const existingConfirmedDate = currentRows.find((row) => row.confirmed_date)?.confirmed_date || null;
 
         const allowedStatuses = new Set(['pending', 'sent', 'confirmed']);
         const totalProducerPercentage = producerEntries.reduce((sum, row) => sum + Number(row.producerPercentage || 0), 0);
@@ -363,19 +714,27 @@ router.put('/:id', async (req, res) => {
                 artistPercentage: req.body.artist_percentage,
                 status,
                 notes,
+                confirmationState: getConfirmationState(producerSplitsForView),
+                flash: '',
                 validationError
             });
         }
 
-        const sentDate = (status === 'sent' || status === 'confirmed') ? new Date() : null;
-        const confirmedDate = status === 'confirmed' ? new Date() : null;
+        const sentDate = (status === 'sent' || status === 'confirmed')
+            ? (existingSentDate || new Date())
+            : null;
+        const confirmedDate = status === 'confirmed'
+            ? (existingConfirmedDate || new Date())
+            : null;
 
         await run('DELETE FROM splitsheets WHERE track_id = ?', [existing.track_id]);
         for (const row of producerEntries) {
+            const producerConfirmedAt = producerConfirmationMap.get(Number(row.producerId)) || null;
             await run(
                 `INSERT INTO splitsheets
-                 (track_id, producer_id, artist_percentage, producer_percentage, status, notes, sent_date, confirmed_date)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+                 (track_id, producer_id, artist_percentage, producer_percentage, status, notes, sent_date, confirmed_date,
+                  producer_confirmed_at, artist_confirmed_at, composer_confirmed_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [
                     existing.track_id,
                     row.producerId,
@@ -384,7 +743,10 @@ router.put('/:id', async (req, res) => {
                     status,
                     notes || null,
                     sentDate,
-                    confirmedDate
+                    confirmedDate,
+                    producerConfirmedAt,
+                    existingArtistConfirmedAt,
+                    existingComposerConfirmedAt
                 ]
             );
         }
@@ -435,30 +797,53 @@ router.put('/:id', async (req, res) => {
 // POST send splitsheet via email
 router.post('/:trackId/send', async (req, res) => {
     try {
+        await ensureSplitsheetInfra();
+
         const trackId = req.params.trackId;
         const { producerEmail, artistEmail, message } = req.body;
-        
-        // Get track and producer info
-        const track = await getOne(`
-            SELECT t.*, p.name as producer_name, p.email as producer_db_email
-            FROM tracks t
-            JOIN producers p ON t.producer_id = p.id
-            WHERE t.id = ?
-        `, [trackId]);
-        
+
+        const track = await getOne(
+            'SELECT id, title, track_number FROM tracks WHERE id = ?',
+            [trackId]
+        );
+
         if (!track) {
             return res.status(404).json({ error: 'Track no encontrado' });
         }
-        
-        // Use provided emails or fallbacks
-        const toProducer = producerEmail || track.producer_db_email;
-        const toArtist = artistEmail || 'galante@el-emperador.com';
-        
-        if (!toProducer) {
-            return res.status(400).json({ error: 'Email del productor no disponible' });
+
+        const producerSplits = await getSplitsheetsByTrackId(trackId);
+        if (!producerSplits.length) {
+            return res.status(422).json({ error: 'No hay splitsheets para este track' });
         }
-        
-        // Create email transporter (configure with your SMTP settings)
+
+        const composers = await getTrackComposers(trackId);
+
+        const explicitProducerEmail = String(producerEmail || '').trim();
+        const producerRecipients = explicitProducerEmail
+            ? [explicitProducerEmail]
+            : [...new Set(
+                producerSplits
+                    .map((row) => String(row.producer_email || '').trim())
+                    .filter(Boolean)
+            )];
+
+        if (!producerRecipients.length) {
+            return res.status(400).json({ error: 'No hay emails de productores para enviar' });
+        }
+
+        const toArtist = String(artistEmail || process.env.SPLITSHEET_ARTIST_EMAIL || 'galante@el-emperador.com').trim();
+        const appUrl = String(process.env.APP_URL || process.env.BASE_URL || 'https://ei2.galantealx.com').trim().replace(/\/$/, '');
+        const representativeSplitsheetId = producerSplits[0].id;
+        const splitsheetPdfUrl = `${appUrl}/splitsheets/${representativeSplitsheetId}/pdf`;
+        const splitsheetEditUrl = `${appUrl}/splitsheets/${representativeSplitsheetId}/edit`;
+
+        const producerBreakdownHtml = producerSplits
+            .map((row) => `<li><strong>${htmlEscape(row.producer_name)}</strong>: ${row.producer_percentage}%</li>`)
+            .join('');
+        const composerBreakdownHtml = composers.length
+            ? composers.map((row) => `<li>${htmlEscape(row.name)}</li>`).join('')
+            : '<li>No hay compositores asignados</li>';
+
         const transporter = nodemailer.createTransporter({
             host: process.env.SMTP_HOST || 'smtp.gmail.com',
             port: process.env.SMTP_PORT || 587,
@@ -468,55 +853,65 @@ router.post('/:trackId/send', async (req, res) => {
                 pass: process.env.SMTP_PASS
             }
         });
-        
-        const splitsheetUrl = `${process.env.APP_URL || 'https://dash.galanteelemperador.com'}/splitsheets/generate/${trackId}`;
-        
+
         const emailContent = `
-            <h2>Splitsheet Agreement - ${track.title}</h2>
-            <p><strong>Tema:</strong> ${track.title}</p>
+            <h2>Splitsheet Agreement - ${htmlEscape(track.title)}</h2>
+            <p><strong>Tema:</strong> #${track.track_number || '-'} - ${htmlEscape(track.title)}</p>
             <p><strong>Artista:</strong> Galante el Emperador</p>
-            <p><strong>Productor:</strong> ${track.producer_name}</p>
-            <p><strong>División:</strong> ${track.split_percentage || '50/50'}</p>
-            
-            ${message ? `<p><strong>Mensaje:</strong><br>${message}</p>` : ''}
-            
-            <p>Ver splitsheet completo: <a href="${splitsheetUrl}">${splitsheetUrl}</a></p>
-            
+
+            <h3>División de Productores</h3>
+            <ul>${producerBreakdownHtml}</ul>
+
+            <h3>Compositores</h3>
+            <ul>${composerBreakdownHtml}</ul>
+
+            ${message ? `<p><strong>Mensaje:</strong><br>${htmlEscape(message)}</p>` : ''}
+
+            <p><strong>Ver versión PDF:</strong> <a href="${splitsheetPdfUrl}">${splitsheetPdfUrl}</a></p>
+            <p><strong>Ver/Editar en dashboard:</strong> <a href="${splitsheetEditUrl}">${splitsheetEditUrl}</a></p>
+
             <hr>
             <p style="font-size: 0.9em; color: #666;">Este es un email automático de El Inmortal 2 Dashboard.</p>
         `;
-        
-        // Send emails
+
         const emailPromises = [];
-        
-        // Email to producer
-        emailPromises.push(transporter.sendMail({
-            from: '"El Inmortal 2" <splits@galanteelemperador.com>',
-            to: toProducer,
-            subject: `Splitsheet - ${track.title}`,
-            html: emailContent
-        }));
-        
-        // Email to artist (CC)
-        emailPromises.push(transporter.sendMail({
-            from: '"El Inmortal 2" <splits@galanteelemperador.com>',
-            to: toArtist,
-            subject: `Copia: Splitsheet - ${track.title}`,
-            html: emailContent
-        }));
-        
+
+        for (const recipient of producerRecipients) {
+            emailPromises.push(
+                transporter.sendMail({
+                    from: '"El Inmortal 2" <splits@galanteelemperador.com>',
+                    to: recipient,
+                    subject: `Splitsheet - ${track.title}`,
+                    html: emailContent
+                })
+            );
+        }
+
+        if (toArtist) {
+            emailPromises.push(
+                transporter.sendMail({
+                    from: '"El Inmortal 2" <splits@galanteelemperador.com>',
+                    to: toArtist,
+                    subject: `Copia: Splitsheet - ${track.title}`,
+                    html: emailContent
+                })
+            );
+        }
+
         await Promise.all(emailPromises);
-        
-        // Update splitsheet status
+
         await run(`
             UPDATE splitsheets 
-            SET status = 'sent', sent_date = CURRENT_TIMESTAMP 
+            SET status = CASE WHEN status = 'pending' THEN 'sent' ELSE status END,
+                sent_date = COALESCE(sent_date, CURRENT_TIMESTAMP)
             WHERE track_id = ?
         `, [trackId]);
+
+        await syncTrackSplitsheetFlags(trackId);
         
         res.json({ 
             success: true, 
-            message: 'Emails enviados exitosamente' 
+            message: `Emails enviados exitosamente a ${producerRecipients.length} productor(es)`
         });
         
     } catch (error) {

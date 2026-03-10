@@ -55,6 +55,31 @@ function normalizeIdArray(value) {
     return [...new Set(ids)];
 }
 
+function normalizeDurationSeconds(value) {
+    if (value === undefined || value === null || value === '') return null;
+
+    if (typeof value === 'number' && Number.isFinite(value)) {
+        return Math.max(0, Math.round(value));
+    }
+
+    const text = String(value).trim();
+    if (!text) return null;
+
+    const mmssMatch = text.match(/^(\d+):([0-5]\d)$/);
+    if (mmssMatch) {
+        const minutes = Number(mmssMatch[1]);
+        const seconds = Number(mmssMatch[2]);
+        return (minutes * 60) + seconds;
+    }
+
+    const parsed = Number(text.replace(',', '.'));
+    if (!Number.isFinite(parsed) || parsed < 0) {
+        return null;
+    }
+
+    return Math.round(parsed);
+}
+
 async function ensureTrackCreditsTables() {
     await run(`
         CREATE TABLE IF NOT EXISTS track_producers (
@@ -215,19 +240,22 @@ router.post('/', upload.single('audio_file'), [
 ], async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
+        const producers = await getAll('SELECT * FROM producers ORDER BY name');
         return res.status(400).render('tracks/new', {
             title: 'Nuevo Tema',
             errors: errors.array(),
-            formData: req.body
+            formData: req.body,
+            producers: producers || []
         });
     }
 
     try {
-        const { track_number, title, producer_id, recording_date, lyrics } = req.body;
+        const { track_number, title, producer_id, recording_date, duration, lyrics } = req.body;
+        const normalizedFormDuration = normalizeDurationSeconds(duration);
         
         // Si se subió audio, procesarlo
         let audioFilePath = null;
-        let duration = null;
+        let detectedDuration = null;
         let audioDescription = null;
         
         if (req.file) {
@@ -245,18 +273,30 @@ router.post('/', upload.single('audio_file'), [
             try {
                 console.log(`[Tracks] Analyzing audio for: ${title}`);
                 const analysis = await analyzeAndDescribeAudio(localFilePath, title, producerName);
-                duration = analysis.duration;
+                detectedDuration = normalizeDurationSeconds(analysis.duration);
                 audioDescription = analysis.description;
-                console.log(`[Tracks] ✅ Audio analyzed - Duration: ${duration}`);
+                console.log(`[Tracks] ✅ Audio analyzed - Duration: ${detectedDuration}`);
             } catch (analysisError) {
                 console.warn(`[Tracks] Could not analyze audio: ${analysisError.message}`);
             }
         }
 
+        const durationToSave = detectedDuration ?? normalizedFormDuration;
+
         await run(
             `INSERT INTO tracks (track_number, title, producer_id, recording_date, duration, lyrics, audio_file_path, audio_file_type, audio_description)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [track_number, title, producer_id || null, recording_date, duration, lyrics, audioFilePath, audioFilePath ? 'master' : null, audioDescription]
+            [
+                track_number,
+                title,
+                producer_id || null,
+                recording_date,
+                durationToSave,
+                lyrics,
+                audioFilePath,
+                audioFilePath ? 'master' : null,
+                audioDescription
+            ]
         );
 
         res.redirect('/tracks');
@@ -371,7 +411,7 @@ router.put('/:id', async (req, res) => {
             composer_ids
         } = req.body;
 
-        const track = await getOne('SELECT id FROM tracks WHERE id = ?', [trackId]);
+        const track = await getOne('SELECT id, duration FROM tracks WHERE id = ?', [trackId]);
         if (!track) {
             return res.status(404).render('error', {
                 title: '404',
@@ -381,6 +421,11 @@ router.put('/:id', async (req, res) => {
         }
 
         const primaryProducerId = toPositiveInt(producer_id);
+        const rawDurationText = duration === undefined || duration === null ? '' : String(duration).trim();
+        const parsedDuration = normalizeDurationSeconds(rawDurationText);
+        const durationToSave = rawDurationText === ''
+            ? null
+            : (parsedDuration !== null ? parsedDuration : normalizeDurationSeconds(track.duration));
 
         await run(
             `UPDATE tracks 
@@ -392,7 +437,7 @@ router.put('/:id', async (req, res) => {
                 title, 
                 primaryProducerId, 
                 recording_date || null, 
-                duration, 
+                durationToSave,
                 lyrics, 
                 status, 
                 is_single ? 1 : 0, 

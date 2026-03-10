@@ -412,6 +412,7 @@ router.post('/track/:id/audio/replace', upload.single('audio_file'), async (req,
             message: 'Audio reemplazado exitosamente',
             newFilePath: newFilePath,
             fileType: file_type || 'master',
+            duration: duration,
             oldFile: oldFileName,
             newFile: newFileName
         });

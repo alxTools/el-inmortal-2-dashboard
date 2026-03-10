@@ -6,6 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const { exec } = require('child_process');
 const { promisify } = require('util');
+const { File: NodeFile } = require('node:buffer');
 const execAsync = promisify(exec);
 const { downloadFromDropbox, cleanupTempFile: cleanupDropboxTemp, isDropboxPath, convertToDropboxPath } = require('../utils/dropboxHelper');
 const { downloadFromDrive, cleanupTempFile: cleanupDriveTemp, isGoogleDrivePath } = require('../utils/googleDriveHelper');
@@ -13,6 +14,10 @@ const { getLatestUpdates } = require('../utils/statusUpdates');
 const { updateYouTubePublishDate, DEFAULT_PR_YOUTUBE_TIME, parseTimeText } = require('../utils/youtubeScheduler');
 
 // Initialize OpenAI client
+if (typeof globalThis.File === 'undefined' && NodeFile) {
+    globalThis.File = NodeFile;
+}
+
 const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY
 });
@@ -983,7 +988,7 @@ router.post('/tracks/:id/transcribe', async (req, res) => {
 
         // Check file size and convert to MP3 if too large (OpenAI limit is 25MB)
         const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB in bytes
-        let convertedFilePath = null;
+        convertedFilePath = null;
         
         try {
             const stats = fs.statSync(audioPath);
@@ -1040,7 +1045,7 @@ router.post('/tracks/:id/transcribe', async (req, res) => {
         } catch (openaiError) {
             console.error('[API] OpenAI Whisper Error:', openaiError);
             res.status(500).json({ 
-                error: 'Error transcribing with OpenAI',
+                error: openaiError.message || 'Error transcribing with OpenAI',
                 details: openaiError.message
             });
         }

@@ -31,15 +31,6 @@ router.get('/', async (req, res) => {
         // Get pending splitsheets
         const pendingSplitsheets = (stats?.total_tracks || 0) - (stats?.splitsheets_confirmed || 0);
 
-        // Get singles for countdown display
-        const singles = await getAll(`
-            SELECT t.*, p.name as producer_name
-            FROM tracks t
-            LEFT JOIN producers p ON t.producer_id = p.id
-            WHERE t.is_single = 1
-            ORDER BY t.track_number
-        `);
-
         // Get recent activity
         const recentActivity = await getAll(`
             SELECT * FROM activity_log
@@ -74,10 +65,8 @@ router.get('/', async (req, res) => {
                 producerCount,
                 urgentTasks
             },
-            singles: singles || [],
             recentActivity: recentActivity || [],
             recentTracks: recentTracks || [],
-            launchDate: new Date('2026-02-17T00:00:00'),
             artistName: 'Galante el Emperador',
             albumName: 'El Inmortal 2',
             flash: String(req.query.flash || ''),

@@ -17,20 +17,22 @@
 body {
     margin: 0;
     min-height: 100vh;
-    font-family: "Rajdhani", "Segoe UI", sans-serif;
     color: var(--text);
     background:
         radial-gradient(1000px 500px at 10% -10%, rgba(43, 125, 255, 0.26), transparent 70%),
         radial-gradient(800px 400px at 110% 120%, rgba(0, 194, 255, 0.17), transparent 70%),
         linear-gradient(160deg, var(--bg-1), var(--bg-2));
-    overflow: hidden;
+    overflow-x: hidden;
+    overflow-y: hidden;
 }
 
 .mission-shell {
+    font-family: "Rajdhani", "Segoe UI", sans-serif;
     display: grid;
     grid-template-rows: auto auto auto 1fr;
     gap: 14px;
-    height: 100vh;
+    min-height: calc(100vh - 70px);
+    height: calc(100vh - 70px);
     padding: 16px;
 }
 
@@ -258,7 +260,7 @@ body {
 
 @media (max-width: 980px) {
     body { overflow: auto; }
-    .mission-shell { height: auto; }
+    .mission-shell { min-height: auto; height: auto; }
     .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .holo-stage { grid-template-columns: 1fr; }
     .holo-map { min-height: 300px; }

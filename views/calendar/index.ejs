@@ -5,73 +5,666 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><%= title %></title>
     <link rel="stylesheet" href="/css/dashboard.css">
+    <link rel="stylesheet" href="/css/admin-calendar.css?v=20260310d">
 </head>
 <body>
     <%- include('../partials/navbar') %>
 
     <div class="container" style="padding-top: 40px;">
-        <h1 style="color: #ffd700; margin-bottom: 30px;">📅 Calendario de Contenido</h1>
+        <div class="section-header" style="margin-bottom: 24px;">
+            <h1 style="color: #ffd700;">📅 Calendario de Contenido (Admin)</h1>
+            <div class="admin-calendar-toolbar">
+                <button id="calendarPrevBtn" type="button" class="btn-small">← Mes anterior</button>
+                <div id="calendarMonthLabel" class="admin-calendar-month-label">-</div>
+                <button id="calendarNextBtn" type="button" class="btn-small">Mes siguiente →</button>
+                <button id="calendarTodayBtn" type="button" class="btn-small">Hoy</button>
+            </div>
+        </div>
 
-        <div class="section">
-            <div style="background: rgba(255, 215, 0, 0.1); border: 2px solid #ffd700; border-radius: 15px; padding: 25px; margin-bottom: 30px;">
-                <h3 style="color: #ffd700; margin-bottom: 15px;">📊 Resumen</h3>
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 20px;">
-                    <div style="text-align: center;">
-                        <div style="font-size: 2em; font-weight: bold; color: #ffd700;"><%= events.filter(e => e.completed).length %></div>
-                        <div style="color: #888;">Completados</div>
-                    </div>
-                    <div style="text-align: center;">
-                        <div style="font-size: 2em; font-weight: bold; color: #ffd700;"><%= events.filter(e => !e.completed).length %></div>
-                        <div style="color: #888;">Pendientes</div>
-                    </div>
-                    <div style="text-align: center;">
-                        <div style="font-size: 2em; font-weight: bold; color: #ffd700;"><%= events.length %></div>
-                        <div style="color: #888;">Total Eventos</div>
-                    </div>
+        <div class="section admin-calendar-section">
+            <div class="admin-calendar-summary">
+                <div class="admin-calendar-stat">
+                    <div id="calendarTotalEvents" class="admin-calendar-stat-number">0</div>
+                    <div class="admin-calendar-stat-label">Eventos del mes</div>
+                </div>
+                <div class="admin-calendar-stat">
+                    <div id="calendarYoutubeEvents" class="admin-calendar-stat-number">0</div>
+                    <div class="admin-calendar-stat-label">Eventos YouTube</div>
+                </div>
+                <div class="admin-calendar-stat">
+                    <div id="calendarCompletedEvents" class="admin-calendar-stat-number">0</div>
+                    <div class="admin-calendar-stat-label">Completados</div>
                 </div>
             </div>
 
-            <% if (events.length === 0) { %>
-                <div style="text-align: center; padding: 50px; color: #888;">
-                    <p style="font-size: 1.2em;">No hay eventos en el calendario aún.</p>
-                    <p>Los eventos se agregan automáticamente desde el sistema.</p>
-                </div>
-            <% } else { %>
-                <div class="timers-grid">
-                    <% events.forEach(event => { %>
-                    <div class="timer-card" style="text-align: left;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                            <h3 style="color: #ffd700;"><%= event.title %></h3>
-                            <% if (event.completed) { %>
-                                <span class="status-badge status-done">✓</span>
-                            <% } %>
-                        </div>
-                        <p style="color: #888; margin-bottom: 10px;">
-                            <strong>Fecha:</strong> <%= new Date(event.date).toLocaleDateString() %>
-                        </p>
-                        <p style="color: #888; margin-bottom: 10px;">
-                            <strong>Tipo:</strong> <%= event.content_type %>
-                        </p>
-                        <p style="color: #888; margin-bottom: 10px;">
-                            <strong>Plataforma:</strong> <%= event.platform %>
-                        </p>
-                        <% if (event.track_title) { %>
-                            <p style="color: #888; margin-bottom: 15px;">
-                                <strong>Tema:</strong> <%= event.track_title %>
-                            </p>
-                        <% } %>
-                        <% if (event.description) { %>
-                            <p style="color: #aaa; font-size: 0.9em; margin-top: 10px;">
-                                <%= event.description %>
-                            </p>
-                        <% } %>
-                    </div>
-                    <% }) %>
-                </div>
-            <% } %>
+            <p class="admin-calendar-help">
+                Haz click en cualquier día para crear un evento y elegir red (YouTube, TikTok, Facebook, Instagram, X).<br>
+                Arrastra y suelta eventos entre días para moverlos. Si es YouTube y tiene Video ID, se sincroniza automáticamente.
+            </p>
+
+            <div id="calendarLoading" class="admin-calendar-loading">Cargando calendario...</div>
+
+            <div class="admin-calendar-shell">
+                <div id="calendarGrid" class="admin-calendar-grid" aria-live="polite"></div>
+            </div>
         </div>
     </div>
 
     <%- include('../partials/footer') %>
+
+    <script>
+        const state = {
+            viewDate: new Date(),
+            events: [],
+            tracks: [],
+            openDayMenu: null,
+            draggingEventId: null,
+            isLoading: false
+        };
+
+        const dom = {
+            prevBtn: document.getElementById('calendarPrevBtn'),
+            nextBtn: document.getElementById('calendarNextBtn'),
+            todayBtn: document.getElementById('calendarTodayBtn'),
+            monthLabel: document.getElementById('calendarMonthLabel'),
+            grid: document.getElementById('calendarGrid'),
+            loading: document.getElementById('calendarLoading'),
+            totalEvents: document.getElementById('calendarTotalEvents'),
+            youtubeEvents: document.getElementById('calendarYoutubeEvents'),
+            completedEvents: document.getElementById('calendarCompletedEvents')
+        };
+
+        const PLATFORM_LABELS = {
+            youtube: 'YouTube',
+            tiktok: 'TikTok',
+            facebook: 'Facebook',
+            instagram: 'Instagram',
+            x: 'X'
+        };
+
+        const PLATFORM_SHORT = {
+            youtube: 'YT',
+            tiktok: 'TT',
+            facebook: 'FB',
+            instagram: 'IG',
+            x: 'X'
+        };
+
+        function pad2(value) {
+            return String(value).padStart(2, '0');
+        }
+
+        function normalizePlatform(value) {
+            const key = String(value || '').trim().toLowerCase();
+            if (key === 'yt') return 'youtube';
+            if (key === 'tt') return 'tiktok';
+            if (key === 'fb') return 'facebook';
+            if (key === 'ig') return 'instagram';
+            if (key === 'twitter') return 'x';
+            return PLATFORM_LABELS[key] ? key : 'other';
+        }
+
+        function monthKey(dateObj) {
+            return `${dateObj.getFullYear()}-${pad2(dateObj.getMonth() + 1)}`;
+        }
+
+        function dateKey(year, monthIndex, day) {
+            return `${year}-${pad2(monthIndex + 1)}-${pad2(day)}`;
+        }
+
+        function formatMonthLabel(dateObj) {
+            return new Intl.DateTimeFormat('es-PR', {
+                month: 'long',
+                year: 'numeric'
+            }).format(dateObj);
+        }
+
+        function escapeHtml(value) {
+            return String(value || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function showToast(message, type = 'info') {
+            const toast = document.createElement('div');
+            toast.className = `dashboard-toast ${type}`;
+            const icon = type === 'success' ? '✓' : (type === 'error' ? '✕' : 'i');
+            toast.innerHTML = `<span class="toast-icon">${icon}</span><span>${escapeHtml(message)}</span>`;
+            document.body.appendChild(toast);
+
+            requestAnimationFrame(() => {
+                toast.classList.add('show');
+            });
+
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.remove(), 350);
+            }, 3200);
+        }
+
+        async function fetchJson(url, options = {}) {
+            const response = await fetch(url, options);
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                throw new Error(payload.error || payload.message || `HTTP ${response.status}`);
+            }
+            return payload;
+        }
+
+        function closeDayMenu() {
+            if (state.openDayMenu) {
+                state.openDayMenu.remove();
+                state.openDayMenu = null;
+                document.body.classList.remove('calendar-modal-open');
+            }
+        }
+
+        function getTrackOptionsHtml() {
+            const options = ['<option value="">Sin track</option>'];
+            for (const track of state.tracks) {
+                const label = `#${track.track_number || '-'} ${track.title || 'Sin título'}`;
+                options.push(`<option value="${track.id}">${escapeHtml(label)}</option>`);
+            }
+            return options.join('');
+        }
+
+        function updateSummary() {
+            const total = state.events.length;
+            const youtubeCount = state.events.filter((event) => normalizePlatform(event.platform) === 'youtube').length;
+            const completedCount = state.events.filter((event) => Number(event.completed) === 1).length;
+
+            dom.totalEvents.textContent = String(total);
+            dom.youtubeEvents.textContent = String(youtubeCount);
+            dom.completedEvents.textContent = String(completedCount);
+        }
+
+        function setLoading(isLoading) {
+            state.isLoading = isLoading;
+            dom.loading.style.display = isLoading ? 'block' : 'none';
+        }
+
+        async function loadTracks() {
+            try {
+                const tracks = await fetchJson('/api/tracks');
+                state.tracks = Array.isArray(tracks) ? tracks : [];
+            } catch (error) {
+                state.tracks = [];
+                console.error('Error loading tracks:', error);
+            }
+        }
+
+        async function loadMonthEvents() {
+            setLoading(true);
+            closeDayMenu();
+
+            try {
+                const month = monthKey(state.viewDate);
+                const result = await fetchJson(`/api/calendar/events?month=${encodeURIComponent(month)}`);
+                state.events = Array.isArray(result.events) ? result.events : [];
+                state.events.sort((a, b) => {
+                    if (a.date === b.date) return Number(a.id) - Number(b.id);
+                    return String(a.date).localeCompare(String(b.date));
+                });
+                renderCalendar();
+                updateSummary();
+            } catch (error) {
+                console.error('Error loading month events:', error);
+                showToast(`No se pudo cargar calendario: ${error.message}`, 'error');
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        function createEventChip(eventItem) {
+            const platform = normalizePlatform(eventItem.platform);
+            const chip = document.createElement('div');
+            chip.className = `admin-calendar-event platform-${platform}`;
+            chip.draggable = true;
+            chip.dataset.eventId = String(eventItem.id);
+            chip.title = `${PLATFORM_LABELS[platform] || eventItem.platform || 'Evento'} - ${eventItem.title || ''}`;
+
+            if (platform === 'youtube' && eventItem.youtube_last_sync_status === 'sync_error') {
+                chip.classList.add('sync-error');
+            }
+
+            const platformBadge = document.createElement('span');
+            platformBadge.className = 'admin-calendar-event-platform';
+            platformBadge.textContent = PLATFORM_SHORT[platform] || 'EV';
+
+            const title = document.createElement('span');
+            title.className = 'admin-calendar-event-title';
+            title.textContent = eventItem.title || 'Sin título';
+
+            const time = document.createElement('span');
+            time.className = 'admin-calendar-event-time';
+            time.textContent = eventItem.scheduled_time || '';
+
+            const deleteBtn = document.createElement('button');
+            deleteBtn.type = 'button';
+            deleteBtn.className = 'admin-calendar-event-delete';
+            deleteBtn.textContent = '×';
+            deleteBtn.title = 'Eliminar evento';
+            deleteBtn.draggable = false;
+            deleteBtn.addEventListener('click', async (clickEvent) => {
+                clickEvent.preventDefault();
+                clickEvent.stopPropagation();
+
+                const confirmed = window.confirm(`Eliminar evento "${eventItem.title}"?`);
+                if (!confirmed) return;
+
+                try {
+                    await fetchJson(`/api/calendar/events/${eventItem.id}`, {
+                        method: 'DELETE'
+                    });
+                    state.events = state.events.filter((item) => Number(item.id) !== Number(eventItem.id));
+                    renderCalendar();
+                    updateSummary();
+                    showToast('Evento eliminado', 'success');
+                } catch (error) {
+                    showToast(`No se pudo eliminar: ${error.message}`, 'error');
+                }
+            });
+
+            chip.appendChild(platformBadge);
+            chip.appendChild(title);
+            if (time.textContent) {
+                chip.appendChild(time);
+            }
+            chip.appendChild(deleteBtn);
+
+            chip.addEventListener('click', (clickEvent) => {
+                clickEvent.stopPropagation();
+            });
+
+            chip.addEventListener('dragstart', (dragEvent) => {
+                state.draggingEventId = String(eventItem.id);
+                chip.classList.add('is-dragging');
+                dragEvent.dataTransfer.effectAllowed = 'move';
+                dragEvent.dataTransfer.setData('text/plain', String(eventItem.id));
+                closeDayMenu();
+            });
+
+            chip.addEventListener('dragend', () => {
+                state.draggingEventId = null;
+                chip.classList.remove('is-dragging');
+                document.querySelectorAll('.admin-calendar-day.is-drop-target').forEach((cell) => {
+                    cell.classList.remove('is-drop-target');
+                });
+            });
+
+            return chip;
+        }
+
+        async function moveEvent(eventId, targetDate) {
+            const sourceEvent = state.events.find((item) => String(item.id) === String(eventId));
+            if (!sourceEvent) return;
+            if (String(sourceEvent.date) === String(targetDate)) return;
+
+            try {
+                const result = await fetchJson(`/api/calendar/events/${eventId}/move`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        date: targetDate
+                    })
+                });
+
+                const index = state.events.findIndex((item) => String(item.id) === String(eventId));
+                if (index >= 0) {
+                    state.events[index] = result.event;
+                }
+
+                state.events.sort((a, b) => {
+                    if (a.date === b.date) return Number(a.id) - Number(b.id);
+                    return String(a.date).localeCompare(String(b.date));
+                });
+
+                renderCalendar();
+                updateSummary();
+
+                if (result.youtubeSync && result.youtubeSync.attempted && !result.youtubeSync.success) {
+                    showToast(`Evento movido, pero YouTube falló: ${result.youtubeSync.message}`, 'error');
+                } else {
+                    showToast('Evento movido correctamente', 'success');
+                }
+            } catch (error) {
+                showToast(`No se pudo mover: ${error.message}`, 'error');
+            }
+        }
+
+        function toggleYoutubeFields(container, platform) {
+            const youtubeFields = container.querySelector('.admin-calendar-youtube-fields');
+            const syncCheckbox = container.querySelector('input[name="youtube_sync_enabled"]');
+
+            if (!youtubeFields || !syncCheckbox) return;
+
+            const isYoutube = platform === 'youtube';
+            youtubeFields.style.display = isYoutube ? 'block' : 'none';
+
+            if (!isYoutube) {
+                syncCheckbox.checked = false;
+            }
+        }
+
+        function openDayMenu(dayCell, targetDate) {
+            closeDayMenu();
+
+            const backdrop = document.createElement('div');
+            backdrop.className = 'admin-calendar-menu-backdrop';
+
+            const menu = document.createElement('div');
+            menu.className = 'admin-calendar-day-menu';
+            menu.innerHTML = `
+                <form class="admin-calendar-day-form">
+                    <div class="admin-calendar-day-form-title">Nuevo evento - ${escapeHtml(targetDate)}</div>
+
+                    <label>Red</label>
+                    <select name="platform" required>
+                        <option value="youtube">YouTube</option>
+                        <option value="tiktok">TikTok</option>
+                        <option value="facebook">Facebook</option>
+                        <option value="instagram">Instagram</option>
+                        <option value="x">X</option>
+                    </select>
+
+                    <label>Título</label>
+                    <input name="title" type="text" maxlength="255" required placeholder="Ej: Estreno oficial" />
+
+                    <label>Tipo de contenido</label>
+                    <select name="content_type">
+                        <option value="estreno">Estreno</option>
+                        <option value="video">Video</option>
+                        <option value="short">Short</option>
+                        <option value="reel">Reel</option>
+                        <option value="post">Post</option>
+                        <option value="story">Story</option>
+                        <option value="live">Live</option>
+                        <option value="promo">Promo</option>
+                    </select>
+
+                    <label>Hora (Puerto Rico)</label>
+                    <input name="scheduled_time" type="time" value="20:00" />
+
+                    <div class="admin-calendar-youtube-fields">
+                        <label>Video ID de YouTube</label>
+                        <input name="youtube_video_id" type="text" maxlength="32" placeholder="Ej: dQw4w9WgXcQ" />
+
+                        <label class="admin-calendar-inline-check">
+                            <input name="youtube_sync_enabled" type="checkbox" checked />
+                            Sincronizar cambio de fecha en YouTube
+                        </label>
+                    </div>
+
+                    <label>Track (opcional)</label>
+                    <select name="track_id">
+                        ${getTrackOptionsHtml()}
+                    </select>
+
+                    <label>Descripción</label>
+                    <textarea name="description" rows="2" placeholder="Notas internas (opcional)"></textarea>
+
+                    <div class="admin-calendar-day-actions">
+                        <button type="submit" class="btn-small">Guardar</button>
+                        <button type="button" class="btn-small" data-close-menu>Cerrar</button>
+                    </div>
+                </form>
+            `;
+
+            menu.addEventListener('pointerdown', (event) => {
+                event.stopPropagation();
+            });
+            menu.addEventListener('click', (event) => {
+                event.stopPropagation();
+            });
+
+            backdrop.addEventListener('click', (event) => {
+                if (event.target === backdrop) {
+                    closeDayMenu();
+                }
+            });
+
+            const form = menu.querySelector('.admin-calendar-day-form');
+            const platformSelect = form.querySelector('select[name="platform"]');
+            const closeBtn = form.querySelector('[data-close-menu]');
+            const submitBtn = form.querySelector('button[type="submit"]');
+
+            toggleYoutubeFields(form, platformSelect.value);
+
+            platformSelect.addEventListener('change', () => {
+                toggleYoutubeFields(form, normalizePlatform(platformSelect.value));
+            });
+
+            closeBtn.addEventListener('click', () => {
+                closeDayMenu();
+            });
+
+            form.addEventListener('submit', async (submitEvent) => {
+                submitEvent.preventDefault();
+
+                const formData = new FormData(form);
+                const platform = normalizePlatform(formData.get('platform'));
+                const payload = {
+                    date: targetDate,
+                    title: String(formData.get('title') || '').trim(),
+                    platform,
+                    content_type: String(formData.get('content_type') || 'post').trim(),
+                    scheduled_time: String(formData.get('scheduled_time') || '').trim() || null,
+                    description: String(formData.get('description') || '').trim() || null,
+                    track_id: formData.get('track_id') ? Number(formData.get('track_id')) : null,
+                    youtube_video_id: String(formData.get('youtube_video_id') || '').trim() || null,
+                    youtube_sync_enabled: formData.get('youtube_sync_enabled') ? 1 : 0
+                };
+
+                if (platform !== 'youtube') {
+                    payload.youtube_video_id = null;
+                    payload.youtube_sync_enabled = 0;
+                }
+
+                if (!payload.title) {
+                    showToast('El título es requerido', 'error');
+                    return;
+                }
+
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'Guardando...';
+
+                try {
+                    const result = await fetchJson('/api/calendar/events', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json'
+                        },
+                        body: JSON.stringify(payload)
+                    });
+
+                    state.events.push(result.event);
+                    state.events.sort((a, b) => {
+                        if (a.date === b.date) return Number(a.id) - Number(b.id);
+                        return String(a.date).localeCompare(String(b.date));
+                    });
+
+                    renderCalendar();
+                    updateSummary();
+                    closeDayMenu();
+
+                    if (result.youtubeSync && result.youtubeSync.attempted && !result.youtubeSync.success) {
+                        showToast(`Evento creado, pero YouTube falló: ${result.youtubeSync.message}`, 'error');
+                    } else {
+                        showToast('Evento creado correctamente', 'success');
+                    }
+                } catch (error) {
+                    showToast(`No se pudo crear: ${error.message}`, 'error');
+                } finally {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Guardar';
+                }
+            });
+
+            backdrop.appendChild(menu);
+            document.body.appendChild(backdrop);
+            state.openDayMenu = backdrop;
+            document.body.classList.add('calendar-modal-open');
+
+            setTimeout(() => {
+                const titleInput = menu.querySelector('input[name="title"]');
+                if (titleInput) titleInput.focus();
+            }, 0);
+        }
+
+        function renderCalendar() {
+            closeDayMenu();
+
+            const year = state.viewDate.getFullYear();
+            const monthIndex = state.viewDate.getMonth();
+            const firstDayWeek = new Date(year, monthIndex, 1).getDay();
+            const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
+
+            dom.monthLabel.textContent = formatMonthLabel(state.viewDate);
+            dom.grid.innerHTML = '';
+
+            const weekdays = ['Dom', 'Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab'];
+            weekdays.forEach((dayName) => {
+                const header = document.createElement('div');
+                header.className = 'admin-calendar-weekday';
+                header.textContent = dayName;
+                dom.grid.appendChild(header);
+            });
+
+            for (let i = 0; i < firstDayWeek; i += 1) {
+                const empty = document.createElement('div');
+                empty.className = 'admin-calendar-day empty';
+                dom.grid.appendChild(empty);
+            }
+
+            const todayKey = dateKey(
+                new Date().getFullYear(),
+                new Date().getMonth(),
+                new Date().getDate()
+            );
+
+            for (let day = 1; day <= daysInMonth; day += 1) {
+                const cellDate = dateKey(year, monthIndex, day);
+                const dayEvents = state.events.filter((eventItem) => String(eventItem.date) === cellDate);
+
+                const dayCell = document.createElement('div');
+                dayCell.className = 'admin-calendar-day';
+                if (cellDate === todayKey) {
+                    dayCell.classList.add('today');
+                }
+
+                dayCell.dataset.date = cellDate;
+
+                const header = document.createElement('div');
+                header.className = 'admin-calendar-day-header';
+
+                const numberBtn = document.createElement('button');
+                numberBtn.type = 'button';
+                numberBtn.className = 'admin-calendar-day-number';
+                numberBtn.textContent = String(day);
+                numberBtn.addEventListener('click', (event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    openDayMenu(dayCell, cellDate);
+                });
+
+                const addBtn = document.createElement('button');
+                addBtn.type = 'button';
+                addBtn.className = 'admin-calendar-day-add';
+                addBtn.textContent = '+';
+                addBtn.title = 'Agregar evento';
+                addBtn.addEventListener('click', (event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    openDayMenu(dayCell, cellDate);
+                });
+
+                header.appendChild(numberBtn);
+                header.appendChild(addBtn);
+
+                const eventsContainer = document.createElement('div');
+                eventsContainer.className = 'admin-calendar-day-events';
+                dayEvents.forEach((eventItem) => {
+                    eventsContainer.appendChild(createEventChip(eventItem));
+                });
+
+                dayCell.addEventListener('click', (event) => {
+                    event.stopPropagation();
+                    if (state.draggingEventId) return;
+                    if (event.target.closest('.admin-calendar-day-menu')) return;
+                    openDayMenu(dayCell, cellDate);
+                });
+
+                dayCell.addEventListener('dragover', (event) => {
+                    if (!state.draggingEventId) return;
+                    event.preventDefault();
+                    dayCell.classList.add('is-drop-target');
+                });
+
+                dayCell.addEventListener('dragleave', () => {
+                    dayCell.classList.remove('is-drop-target');
+                });
+
+                dayCell.addEventListener('drop', async (event) => {
+                    if (!state.draggingEventId) return;
+                    event.preventDefault();
+                    dayCell.classList.remove('is-drop-target');
+
+                    const eventId = event.dataTransfer.getData('text/plain') || state.draggingEventId;
+                    if (!eventId) return;
+                    await moveEvent(eventId, cellDate);
+                });
+
+                dayCell.appendChild(header);
+                dayCell.appendChild(eventsContainer);
+                dom.grid.appendChild(dayCell);
+            }
+        }
+
+        function shiftMonth(offset) {
+            const next = new Date(state.viewDate.getFullYear(), state.viewDate.getMonth() + offset, 1);
+            state.viewDate = next;
+            loadMonthEvents();
+        }
+
+        function jumpToTodayMonth() {
+            const now = new Date();
+            state.viewDate = new Date(now.getFullYear(), now.getMonth(), 1);
+            loadMonthEvents();
+        }
+
+        function registerGlobalListeners() {
+            dom.prevBtn.addEventListener('click', () => shiftMonth(-1));
+            dom.nextBtn.addEventListener('click', () => shiftMonth(1));
+            dom.todayBtn.addEventListener('click', jumpToTodayMonth);
+
+            document.addEventListener('click', (event) => {
+                if (!state.openDayMenu) return;
+                if (state.openDayMenu.contains(event.target)) return;
+                closeDayMenu();
+            });
+
+            document.addEventListener('keydown', (event) => {
+                if (event.key === 'Escape') {
+                    closeDayMenu();
+                }
+            });
+        }
+
+        async function initCalendar() {
+            state.viewDate = new Date(state.viewDate.getFullYear(), state.viewDate.getMonth(), 1);
+            registerGlobalListeners();
+            await loadTracks();
+            await loadMonthEvents();
+        }
+
+        initCalendar();
+    </script>
 </body>
 </html>

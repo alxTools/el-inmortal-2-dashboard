@@ -10,11 +10,272 @@ const execAsync = promisify(exec);
 const { downloadFromDropbox, cleanupTempFile: cleanupDropboxTemp, isDropboxPath, convertToDropboxPath } = require('../utils/dropboxHelper');
 const { downloadFromDrive, cleanupTempFile: cleanupDriveTemp, isGoogleDrivePath } = require('../utils/googleDriveHelper');
 const { getLatestUpdates } = require('../utils/statusUpdates');
+const { updateYouTubePublishDate, DEFAULT_PR_YOUTUBE_TIME, parseTimeText } = require('../utils/youtubeScheduler');
 
 // Initialize OpenAI client
 const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY
 });
+
+const PLATFORM_ALIASES = {
+    youtube: 'youtube',
+    yt: 'youtube',
+    tiktok: 'tiktok',
+    tt: 'tiktok',
+    facebook: 'facebook',
+    fb: 'facebook',
+    instagram: 'instagram',
+    ig: 'instagram',
+    x: 'x',
+    twitter: 'x'
+};
+
+let calendarSchemaReady = false;
+
+function pad2(value) {
+    return String(value).padStart(2, '0');
+}
+
+function normalizePlatform(platform) {
+    const key = String(platform || '').trim().toLowerCase();
+    return PLATFORM_ALIASES[key] || null;
+}
+
+function normalizeText(value, maxLength = 5000) {
+    const text = String(value || '').trim();
+    if (!text) return '';
+    return text.slice(0, maxLength);
+}
+
+function toBoolInt(value, fallback = 0) {
+    if (value === undefined || value === null || value === '') return fallback;
+    if (value === true || value === 1 || value === '1' || value === 'true' || value === 'on') return 1;
+    if (value === false || value === 0 || value === '0' || value === 'false' || value === 'off') return 0;
+    return fallback;
+}
+
+function isValidDateText(value) {
+    const text = String(value || '').trim();
+    const match = text.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!match) return false;
+    const year = Number(match[1]);
+    const month = Number(match[2]);
+    const day = Number(match[3]);
+    const probe = new Date(Date.UTC(year, month - 1, day));
+    return (
+        probe.getUTCFullYear() === year &&
+        probe.getUTCMonth() === month - 1 &&
+        probe.getUTCDate() === day
+    );
+}
+
+function toDayNumber(dateText) {
+    return Number(String(dateText).slice(8, 10)) || 1;
+}
+
+function normalizeTrackId(value) {
+    const parsed = Number(value);
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
+function isValidYoutubeVideoId(value) {
+    return /^[A-Za-z0-9_-]{11}$/.test(String(value || '').trim());
+}
+
+function formatDbTime(value) {
+    const text = String(value || '').trim();
+    if (!text) return null;
+    const match = text.match(/^([01]\d|2[0-3]):([0-5]\d)/);
+    if (!match) return null;
+    return `${match[1]}:${match[2]}`;
+}
+
+function normalizeScheduledTime(value, { allowNull = false, fallback = DEFAULT_PR_YOUTUBE_TIME } = {}) {
+    const raw = value === undefined || value === null ? '' : String(value).trim();
+    if (!raw) {
+        return allowNull ? null : fallback;
+    }
+    return parseTimeText(raw, fallback);
+}
+
+function toDbTimeValue(timeText) {
+    if (!timeText) return null;
+    return `${timeText}:00`;
+}
+
+function parseMonthDescriptor(monthParam) {
+    const fallback = new Date();
+    let year = fallback.getFullYear();
+    let month = fallback.getMonth() + 1;
+
+    const raw = String(monthParam || '').trim();
+    const match = raw.match(/^(\d{4})-(0[1-9]|1[0-2])$/);
+    if (match) {
+        year = Number(match[1]);
+        month = Number(match[2]);
+    }
+
+    const nextYear = month === 12 ? year + 1 : year;
+    const nextMonth = month === 12 ? 1 : month + 1;
+
+    return {
+        year,
+        month,
+        monthKey: `${year}-${pad2(month)}`,
+        startDate: `${year}-${pad2(month)}-01`,
+        endDate: `${nextYear}-${pad2(nextMonth)}-01`
+    };
+}
+
+async function ensureCalendarSchema() {
+    if (calendarSchemaReady) return;
+
+    await run(`
+        CREATE TABLE IF NOT EXISTS content_calendar (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            day_number INT NOT NULL,
+            date DATE NOT NULL,
+            title VARCHAR(255) NOT NULL,
+            content_type VARCHAR(100) NOT NULL,
+            platform VARCHAR(100) NOT NULL,
+            description TEXT,
+            status VARCHAR(50) DEFAULT 'pending',
+            completed TINYINT(1) DEFAULT 0,
+            track_id INT NULL,
+            youtube_video_id VARCHAR(32) NULL,
+            scheduled_time TIME NULL,
+            youtube_sync_enabled TINYINT(1) NOT NULL DEFAULT 0,
+            youtube_last_sync_status VARCHAR(32) NULL,
+            youtube_last_sync_message TEXT NULL,
+            youtube_last_synced_at DATETIME NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    `);
+
+    const columnRows = await getAll(
+        `SELECT column_name
+         FROM information_schema.columns
+         WHERE table_schema = DATABASE()
+           AND table_name = 'content_calendar'`
+    );
+    const existingColumns = new Set(
+        columnRows
+            .map((row) => (row.column_name || row.COLUMN_NAME || '').toLowerCase())
+            .filter(Boolean)
+    );
+
+    const requiredColumns = [
+        ['youtube_video_id', 'VARCHAR(32) NULL'],
+        ['scheduled_time', 'TIME NULL'],
+        ['youtube_sync_enabled', 'TINYINT(1) NOT NULL DEFAULT 0'],
+        ['youtube_last_sync_status', 'VARCHAR(32) NULL'],
+        ['youtube_last_sync_message', 'TEXT NULL'],
+        ['youtube_last_synced_at', 'DATETIME NULL']
+    ];
+
+    for (const [columnName, definition] of requiredColumns) {
+        if (existingColumns.has(columnName.toLowerCase())) continue;
+        try {
+            await run(`ALTER TABLE content_calendar ADD COLUMN ${columnName} ${definition}`);
+        } catch (error) {
+            if (error.code !== 'ER_DUP_FIELDNAME') {
+                throw error;
+            }
+        }
+    }
+
+    calendarSchemaReady = true;
+}
+
+async function getCalendarEventById(eventId) {
+    return await getOne(
+        `SELECT
+            c.id,
+            c.day_number,
+            DATE_FORMAT(c.date, '%Y-%m-%d') AS date,
+            c.title,
+            c.content_type,
+            c.platform,
+            c.description,
+            c.status,
+            c.completed,
+            c.track_id,
+            c.youtube_video_id,
+            TIME_FORMAT(c.scheduled_time, '%H:%i') AS scheduled_time,
+            c.youtube_sync_enabled,
+            c.youtube_last_sync_status,
+            c.youtube_last_sync_message,
+            c.youtube_last_synced_at,
+            t.title AS track_title
+         FROM content_calendar c
+         LEFT JOIN tracks t ON t.id = c.track_id
+         WHERE c.id = ?
+         LIMIT 1`,
+        [eventId]
+    );
+}
+
+function shouldSyncYoutubeCalendarEvent(eventRow) {
+    return (
+        normalizePlatform(eventRow?.platform) === 'youtube' &&
+        Number(eventRow?.youtube_sync_enabled || 0) === 1 &&
+        !!String(eventRow?.youtube_video_id || '').trim()
+    );
+}
+
+async function syncCalendarEventToYoutube(eventRow, { dateOverride, timeOverride } = {}) {
+    if (!shouldSyncYoutubeCalendarEvent(eventRow)) {
+        return {
+            attempted: false,
+            success: false,
+            message: 'youtube_sync_not_configured'
+        };
+    }
+
+    const targetDate = dateOverride || eventRow.date;
+    const targetTime = timeOverride || formatDbTime(eventRow.scheduled_time) || DEFAULT_PR_YOUTUBE_TIME;
+
+    try {
+        const syncResult = await updateYouTubePublishDate({
+            videoId: eventRow.youtube_video_id,
+            date: targetDate,
+            time: targetTime
+        });
+
+        const message = `publishAt actualizado a ${syncResult.publishAt}`;
+        await run(
+            `UPDATE content_calendar
+             SET youtube_last_sync_status = ?,
+                 youtube_last_sync_message = ?,
+                 youtube_last_synced_at = NOW()
+             WHERE id = ?`,
+            ['synced', message, eventRow.id]
+        );
+
+        return {
+            attempted: true,
+            success: true,
+            publishAt: syncResult.publishAt,
+            message
+        };
+    } catch (error) {
+        const message = String(error.message || 'youtube_sync_failed').slice(0, 800);
+        await run(
+            `UPDATE content_calendar
+             SET youtube_last_sync_status = ?,
+                 youtube_last_sync_message = ?,
+                 youtube_last_synced_at = NOW()
+             WHERE id = ?`,
+            ['sync_error', message, eventRow.id]
+        );
+
+        return {
+            attempted: true,
+            success: false,
+            message
+        };
+    }
+}
 
 // Helper function to convert audio to MP3 using ffmpeg
 async function convertToMp3(inputPath, outputPath) {
@@ -271,6 +532,371 @@ router.post('/checklist/:id/toggle', async (req, res) => {
     } catch (error) {
         console.error('API Toggle Error:', error);
         res.status(500).json({ error: 'Error toggling item' });
+    }
+});
+
+// GET calendar events for a month (admin dashboard)
+router.get('/calendar/events', async (req, res) => {
+    try {
+        await ensureCalendarSchema();
+
+        const month = parseMonthDescriptor(req.query.month);
+        const events = await getAll(
+            `SELECT
+                c.id,
+                c.day_number,
+                DATE_FORMAT(c.date, '%Y-%m-%d') AS date,
+                c.title,
+                c.content_type,
+                c.platform,
+                c.description,
+                c.status,
+                c.completed,
+                c.track_id,
+                c.youtube_video_id,
+                TIME_FORMAT(c.scheduled_time, '%H:%i') AS scheduled_time,
+                c.youtube_sync_enabled,
+                c.youtube_last_sync_status,
+                c.youtube_last_sync_message,
+                c.youtube_last_synced_at,
+                t.title AS track_title
+             FROM content_calendar c
+             LEFT JOIN tracks t ON t.id = c.track_id
+             WHERE c.date >= ?
+               AND c.date < ?
+             ORDER BY c.date ASC, c.id ASC`,
+            [month.startDate, month.endDate]
+        );
+
+        return res.json({
+            month: month.monthKey,
+            events: events || []
+        });
+    } catch (error) {
+        console.error('API Calendar List Error:', error);
+        return res.status(500).json({ error: 'Error fetching calendar events' });
+    }
+});
+
+// POST create calendar event
+router.post('/calendar/events', async (req, res) => {
+    try {
+        await ensureCalendarSchema();
+
+        const date = String(req.body.date || '').trim();
+        const title = normalizeText(req.body.title, 255);
+        const contentType = normalizeText(req.body.content_type || 'post', 100) || 'post';
+        const platform = normalizePlatform(req.body.platform);
+        const description = normalizeText(req.body.description, 5000) || null;
+        const status = normalizeText(req.body.status || 'pending', 50) || 'pending';
+        const completed = toBoolInt(req.body.completed, 0);
+        const trackId = normalizeTrackId(req.body.track_id);
+
+        if (!isValidDateText(date)) {
+            return res.status(422).json({ error: 'Fecha inválida. Usa formato YYYY-MM-DD' });
+        }
+        if (!title) {
+            return res.status(422).json({ error: 'El título es requerido' });
+        }
+        if (!platform) {
+            return res.status(422).json({ error: 'Plataforma inválida' });
+        }
+
+        const youtubeVideoIdRaw = normalizeText(req.body.youtube_video_id, 32);
+        const youtubeVideoId = platform === 'youtube' && youtubeVideoIdRaw ? youtubeVideoIdRaw : null;
+        const youtubeSyncEnabled = platform === 'youtube'
+            ? toBoolInt(req.body.youtube_sync_enabled, youtubeVideoId ? 1 : 0)
+            : 0;
+
+        if (youtubeVideoId && !isValidYoutubeVideoId(youtubeVideoId)) {
+            return res.status(422).json({ error: 'youtube_video_id inválido (debe tener 11 caracteres)' });
+        }
+
+        if (platform === 'youtube' && youtubeSyncEnabled === 1 && !youtubeVideoId) {
+            return res.status(422).json({ error: 'youtube_video_id es requerido para sincronizar con YouTube' });
+        }
+
+        const scheduledTime = platform === 'youtube'
+            ? normalizeScheduledTime(req.body.scheduled_time, { allowNull: false, fallback: DEFAULT_PR_YOUTUBE_TIME })
+            : normalizeScheduledTime(req.body.scheduled_time, { allowNull: true });
+
+        const result = await run(
+            `INSERT INTO content_calendar
+            (day_number, date, title, content_type, platform, description, status, completed, track_id,
+             youtube_video_id, scheduled_time, youtube_sync_enabled)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+                toDayNumber(date),
+                date,
+                title,
+                contentType,
+                platform,
+                description,
+                status,
+                completed,
+                trackId,
+                youtubeVideoId,
+                toDbTimeValue(scheduledTime),
+                youtubeSyncEnabled
+            ]
+        );
+
+        const eventId = result.lastID || result.insertId;
+        let event = await getCalendarEventById(eventId);
+
+        let youtubeSync = {
+            attempted: false,
+            success: false,
+            message: 'not_attempted'
+        };
+
+        if (shouldSyncYoutubeCalendarEvent(event)) {
+            youtubeSync = await syncCalendarEventToYoutube(event, {
+                dateOverride: event.date,
+                timeOverride: formatDbTime(event.scheduled_time) || DEFAULT_PR_YOUTUBE_TIME
+            });
+            event = await getCalendarEventById(eventId);
+        }
+
+        return res.status(201).json({
+            success: true,
+            event,
+            youtubeSync
+        });
+    } catch (error) {
+        console.error('API Calendar Create Error:', error);
+        return res.status(500).json({
+            error: 'Error creating calendar event',
+            details: error.message
+        });
+    }
+});
+
+// PATCH move calendar event to another date (drag and drop)
+router.patch('/calendar/events/:id/move', async (req, res) => {
+    try {
+        await ensureCalendarSchema();
+
+        const eventId = req.params.id;
+        const targetDate = String(req.body.date || '').trim();
+
+        if (!isValidDateText(targetDate)) {
+            return res.status(422).json({ error: 'Fecha inválida. Usa formato YYYY-MM-DD' });
+        }
+
+        const existing = await getCalendarEventById(eventId);
+        if (!existing) {
+            return res.status(404).json({ error: 'Evento no encontrado' });
+        }
+
+        let nextScheduledTime = formatDbTime(existing.scheduled_time);
+        if (req.body.scheduled_time !== undefined) {
+            nextScheduledTime = normalizeScheduledTime(req.body.scheduled_time, {
+                allowNull: normalizePlatform(existing.platform) !== 'youtube',
+                fallback: DEFAULT_PR_YOUTUBE_TIME
+            });
+        }
+        if (!nextScheduledTime && normalizePlatform(existing.platform) === 'youtube') {
+            nextScheduledTime = DEFAULT_PR_YOUTUBE_TIME;
+        }
+
+        await run(
+            `UPDATE content_calendar
+             SET date = ?,
+                 day_number = ?,
+                 scheduled_time = ?
+             WHERE id = ?`,
+            [
+                targetDate,
+                toDayNumber(targetDate),
+                toDbTimeValue(nextScheduledTime),
+                eventId
+            ]
+        );
+
+        let updated = await getCalendarEventById(eventId);
+        let youtubeSync = {
+            attempted: false,
+            success: false,
+            message: 'not_attempted'
+        };
+
+        if (shouldSyncYoutubeCalendarEvent(updated)) {
+            youtubeSync = await syncCalendarEventToYoutube(updated, {
+                dateOverride: updated.date,
+                timeOverride: formatDbTime(updated.scheduled_time) || DEFAULT_PR_YOUTUBE_TIME
+            });
+            updated = await getCalendarEventById(eventId);
+        }
+
+        return res.json({
+            success: true,
+            event: updated,
+            youtubeSync
+        });
+    } catch (error) {
+        console.error('API Calendar Move Error:', error);
+        return res.status(500).json({
+            error: 'Error moving calendar event',
+            details: error.message
+        });
+    }
+});
+
+// PATCH update calendar event details
+router.patch('/calendar/events/:id', async (req, res) => {
+    try {
+        await ensureCalendarSchema();
+
+        const eventId = req.params.id;
+        const existing = await getCalendarEventById(eventId);
+        if (!existing) {
+            return res.status(404).json({ error: 'Evento no encontrado' });
+        }
+
+        const nextDate = req.body.date !== undefined ? String(req.body.date || '').trim() : existing.date;
+        if (!isValidDateText(nextDate)) {
+            return res.status(422).json({ error: 'Fecha inválida. Usa formato YYYY-MM-DD' });
+        }
+
+        const nextTitle = req.body.title !== undefined
+            ? normalizeText(req.body.title, 255)
+            : String(existing.title || '');
+        if (!nextTitle) {
+            return res.status(422).json({ error: 'El título es requerido' });
+        }
+
+        const nextPlatform = req.body.platform !== undefined
+            ? normalizePlatform(req.body.platform)
+            : normalizePlatform(existing.platform);
+        if (!nextPlatform) {
+            return res.status(422).json({ error: 'Plataforma inválida' });
+        }
+
+        const nextContentType = req.body.content_type !== undefined
+            ? normalizeText(req.body.content_type, 100)
+            : String(existing.content_type || 'post');
+        const nextDescription = req.body.description !== undefined
+            ? (normalizeText(req.body.description, 5000) || null)
+            : (existing.description || null);
+        const nextStatus = req.body.status !== undefined
+            ? (normalizeText(req.body.status, 50) || 'pending')
+            : (String(existing.status || 'pending'));
+        const nextCompleted = req.body.completed !== undefined
+            ? toBoolInt(req.body.completed, 0)
+            : toBoolInt(existing.completed, 0);
+        const nextTrackId = req.body.track_id !== undefined
+            ? normalizeTrackId(req.body.track_id)
+            : normalizeTrackId(existing.track_id);
+
+        let nextYoutubeVideoId = req.body.youtube_video_id !== undefined
+            ? normalizeText(req.body.youtube_video_id, 32)
+            : normalizeText(existing.youtube_video_id, 32);
+        let nextYoutubeSyncEnabled = req.body.youtube_sync_enabled !== undefined
+            ? toBoolInt(req.body.youtube_sync_enabled, 0)
+            : toBoolInt(existing.youtube_sync_enabled, 0);
+
+        if (nextPlatform !== 'youtube') {
+            nextYoutubeVideoId = null;
+            nextYoutubeSyncEnabled = 0;
+        } else {
+            nextYoutubeVideoId = nextYoutubeVideoId || null;
+            if (req.body.youtube_sync_enabled === undefined && req.body.youtube_video_id !== undefined) {
+                nextYoutubeSyncEnabled = nextYoutubeVideoId ? 1 : 0;
+            }
+        }
+
+        if (nextPlatform === 'youtube' && nextYoutubeSyncEnabled === 1 && !nextYoutubeVideoId) {
+            return res.status(422).json({ error: 'youtube_video_id es requerido para sincronizar con YouTube' });
+        }
+        if (nextYoutubeVideoId && !isValidYoutubeVideoId(nextYoutubeVideoId)) {
+            return res.status(422).json({ error: 'youtube_video_id inválido (debe tener 11 caracteres)' });
+        }
+
+        let nextScheduledTime = formatDbTime(existing.scheduled_time);
+        if (req.body.scheduled_time !== undefined) {
+            nextScheduledTime = normalizeScheduledTime(req.body.scheduled_time, {
+                allowNull: nextPlatform !== 'youtube',
+                fallback: DEFAULT_PR_YOUTUBE_TIME
+            });
+        }
+        if (!nextScheduledTime && nextPlatform === 'youtube') {
+            nextScheduledTime = DEFAULT_PR_YOUTUBE_TIME;
+        }
+
+        await run(
+            `UPDATE content_calendar
+             SET day_number = ?,
+                 date = ?,
+                 title = ?,
+                 content_type = ?,
+                 platform = ?,
+                 description = ?,
+                 status = ?,
+                 completed = ?,
+                 track_id = ?,
+                 youtube_video_id = ?,
+                 scheduled_time = ?,
+                 youtube_sync_enabled = ?
+             WHERE id = ?`,
+            [
+                toDayNumber(nextDate),
+                nextDate,
+                nextTitle,
+                nextContentType || 'post',
+                nextPlatform,
+                nextDescription,
+                nextStatus,
+                nextCompleted,
+                nextTrackId,
+                nextYoutubeVideoId,
+                toDbTimeValue(nextScheduledTime),
+                nextYoutubeSyncEnabled,
+                eventId
+            ]
+        );
+
+        let updated = await getCalendarEventById(eventId);
+        let youtubeSync = {
+            attempted: false,
+            success: false,
+            message: 'not_attempted'
+        };
+
+        if (shouldSyncYoutubeCalendarEvent(updated)) {
+            youtubeSync = await syncCalendarEventToYoutube(updated, {
+                dateOverride: updated.date,
+                timeOverride: formatDbTime(updated.scheduled_time) || DEFAULT_PR_YOUTUBE_TIME
+            });
+            updated = await getCalendarEventById(eventId);
+        }
+
+        return res.json({
+            success: true,
+            event: updated,
+            youtubeSync
+        });
+    } catch (error) {
+        console.error('API Calendar Update Error:', error);
+        return res.status(500).json({
+            error: 'Error updating calendar event',
+            details: error.message
+        });
+    }
+});
+
+// DELETE calendar event
+router.delete('/calendar/events/:id', async (req, res) => {
+    try {
+        await ensureCalendarSchema();
+        await run('DELETE FROM content_calendar WHERE id = ?', [req.params.id]);
+        return res.json({ success: true, deleted: true });
+    } catch (error) {
+        console.error('API Calendar Delete Error:', error);
+        return res.status(500).json({
+            error: 'Error deleting calendar event',
+            details: error.message
+        });
     }
 });
 

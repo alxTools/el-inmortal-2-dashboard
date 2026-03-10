@@ -9,14 +9,14 @@
 <body>
     <%- include('../partials/navbar') %>
 
-    <div class="container" style="padding-top: 40px; max-width: 760px;">
+    <div class="container" style="padding-top: 40px; max-width: 900px;">
         <h1 style="color: #ffd700; margin-bottom: 24px;">✏️ Editar Splitsheet</h1>
 
         <div class="section" style="margin-bottom: 20px;">
             <div style="display: grid; gap: 8px; color: #d1d5db;">
                 <div><strong>Tema:</strong> #<%= splitsheet.track_number %> - <%= splitsheet.track_title %></div>
-                <div><strong>Productor:</strong> <%= splitsheet.producer_name %></div>
-                <div><strong>Email Productor:</strong> <%= splitsheet.producer_email || 'N/A' %></div>
+                <div><strong>Track ID:</strong> <%= splitsheet.track_id %></div>
+                <div><strong>Productores actuales:</strong> <%= (producerSplits || []).length %></div>
             </div>
         </div>
 
@@ -31,32 +31,69 @@
                 <div class="form-row">
                     <div class="form-group">
                         <label for="artist_percentage">% Artista</label>
-                        <input id="artist_percentage" name="artist_percentage" type="number" min="0" max="100" value="<%= splitsheet.artist_percentage %>" required>
+                        <input id="artist_percentage" name="artist_percentage" type="number" min="0" max="100" value="<%= artistPercentage %>" required>
                     </div>
                     <div class="form-group">
-                        <label for="producer_percentage">% Productor</label>
-                        <input id="producer_percentage" name="producer_percentage" type="number" min="0" max="100" value="<%= splitsheet.producer_percentage %>" required>
-                    </div>
-                </div>
-
-                <div style="margin-top: 6px; margin-bottom: 14px; color: #9ca3af; font-size: 0.9em;">
-                    Total: <span id="splitTotalText"><%= Number(splitsheet.artist_percentage || 0) + Number(splitsheet.producer_percentage || 0) %></span>%
-                </div>
-
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="status">Estado</label>
+                        <label for="status">Estado general</label>
                         <select id="status" name="status">
-                            <option value="pending" <%= splitsheet.status === 'pending' ? 'selected' : '' %>>Pendiente</option>
-                            <option value="sent" <%= splitsheet.status === 'sent' ? 'selected' : '' %>>Enviado</option>
-                            <option value="confirmed" <%= splitsheet.status === 'confirmed' ? 'selected' : '' %>>Confirmado</option>
+                            <option value="pending" <%= status === 'pending' ? 'selected' : '' %>>Pendiente</option>
+                            <option value="sent" <%= status === 'sent' ? 'selected' : '' %>>Enviado</option>
+                            <option value="confirmed" <%= status === 'confirmed' ? 'selected' : '' %>>Confirmado</option>
                         </select>
                     </div>
                 </div>
 
+                <div style="margin-top: 6px; margin-bottom: 16px; color: #9ca3af; font-size: 0.9em;">
+                    Total (Artista + Productores):
+                    <span id="splitTotalText">0</span>%
+                </div>
+
+                <div style="background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 10px; padding: 16px; margin-bottom: 16px;">
+                    <h3 style="color: #ffd700; margin-bottom: 10px; font-size: 1.05em;">🎧 Productores y Splits</h3>
+                    <div id="producerSplitsContainer" style="display: flex; flex-direction: column; gap: 8px;">
+                        <% if (!(producerSplits || []).length) { %>
+                            <div id="noProducerRowsText" style="color: #888; font-size: 0.9em;">No hay productores. Agrega al menos uno.</div>
+                        <% } %>
+                        <% (producerSplits || []).forEach((entry) => { %>
+                            <div class="producer-split-row" style="display: flex; gap: 8px; align-items: center;">
+                                <select name="producer_ids[]" class="producer-select" style="flex: 1;">
+                                    <option value="">Seleccionar productor...</option>
+                                    <% (producers || []).forEach((producer) => { %>
+                                        <option value="<%= producer.id %>" <%= Number(entry.producer_id) === Number(producer.id) ? 'selected' : '' %>><%= producer.name %></option>
+                                    <% }) %>
+                                </select>
+                                <input name="producer_percentages[]" class="producer-percentage" type="number" min="0" max="100" value="<%= entry.producer_percentage %>" style="width: 120px;" placeholder="%" required>
+                                <button type="button" class="btn-small remove-producer-btn" style="background: rgba(255, 107, 107, 0.15); border-color: rgba(255, 107, 107, 0.45); color: #ff9b9b;">✕</button>
+                            </div>
+                        <% }) %>
+                    </div>
+                    <button type="button" id="addProducerSplitBtn" class="btn-small" style="margin-top: 10px;">➕ Agregar Productor</button>
+                </div>
+
+                <div style="background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 10px; padding: 16px; margin-bottom: 16px;">
+                    <h3 style="color: #ffd700; margin-bottom: 10px; font-size: 1.05em;">✍️ Compositores</h3>
+                    <div id="composerContainer" style="display: flex; flex-direction: column; gap: 8px;">
+                        <% if (!(selectedComposers || []).length) { %>
+                            <div id="noComposerRowsText" style="color: #888; font-size: 0.9em;">No hay compositores asignados.</div>
+                        <% } %>
+                        <% (selectedComposers || []).forEach((entry) => { %>
+                            <div class="composer-row" style="display: flex; gap: 8px; align-items: center;">
+                                <select name="composer_ids[]" class="composer-select" style="flex: 1;">
+                                    <option value="">Seleccionar compositor...</option>
+                                    <% (composers || []).forEach((composer) => { %>
+                                        <option value="<%= composer.id %>" <%= Number(entry.id) === Number(composer.id) ? 'selected' : '' %>><%= composer.name %></option>
+                                    <% }) %>
+                                </select>
+                                <button type="button" class="btn-small remove-composer-btn" style="background: rgba(255, 107, 107, 0.15); border-color: rgba(255, 107, 107, 0.45); color: #ff9b9b;">✕</button>
+                            </div>
+                        <% }) %>
+                    </div>
+                    <button type="button" id="addComposerBtn" class="btn-small" style="margin-top: 10px;">➕ Agregar Compositor</button>
+                </div>
+
                 <div class="form-group">
                     <label for="notes">Notas</label>
-                    <textarea id="notes" name="notes" rows="5" placeholder="Notas internas sobre el acuerdo"><%= splitsheet.notes || '' %></textarea>
+                    <textarea id="notes" name="notes" rows="4" placeholder="Notas internas sobre el acuerdo"><%= notes || '' %></textarea>
                 </div>
 
                 <div style="display: flex; gap: 12px; margin-top: 20px;">
@@ -70,33 +107,202 @@
     <%- include('../partials/footer') %>
 
     <script>
-        const artistInput = document.getElementById('artist_percentage');
-        const producerInput = document.getElementById('producer_percentage');
-        const totalText = document.getElementById('splitTotalText');
+        const producerOptions = <%- JSON.stringify((producers || []).map((producer) => ({ id: producer.id, name: producer.name }))) %>;
+        const composerOptions = <%- JSON.stringify((composers || []).map((composer) => ({ id: composer.id, name: composer.name }))) %>;
+
         const form = document.getElementById('editSplitsheetForm');
+        const artistInput = document.getElementById('artist_percentage');
+        const totalText = document.getElementById('splitTotalText');
+        const producerContainer = document.getElementById('producerSplitsContainer');
+        const composerContainer = document.getElementById('composerContainer');
+        const noProducerRowsText = document.getElementById('noProducerRowsText');
+        const noComposerRowsText = document.getElementById('noComposerRowsText');
 
         function asInt(value) {
             const n = Number(value);
             return Number.isFinite(n) ? Math.round(n) : 0;
         }
 
+        function hideOrShowEmptyStates() {
+            if (noProducerRowsText) {
+                noProducerRowsText.style.display = producerContainer.querySelectorAll('.producer-split-row').length ? 'none' : 'block';
+            }
+            if (noComposerRowsText) {
+                noComposerRowsText.style.display = composerContainer.querySelectorAll('.composer-row').length ? 'none' : 'block';
+            }
+        }
+
         function updateTotal() {
-            const total = asInt(artistInput.value) + asInt(producerInput.value);
+            const artistPct = asInt(artistInput.value);
+            const producerPctSum = Array.from(document.querySelectorAll('.producer-percentage'))
+                .reduce((sum, input) => sum + asInt(input.value), 0);
+
+            const total = artistPct + producerPctSum;
             totalText.textContent = String(total);
             totalText.style.color = total === 100 ? '#22c55e' : '#ff8a8a';
         }
 
+        function createSelect(options, placeholder, className, name, selectedId) {
+            const select = document.createElement('select');
+            select.name = name;
+            select.className = className;
+            select.style.flex = '1';
+
+            const placeholderOption = document.createElement('option');
+            placeholderOption.value = '';
+            placeholderOption.textContent = placeholder;
+            select.appendChild(placeholderOption);
+
+            options.forEach((item) => {
+                const option = document.createElement('option');
+                option.value = String(item.id);
+                option.textContent = item.name;
+                if (Number(selectedId) === Number(item.id)) {
+                    option.selected = true;
+                }
+                select.appendChild(option);
+            });
+
+            return select;
+        }
+
+        function addProducerRow(selectedId = '', percentage = '') {
+            const row = document.createElement('div');
+            row.className = 'producer-split-row';
+            row.style.display = 'flex';
+            row.style.gap = '8px';
+            row.style.alignItems = 'center';
+
+            const select = createSelect(producerOptions, 'Seleccionar productor...', 'producer-select', 'producer_ids[]', selectedId);
+
+            const percentageInput = document.createElement('input');
+            percentageInput.name = 'producer_percentages[]';
+            percentageInput.className = 'producer-percentage';
+            percentageInput.type = 'number';
+            percentageInput.min = '0';
+            percentageInput.max = '100';
+            percentageInput.placeholder = '%';
+            percentageInput.style.width = '120px';
+            percentageInput.required = true;
+            if (percentage !== '') {
+                percentageInput.value = String(percentage);
+            }
+            percentageInput.addEventListener('input', updateTotal);
+
+            const removeBtn = document.createElement('button');
+            removeBtn.type = 'button';
+            removeBtn.className = 'btn-small remove-producer-btn';
+            removeBtn.style.background = 'rgba(255, 107, 107, 0.15)';
+            removeBtn.style.borderColor = 'rgba(255, 107, 107, 0.45)';
+            removeBtn.style.color = '#ff9b9b';
+            removeBtn.textContent = '✕';
+            removeBtn.addEventListener('click', () => {
+                row.remove();
+                hideOrShowEmptyStates();
+                updateTotal();
+            });
+
+            row.appendChild(select);
+            row.appendChild(percentageInput);
+            row.appendChild(removeBtn);
+            producerContainer.appendChild(row);
+
+            hideOrShowEmptyStates();
+            updateTotal();
+        }
+
+        function addComposerRow(selectedId = '') {
+            const row = document.createElement('div');
+            row.className = 'composer-row';
+            row.style.display = 'flex';
+            row.style.gap = '8px';
+            row.style.alignItems = 'center';
+
+            const select = createSelect(composerOptions, 'Seleccionar compositor...', 'composer-select', 'composer_ids[]', selectedId);
+
+            const removeBtn = document.createElement('button');
+            removeBtn.type = 'button';
+            removeBtn.className = 'btn-small remove-composer-btn';
+            removeBtn.style.background = 'rgba(255, 107, 107, 0.15)';
+            removeBtn.style.borderColor = 'rgba(255, 107, 107, 0.45)';
+            removeBtn.style.color = '#ff9b9b';
+            removeBtn.textContent = '✕';
+            removeBtn.addEventListener('click', () => {
+                row.remove();
+                hideOrShowEmptyStates();
+            });
+
+            row.appendChild(select);
+            row.appendChild(removeBtn);
+            composerContainer.appendChild(row);
+
+            hideOrShowEmptyStates();
+        }
+
+        document.getElementById('addProducerSplitBtn').addEventListener('click', () => {
+            addProducerRow();
+        });
+
+        document.getElementById('addComposerBtn').addEventListener('click', () => {
+            addComposerRow();
+        });
+
+        document.querySelectorAll('.remove-producer-btn').forEach((button) => {
+            button.addEventListener('click', () => {
+                const row = button.closest('.producer-split-row');
+                if (row) row.remove();
+                hideOrShowEmptyStates();
+                updateTotal();
+            });
+        });
+
+        document.querySelectorAll('.remove-composer-btn').forEach((button) => {
+            button.addEventListener('click', () => {
+                const row = button.closest('.composer-row');
+                if (row) row.remove();
+                hideOrShowEmptyStates();
+            });
+        });
+
+        document.querySelectorAll('.producer-percentage').forEach((input) => {
+            input.addEventListener('input', updateTotal);
+        });
+
         artistInput.addEventListener('input', updateTotal);
-        producerInput.addEventListener('input', updateTotal);
 
         form.addEventListener('submit', (event) => {
-            const total = asInt(artistInput.value) + asInt(producerInput.value);
+            const producerRows = Array.from(document.querySelectorAll('.producer-split-row'));
+            if (!producerRows.length) {
+                event.preventDefault();
+                alert('Debes agregar al menos un productor.');
+                return;
+            }
+
+            const selectedProducerIds = producerRows
+                .map((row) => Number(row.querySelector('.producer-select')?.value || 0))
+                .filter((id) => Number.isInteger(id) && id > 0);
+
+            const uniqueIds = new Set(selectedProducerIds);
+            if (selectedProducerIds.length !== producerRows.length) {
+                event.preventDefault();
+                alert('Todos los productores deben estar seleccionados.');
+                return;
+            }
+
+            if (uniqueIds.size !== selectedProducerIds.length) {
+                event.preventDefault();
+                alert('No puedes repetir productores.');
+                return;
+            }
+
+            const total = asInt(totalText.textContent);
             if (total !== 100) {
                 event.preventDefault();
-                alert('La suma de Artista + Productor debe ser 100%.');
+                alert('La suma de Artista + Productores debe ser 100%.');
             }
         });
 
+        hideOrShowEmptyStates();
         updateTotal();
     </script>
 </body>

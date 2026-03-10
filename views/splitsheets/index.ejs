@@ -27,6 +27,7 @@
                             <th>Splits</th>
                             <th>Estado</th>
                             <th>Fecha Envío</th>
+                            <th>Acciones</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -45,6 +46,9 @@
                                 <% } %>
                             </td>
                             <td><%= sheet.sent_date ? new Date(sheet.sent_date).toLocaleDateString() : '-' %></td>
+                            <td>
+                                <a href="/splitsheets/<%= sheet.id %>/edit" class="btn-small">Editar</a>
+                            </td>
                         </tr>
                         <% }) %>
                     </tbody>

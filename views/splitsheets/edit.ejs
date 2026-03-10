@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %></title>
+    <link rel="stylesheet" href="/css/dashboard.css">
+</head>
+<body>
+    <%- include('../partials/navbar') %>
+
+    <div class="container" style="padding-top: 40px; max-width: 760px;">
+        <h1 style="color: #ffd700; margin-bottom: 24px;">✏️ Editar Splitsheet</h1>
+
+        <div class="section" style="margin-bottom: 20px;">
+            <div style="display: grid; gap: 8px; color: #d1d5db;">
+                <div><strong>Tema:</strong> #<%= splitsheet.track_number %> - <%= splitsheet.track_title %></div>
+                <div><strong>Productor:</strong> <%= splitsheet.producer_name %></div>
+                <div><strong>Email Productor:</strong> <%= splitsheet.producer_email || 'N/A' %></div>
+            </div>
+        </div>
+
+        <div class="section">
+            <% if (validationError) { %>
+                <div style="margin-bottom: 16px; padding: 10px 12px; border: 1px solid rgba(255, 107, 107, 0.5); background: rgba(255, 107, 107, 0.12); border-radius: 8px; color: #ffb4b4;">
+                    <%= validationError %>
+                </div>
+            <% } %>
+
+            <form action="/splitsheets/<%= splitsheet.id %>?_method=PUT" method="POST" id="editSplitsheetForm">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="artist_percentage">% Artista</label>
+                        <input id="artist_percentage" name="artist_percentage" type="number" min="0" max="100" value="<%= splitsheet.artist_percentage %>" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="producer_percentage">% Productor</label>
+                        <input id="producer_percentage" name="producer_percentage" type="number" min="0" max="100" value="<%= splitsheet.producer_percentage %>" required>
+                    </div>
+                </div>
+
+                <div style="margin-top: 6px; margin-bottom: 14px; color: #9ca3af; font-size: 0.9em;">
+                    Total: <span id="splitTotalText"><%= Number(splitsheet.artist_percentage || 0) + Number(splitsheet.producer_percentage || 0) %></span>%
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="status">Estado</label>
+                        <select id="status" name="status">
+                            <option value="pending" <%= splitsheet.status === 'pending' ? 'selected' : '' %>>Pendiente</option>
+                            <option value="sent" <%= splitsheet.status === 'sent' ? 'selected' : '' %>>Enviado</option>
+                            <option value="confirmed" <%= splitsheet.status === 'confirmed' ? 'selected' : '' %>>Confirmado</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="notes">Notas</label>
+                    <textarea id="notes" name="notes" rows="5" placeholder="Notas internas sobre el acuerdo"><%= splitsheet.notes || '' %></textarea>
+                </div>
+
+                <div style="display: flex; gap: 12px; margin-top: 20px;">
+                    <button type="submit" class="btn">💾 Guardar Splitsheet</button>
+                    <a href="/splitsheets" class="btn btn-secondary">Volver</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <%- include('../partials/footer') %>
+
+    <script>
+        const artistInput = document.getElementById('artist_percentage');
+        const producerInput = document.getElementById('producer_percentage');
+        const totalText = document.getElementById('splitTotalText');
+        const form = document.getElementById('editSplitsheetForm');
+
+        function asInt(value) {
+            const n = Number(value);
+            return Number.isFinite(n) ? Math.round(n) : 0;
+        }
+
+        function updateTotal() {
+            const total = asInt(artistInput.value) + asInt(producerInput.value);
+            totalText.textContent = String(total);
+            totalText.style.color = total === 100 ? '#22c55e' : '#ff8a8a';
+        }
+
+        artistInput.addEventListener('input', updateTotal);
+        producerInput.addEventListener('input', updateTotal);
+
+        form.addEventListener('submit', (event) => {
+            const total = asInt(artistInput.value) + asInt(producerInput.value);
+            if (total !== 100) {
+                event.preventDefault();
+                alert('La suma de Artista + Productor debe ser 100%.');
+            }
+        });
+
+        updateTotal();
+    </script>
+</body>
+</html>

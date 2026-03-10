@@ -38,6 +38,113 @@ const upload = multer({
     }
 });
 
+function toPositiveInt(value) {
+    const parsed = Number(value);
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
+function normalizeIdArray(value) {
+    const rawValues = Array.isArray(value)
+        ? value
+        : (value === undefined || value === null || value === '' ? [] : [value]);
+
+    const ids = rawValues
+        .map(toPositiveInt)
+        .filter(Boolean);
+
+    return [...new Set(ids)];
+}
+
+async function ensureTrackCreditsTables() {
+    await run(`
+        CREATE TABLE IF NOT EXISTS track_producers (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            track_id INT NOT NULL,
+            producer_id INT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_track_producers_track (track_id),
+            INDEX idx_track_producers_producer (producer_id),
+            UNIQUE KEY uniq_track_producer (track_id, producer_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    `);
+
+    await run(`
+        CREATE TABLE IF NOT EXISTS track_composers (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            track_id INT NOT NULL,
+            composer_id INT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_track_composers_track (track_id),
+            INDEX idx_track_composers_composer (composer_id),
+            UNIQUE KEY uniq_track_composer (track_id, composer_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    `);
+}
+
+async function filterExistingIds(tableName, ids) {
+    if (!ids.length) return [];
+
+    const allowedTables = new Set(['producers', 'composers']);
+    if (!allowedTables.has(tableName)) {
+        throw new Error('Invalid table for id filtering');
+    }
+
+    const placeholders = ids.map(() => '?').join(', ');
+    const rows = await getAll(`SELECT id FROM ${tableName} WHERE id IN (${placeholders})`, ids);
+    const validSet = new Set(rows.map((row) => Number(row.id)));
+    return ids.filter((id) => validSet.has(id));
+}
+
+async function getTrackCreditIds(trackId) {
+    await ensureTrackCreditsTables();
+
+    const producerRows = await getAll(
+        'SELECT producer_id FROM track_producers WHERE track_id = ? ORDER BY id',
+        [trackId]
+    );
+    const composerRows = await getAll(
+        'SELECT composer_id FROM track_composers WHERE track_id = ? ORDER BY id',
+        [trackId]
+    );
+
+    return {
+        additionalProducerIds: normalizeIdArray(producerRows.map((row) => row.producer_id)),
+        composerIds: normalizeIdArray(composerRows.map((row) => row.composer_id))
+    };
+}
+
+async function syncTrackCredits(trackId, { primaryProducerId, additionalProducerIds, composerIds }) {
+    await ensureTrackCreditsTables();
+
+    const normalizedPrimary = toPositiveInt(primaryProducerId);
+    const validAdditionalProducers = await filterExistingIds('producers', normalizeIdArray(additionalProducerIds));
+    const validComposers = await filterExistingIds('composers', normalizeIdArray(composerIds));
+
+    const filteredAdditionalProducers = validAdditionalProducers.filter((producerId) => producerId !== normalizedPrimary);
+
+    await run('DELETE FROM track_producers WHERE track_id = ?', [trackId]);
+    for (const producerId of filteredAdditionalProducers) {
+        await run(
+            'INSERT IGNORE INTO track_producers (track_id, producer_id) VALUES (?, ?)',
+            [trackId, producerId]
+        );
+    }
+
+    await run('DELETE FROM track_composers WHERE track_id = ?', [trackId]);
+    for (const composerId of validComposers) {
+        await run(
+            'INSERT IGNORE INTO track_composers (track_id, composer_id) VALUES (?, ?)',
+            [trackId, composerId]
+        );
+    }
+
+    return {
+        primaryProducerId: normalizedPrimary,
+        additionalProducerIds: filteredAdditionalProducers,
+        composerIds: validComposers
+    };
+}
+
 // GET all tracks
 router.get('/', async (req, res) => {
     try {
@@ -197,6 +304,8 @@ router.get('/:id/edit', async (req, res) => {
     try {
         const trackId = req.params.id;
 
+        await ensureTrackCreditsTables();
+
         const track = await getOne('SELECT * FROM tracks WHERE id = ?', [trackId]);
 
         if (!track) {
@@ -208,11 +317,31 @@ router.get('/:id/edit', async (req, res) => {
         }
 
         const producers = await getAll('SELECT * FROM producers ORDER BY name');
+        const composers = await getAll('SELECT * FROM composers ORDER BY name');
+        const additionalProducers = await getAll(
+            `SELECT p.id, p.name
+             FROM track_producers tp
+             JOIN producers p ON p.id = tp.producer_id
+             WHERE tp.track_id = ?
+             ORDER BY p.name`,
+            [trackId]
+        );
+        const selectedComposers = await getAll(
+            `SELECT c.id, c.name
+             FROM track_composers tc
+             JOIN composers c ON c.id = tc.composer_id
+             WHERE tc.track_id = ?
+             ORDER BY c.name`,
+            [trackId]
+        );
 
         res.render('tracks/edit', {
             title: `Editar: ${track.title}`,
             track: track,
-            producers: producers || []
+            producers: producers || [],
+            composers: composers || [],
+            additionalProducers: additionalProducers || [],
+            selectedComposers: selectedComposers || []
         });
     } catch (error) {
         console.error('Error:', error);
@@ -228,7 +357,30 @@ router.get('/:id/edit', async (req, res) => {
 router.put('/:id', async (req, res) => {
     try {
         const trackId = req.params.id;
-        const { title, producer_id, recording_date, duration, lyrics, status, is_single, is_primary, track_type } = req.body;
+        const {
+            title,
+            producer_id,
+            recording_date,
+            duration,
+            lyrics,
+            status,
+            is_single,
+            is_primary,
+            track_type,
+            additional_producer_ids,
+            composer_ids
+        } = req.body;
+
+        const track = await getOne('SELECT id FROM tracks WHERE id = ?', [trackId]);
+        if (!track) {
+            return res.status(404).render('error', {
+                title: '404',
+                message: 'Tema no encontrado',
+                error: {}
+            });
+        }
+
+        const primaryProducerId = toPositiveInt(producer_id);
 
         await run(
             `UPDATE tracks 
@@ -238,7 +390,7 @@ router.put('/:id', async (req, res) => {
              WHERE id = ?`,
             [
                 title, 
-                producer_id || null, 
+                primaryProducerId, 
                 recording_date || null, 
                 duration, 
                 lyrics, 
@@ -250,6 +402,12 @@ router.put('/:id', async (req, res) => {
             ]
         );
 
+        await syncTrackCredits(trackId, {
+            primaryProducerId,
+            additionalProducerIds: normalizeIdArray(additional_producer_ids),
+            composerIds: normalizeIdArray(composer_ids)
+        });
+
         res.redirect('/tracks');
     } catch (error) {
         console.error('Error updating track:', error);
@@ -257,6 +415,148 @@ router.put('/:id', async (req, res) => {
             title: 'Error',
             message: 'Error actualizando el tema',
             error: process.env.NODE_ENV === 'development' ? error : {}
+        });
+    }
+});
+
+// POST auto-generate splitsheets for a track based on assigned producers
+router.post('/:id/auto-generate-splitsheets', async (req, res) => {
+    try {
+        const trackId = req.params.id;
+        const track = await getOne('SELECT id, title, producer_id FROM tracks WHERE id = ?', [trackId]);
+
+        if (!track) {
+            return res.status(404).json({ error: 'Tema no encontrado' });
+        }
+
+        const payload = req.body || {};
+        const hasCreditsPayload =
+            payload.producer_id !== undefined ||
+            payload.additional_producer_ids !== undefined ||
+            payload.composer_ids !== undefined;
+
+        const existingCredits = await getTrackCreditIds(trackId);
+
+        let primaryProducerId = toPositiveInt(track.producer_id);
+        let additionalProducerIds = existingCredits.additionalProducerIds;
+        let composerIds = existingCredits.composerIds;
+
+        if (hasCreditsPayload) {
+            if (payload.producer_id !== undefined) {
+                primaryProducerId = toPositiveInt(payload.producer_id);
+                await run('UPDATE tracks SET producer_id = ? WHERE id = ?', [primaryProducerId, trackId]);
+            }
+            if (payload.additional_producer_ids !== undefined) {
+                additionalProducerIds = normalizeIdArray(payload.additional_producer_ids);
+            }
+            if (payload.composer_ids !== undefined) {
+                composerIds = normalizeIdArray(payload.composer_ids);
+            }
+
+            const synced = await syncTrackCredits(trackId, {
+                primaryProducerId,
+                additionalProducerIds,
+                composerIds
+            });
+
+            primaryProducerId = synced.primaryProducerId;
+            additionalProducerIds = synced.additionalProducerIds;
+        }
+
+        const producerIdsForSheet = [...new Set([
+            ...(primaryProducerId ? [primaryProducerId] : []),
+            ...normalizeIdArray(additionalProducerIds)
+        ])];
+
+        const validProducerIds = await filterExistingIds('producers', producerIdsForSheet);
+
+        if (!validProducerIds.length) {
+            return res.status(422).json({
+                error: 'No hay productores asignados para generar splitsheets'
+            });
+        }
+
+        await run(`
+            CREATE TABLE IF NOT EXISTS splitsheets (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                track_id INT NOT NULL,
+                producer_id INT NOT NULL,
+                artist_percentage INT DEFAULT 50,
+                producer_percentage INT DEFAULT 50,
+                document_path VARCHAR(500),
+                sent_date DATETIME,
+                confirmed_date DATETIME,
+                status VARCHAR(50) DEFAULT 'pending',
+                notes TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                INDEX idx_splitsheets_track (track_id),
+                INDEX idx_splitsheets_producer (producer_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        `);
+
+        await run('DELETE FROM splitsheets WHERE track_id = ?', [trackId]);
+
+        const artistPercentage = 50;
+        const producerPool = 50;
+        const baseShare = Math.floor(producerPool / validProducerIds.length);
+        let remainder = producerPool - (baseShare * validProducerIds.length);
+
+        for (const producerId of validProducerIds) {
+            const producerPercentage = baseShare + (remainder > 0 ? 1 : 0);
+            if (remainder > 0) remainder -= 1;
+
+            await run(
+                `INSERT INTO splitsheets (track_id, producer_id, artist_percentage, producer_percentage, status, notes)
+                 VALUES (?, ?, ?, ?, ?, ?)`,
+                [
+                    trackId,
+                    producerId,
+                    artistPercentage,
+                    producerPercentage,
+                    'pending',
+                    'Auto-generado desde Track Editor'
+                ]
+            );
+        }
+
+        await run(
+            'UPDATE tracks SET splitsheet_sent = 1, splitsheet_confirmed = 0 WHERE id = ?',
+            [trackId]
+        );
+
+        try {
+            await run(
+                'INSERT INTO activity_log (action, entity_type, entity_id, details) VALUES (?, ?, ?, ?)',
+                [
+                    'SPLITSHEET_AUTO_GENERATE',
+                    'track',
+                    trackId,
+                    `Splitsheets auto-generados para ${validProducerIds.length} productor(es)`
+                ]
+            );
+        } catch (logError) {
+            console.warn('Could not log auto-generate splitsheet activity:', logError.message);
+        }
+
+        const placeholders = validProducerIds.map(() => '?').join(', ');
+        const producers = await getAll(
+            `SELECT id, name, email FROM producers WHERE id IN (${placeholders}) ORDER BY name`,
+            validProducerIds
+        );
+
+        return res.json({
+            success: true,
+            message: `Splitsheets generados para ${validProducerIds.length} productor(es)`,
+            trackId: Number(trackId),
+            trackTitle: track.title,
+            producerCount: validProducerIds.length,
+            producers
+        });
+    } catch (error) {
+        console.error('Error auto-generating splitsheets:', error);
+        return res.status(500).json({
+            error: 'Error generando splitsheets automáticamente',
+            details: error.message
         });
     }
 });

@@ -28,7 +28,7 @@
                 <div class="form-row">
                     <div class="form-group">
                         <label>Productor</label>
-                        <select name="producer_id">
+                        <select name="producer_id" id="primaryProducerSelect">
                             <option value="">Sin asignar</option>
                             <% producers.forEach(producer => { %>
                                 <option value="<%= producer.id %>" <%= track.producer_id == producer.id ? 'selected' : '' %>><%= producer.name %></option>
@@ -38,6 +38,52 @@
                     <div class="form-group">
                         <label>Fecha de Grabación</label>
                         <input type="date" name="recording_date" value="<%= track.recording_date %>">
+                    </div>
+                </div>
+
+                <div style="background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 10px; padding: 18px; margin: 20px 0;">
+                    <h3 style="color: #ffd700; margin-bottom: 12px; font-size: 1.05em;">👥 Créditos del Track</h3>
+
+                    <div class="form-group" style="margin-bottom: 18px;">
+                        <label style="display: block; margin-bottom: 8px;">Productores adicionales</label>
+                        <div id="additionalProducersContainer" style="display: flex; flex-direction: column; gap: 8px;">
+                            <% if (!additionalProducers || additionalProducers.length === 0) { %>
+                                <div id="noAdditionalProducersText" style="color: #888; font-size: 0.85em;">No hay productores adicionales asignados.</div>
+                            <% } %>
+                            <% (additionalProducers || []).forEach(producerItem => { %>
+                                <div class="credit-entry" data-credit-type="producer" style="display: flex; gap: 8px; align-items: center;">
+                                    <select name="additional_producer_ids[]" class="credit-select" style="flex: 1;">
+                                        <option value="">Seleccionar productor...</option>
+                                        <% producers.forEach(producer => { %>
+                                            <option value="<%= producer.id %>" <%= producerItem.id == producer.id ? 'selected' : '' %>><%= producer.name %></option>
+                                        <% }) %>
+                                    </select>
+                                    <button type="button" class="btn-small remove-credit-btn" style="background: rgba(255, 107, 107, 0.15); border-color: rgba(255, 107, 107, 0.45); color: #ff9b9b;">✕</button>
+                                </div>
+                            <% }) %>
+                        </div>
+                        <button type="button" id="addProducerBtn" class="btn-small" style="margin-top: 8px;">➕ Agregar Productor</button>
+                    </div>
+
+                    <div class="form-group">
+                        <label style="display: block; margin-bottom: 8px;">Compositores</label>
+                        <div id="composersContainer" style="display: flex; flex-direction: column; gap: 8px;">
+                            <% if (!selectedComposers || selectedComposers.length === 0) { %>
+                                <div id="noComposersText" style="color: #888; font-size: 0.85em;">No hay compositores asignados.</div>
+                            <% } %>
+                            <% (selectedComposers || []).forEach(composerItem => { %>
+                                <div class="credit-entry" data-credit-type="composer" style="display: flex; gap: 8px; align-items: center;">
+                                    <select name="composer_ids[]" class="credit-select" style="flex: 1;">
+                                        <option value="">Seleccionar compositor...</option>
+                                        <% (composers || []).forEach(composer => { %>
+                                            <option value="<%= composer.id %>" <%= composerItem.id == composer.id ? 'selected' : '' %>><%= composer.name %></option>
+                                        <% }) %>
+                                    </select>
+                                    <button type="button" class="btn-small remove-credit-btn" style="background: rgba(255, 107, 107, 0.15); border-color: rgba(255, 107, 107, 0.45); color: #ff9b9b;">✕</button>
+                                </div>
+                            <% }) %>
+                        </div>
+                        <button type="button" id="addComposerBtn" class="btn-small" style="margin-top: 8px;">➕ Agregar Compositor</button>
                     </div>
                 </div>
 
@@ -118,8 +164,10 @@
 
                 <div style="display: flex; gap: 15px; margin-top: 30px;">
                     <button type="submit" class="btn">💾 Actualizar Tema</button>
+                    <button type="button" id="autoSplitsheetBtn" class="btn" style="background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); border: none;">⚡ Auto Generar Splitsheet</button>
                     <a href="/tracks" class="btn btn-secondary">Cancelar</a>
                 </div>
+                <p id="autoSplitsheetStatus" style="display: none; margin-top: 10px; color: #888; font-size: 0.9em;"></p>
             </form>
         </div>
 
@@ -283,6 +331,141 @@
     <%- include('../partials/footer') %>
 
     <script>
+        const producerOptionsData = <%- JSON.stringify((producers || []).map((producer) => ({ id: producer.id, name: producer.name }))) %>;
+        const composerOptionsData = <%- JSON.stringify((composers || []).map((composer) => ({ id: composer.id, name: composer.name }))) %>;
+
+        function getCurrentCreditsPayload() {
+            const primaryProducerEl = document.getElementById('primaryProducerSelect');
+            const additionalProducerValues = Array.from(document.querySelectorAll('select[name="additional_producer_ids[]"]'))
+                .map((select) => Number(select.value))
+                .filter((id) => Number.isInteger(id) && id > 0);
+            const composerValues = Array.from(document.querySelectorAll('select[name="composer_ids[]"]'))
+                .map((select) => Number(select.value))
+                .filter((id) => Number.isInteger(id) && id > 0);
+
+            return {
+                producer_id: primaryProducerEl ? Number(primaryProducerEl.value) || null : null,
+                additional_producer_ids: [...new Set(additionalProducerValues)],
+                composer_ids: [...new Set(composerValues)]
+            };
+        }
+
+        function updateCreditEmptyState(containerId, emptyStateId) {
+            const container = document.getElementById(containerId);
+            const emptyState = document.getElementById(emptyStateId);
+            if (!container || !emptyState) return;
+
+            const hasEntries = container.querySelectorAll('.credit-entry').length > 0;
+            emptyState.style.display = hasEntries ? 'none' : 'block';
+        }
+
+        function createCreditEntry({ inputName, optionsData, placeholderText }) {
+            const row = document.createElement('div');
+            row.className = 'credit-entry';
+            row.style.display = 'flex';
+            row.style.gap = '8px';
+            row.style.alignItems = 'center';
+
+            const select = document.createElement('select');
+            select.name = inputName;
+            select.className = 'credit-select';
+            select.style.flex = '1';
+
+            const defaultOption = document.createElement('option');
+            defaultOption.value = '';
+            defaultOption.textContent = placeholderText;
+            select.appendChild(defaultOption);
+
+            optionsData.forEach((optionData) => {
+                const option = document.createElement('option');
+                option.value = String(optionData.id);
+                option.textContent = optionData.name;
+                select.appendChild(option);
+            });
+
+            const removeButton = document.createElement('button');
+            removeButton.type = 'button';
+            removeButton.className = 'btn-small remove-credit-btn';
+            removeButton.style.background = 'rgba(255, 107, 107, 0.15)';
+            removeButton.style.borderColor = 'rgba(255, 107, 107, 0.45)';
+            removeButton.style.color = '#ff9b9b';
+            removeButton.textContent = '✕';
+            removeButton.addEventListener('click', () => {
+                row.remove();
+                updateCreditEmptyState('additionalProducersContainer', 'noAdditionalProducersText');
+                updateCreditEmptyState('composersContainer', 'noComposersText');
+            });
+
+            row.appendChild(select);
+            row.appendChild(removeButton);
+
+            return row;
+        }
+
+        function addCreditEntry(containerId, config) {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+
+            const row = createCreditEntry(config);
+            container.appendChild(row);
+
+            updateCreditEmptyState('additionalProducersContainer', 'noAdditionalProducersText');
+            updateCreditEmptyState('composersContainer', 'noComposersText');
+        }
+
+        function wireExistingCreditRemoveButtons() {
+            document.querySelectorAll('.remove-credit-btn').forEach((button) => {
+                if (button.dataset.wired === '1') return;
+                button.dataset.wired = '1';
+
+                button.addEventListener('click', () => {
+                    const row = button.closest('.credit-entry');
+                    if (row) row.remove();
+                    updateCreditEmptyState('additionalProducersContainer', 'noAdditionalProducersText');
+                    updateCreditEmptyState('composersContainer', 'noComposersText');
+                });
+            });
+        }
+
+        async function autoGenerateSplitsheet() {
+            const button = document.getElementById('autoSplitsheetBtn');
+            const status = document.getElementById('autoSplitsheetStatus');
+            if (!button || !status) return;
+
+            button.disabled = true;
+            status.style.display = 'block';
+            status.style.color = '#ffd700';
+            status.textContent = '⏳ Generando splitsheets automáticos...';
+
+            try {
+                const payload = getCurrentCreditsPayload();
+                const response = await fetch('/tracks/<%= track.id %>/auto-generate-splitsheets', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                const result = await response.json();
+                if (!response.ok || !result.success) {
+                    throw new Error(result.error || result.details || 'No se pudo generar el splitsheet');
+                }
+
+                status.style.color = '#22c55e';
+                status.textContent = `✅ ${result.message}`;
+                alert(`✅ ${result.message}\n\nProductores incluidos: ${result.producerCount}`);
+            } catch (error) {
+                status.style.color = '#ff6b6b';
+                status.textContent = `❌ ${error.message}`;
+                alert(`❌ Error generando splitsheets: ${error.message}`);
+                console.error('Auto splitsheet error:', error);
+            } finally {
+                button.disabled = false;
+            }
+        }
+
         // Audio player controls
         function playAudio() {
             const player = document.getElementById('audioPlayer');
@@ -689,6 +872,37 @@
 
         // Add event listeners for buttons (not using inline onclick due to CSP)
         document.addEventListener('DOMContentLoaded', function() {
+            wireExistingCreditRemoveButtons();
+            updateCreditEmptyState('additionalProducersContainer', 'noAdditionalProducersText');
+            updateCreditEmptyState('composersContainer', 'noComposersText');
+
+            const addProducerBtn = document.getElementById('addProducerBtn');
+            if (addProducerBtn) {
+                addProducerBtn.addEventListener('click', () => {
+                    addCreditEntry('additionalProducersContainer', {
+                        inputName: 'additional_producer_ids[]',
+                        optionsData: producerOptionsData,
+                        placeholderText: 'Seleccionar productor...'
+                    });
+                });
+            }
+
+            const addComposerBtn = document.getElementById('addComposerBtn');
+            if (addComposerBtn) {
+                addComposerBtn.addEventListener('click', () => {
+                    addCreditEntry('composersContainer', {
+                        inputName: 'composer_ids[]',
+                        optionsData: composerOptionsData,
+                        placeholderText: 'Seleccionar compositor...'
+                    });
+                });
+            }
+
+            const autoSplitsheetBtn = document.getElementById('autoSplitsheetBtn');
+            if (autoSplitsheetBtn) {
+                autoSplitsheetBtn.addEventListener('click', autoGenerateSplitsheet);
+            }
+
             // Load activity log
             loadActivityLog();
             

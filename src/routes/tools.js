@@ -128,6 +128,110 @@ function parseMiniDiscFlash(raw) {
     };
 }
 
+const STICKY_NOTE_DEFAULT_COLOR = '#FDE68A';
+const STICKY_NOTE_ALLOWED_COLORS = new Set([
+    '#FDE68A',
+    '#FCA5A5',
+    '#BFDBFE',
+    '#A7F3D0',
+    '#DDD6FE',
+    '#FBCFE8',
+    '#FEF3C7',
+    '#E2E8F0'
+]);
+
+function getStickyNotesUserId(req) {
+    const userId = Number(req.session?.user?.id || 0);
+    return Number.isInteger(userId) && userId > 0 ? userId : 0;
+}
+
+function clampStickyNumber(value, min, max, fallback) {
+    const parsed = Number.parseInt(value, 10);
+    if (!Number.isFinite(parsed)) {
+        return fallback;
+    }
+
+    if (parsed < min) return min;
+    if (parsed > max) return max;
+    return parsed;
+}
+
+function normalizeStickyText(value, maxLen) {
+    return String(value || '')
+        .replace(/\r\n/g, '\n')
+        .replace(/\u0000/g, '')
+        .slice(0, maxLen)
+        .trim();
+}
+
+function normalizeStickyColor(rawColor) {
+    const normalized = String(rawColor || '').trim().toUpperCase();
+    if (STICKY_NOTE_ALLOWED_COLORS.has(normalized)) {
+        return normalized;
+    }
+
+    return STICKY_NOTE_DEFAULT_COLOR;
+}
+
+function mapStickyNote(row) {
+    return {
+        id: Number(row.id),
+        title: String(row.title || ''),
+        content: String(row.content || ''),
+        color: normalizeStickyColor(row.color),
+        x: Number(row.pos_x || 36),
+        y: Number(row.pos_y || 36),
+        width: Number(row.width || 260),
+        height: Number(row.height || 220),
+        zIndex: Number(row.z_index || 1),
+        createdAt: row.created_at,
+        updatedAt: row.updated_at
+    };
+}
+
+async function ensureStickyNotesTable() {
+    const isSQLite = process.env.DB_TYPE === 'sqlite' || !process.env.DB_HOST;
+
+    if (isSQLite) {
+        await run(
+            `CREATE TABLE IF NOT EXISTS dashboard_sticky_notes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                title TEXT NOT NULL DEFAULT '',
+                content TEXT,
+                color TEXT NOT NULL DEFAULT '#FDE68A',
+                pos_x INTEGER NOT NULL DEFAULT 36,
+                pos_y INTEGER NOT NULL DEFAULT 36,
+                width INTEGER NOT NULL DEFAULT 260,
+                height INTEGER NOT NULL DEFAULT 220,
+                z_index INTEGER NOT NULL DEFAULT 1,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )`
+        );
+        return;
+    }
+
+    await run(
+        `CREATE TABLE IF NOT EXISTS dashboard_sticky_notes (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL,
+            title VARCHAR(120) NOT NULL DEFAULT '',
+            content TEXT NULL,
+            color VARCHAR(16) NOT NULL DEFAULT '#FDE68A',
+            pos_x INT NOT NULL DEFAULT 36,
+            pos_y INT NOT NULL DEFAULT 36,
+            width INT NOT NULL DEFAULT 260,
+            height INT NOT NULL DEFAULT 220,
+            z_index INT NOT NULL DEFAULT 1,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            KEY idx_sticky_user (user_id),
+            KEY idx_sticky_user_z (user_id, z_index)
+        )`
+    );
+}
+
 async function syncMiniDiscOrderToNotion(orderId) {
     if (process.env.NOTION_SYNC_ENABLED !== 'true') {
         return { skipped: true, reason: 'disabled' };
@@ -563,6 +667,226 @@ router.get('/thumbnail-generator', (req, res) => {
     res.render('tools/thumbnail-generator', {
         title: 'Thumbnail Generator - El Inmortal 2 Dashboard'
     });
+});
+
+router.get('/notes', async (req, res) => {
+    try {
+        await ensureStickyNotesTable();
+        res.render('tools/notes', {
+            title: 'Notes - El Inmortal 2 Dashboard',
+            noteColors: Array.from(STICKY_NOTE_ALLOWED_COLORS)
+        });
+    } catch (error) {
+        console.error('[Sticky Notes] Error cargando vista:', error);
+        res.status(500).render('error', {
+            title: 'Error',
+            message: 'No se pudo cargar el tool de Notes.',
+            error: process.env.NODE_ENV === 'development' ? error : {}
+        });
+    }
+});
+
+router.get('/notes/api', async (req, res) => {
+    try {
+        const userId = getStickyNotesUserId(req);
+        if (!userId) {
+            return res.status(401).json({ success: false, error: 'unauthorized' });
+        }
+
+        await ensureStickyNotesTable();
+        const rows = await getAll(
+            `SELECT id, title, content, color, pos_x, pos_y, width, height, z_index, created_at, updated_at
+             FROM dashboard_sticky_notes
+             WHERE user_id = ?
+             ORDER BY z_index ASC, updated_at DESC`,
+            [userId]
+        );
+
+        return res.json({
+            success: true,
+            notes: rows.map(mapStickyNote)
+        });
+    } catch (error) {
+        console.error('[Sticky Notes] Error listando notas:', error);
+        return res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+router.post('/notes/api', async (req, res) => {
+    try {
+        const userId = getStickyNotesUserId(req);
+        if (!userId) {
+            return res.status(401).json({ success: false, error: 'unauthorized' });
+        }
+
+        await ensureStickyNotesTable();
+
+        const title = normalizeStickyText(req.body.title, 120);
+        const content = normalizeStickyText(req.body.content, 8000);
+        const color = normalizeStickyColor(req.body.color);
+        const x = clampStickyNumber(req.body.x, -500, 6000, 36);
+        const y = clampStickyNumber(req.body.y, -500, 6000, 36);
+        const width = clampStickyNumber(req.body.width, 200, 480, 260);
+        const height = clampStickyNumber(req.body.height, 180, 620, 220);
+
+        const maxZRow = await getOne(
+            'SELECT COALESCE(MAX(z_index), 0) AS max_z FROM dashboard_sticky_notes WHERE user_id = ?',
+            [userId]
+        );
+        const zIndex = Math.min((Number(maxZRow?.max_z || 0) + 1), 9999);
+
+        const insertResult = await run(
+            `INSERT INTO dashboard_sticky_notes
+             (user_id, title, content, color, pos_x, pos_y, width, height, z_index)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [userId, title, content, color, x, y, width, height, zIndex]
+        );
+
+        const created = await getOne(
+            `SELECT id, title, content, color, pos_x, pos_y, width, height, z_index, created_at, updated_at
+             FROM dashboard_sticky_notes
+             WHERE id = ? AND user_id = ?`,
+            [insertResult.lastID, userId]
+        );
+
+        return res.status(201).json({
+            success: true,
+            note: mapStickyNote(created)
+        });
+    } catch (error) {
+        console.error('[Sticky Notes] Error creando nota:', error);
+        return res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+router.patch('/notes/api/:id', async (req, res) => {
+    try {
+        const userId = getStickyNotesUserId(req);
+        if (!userId) {
+            return res.status(401).json({ success: false, error: 'unauthorized' });
+        }
+
+        const noteId = Number(req.params.id || 0);
+        if (!Number.isInteger(noteId) || noteId <= 0) {
+            return res.status(400).json({ success: false, error: 'invalid_note_id' });
+        }
+
+        await ensureStickyNotesTable();
+
+        const existing = await getOne(
+            `SELECT id, title, content, color, pos_x, pos_y, width, height, z_index
+             FROM dashboard_sticky_notes
+             WHERE id = ? AND user_id = ?`,
+            [noteId, userId]
+        );
+
+        if (!existing) {
+            return res.status(404).json({ success: false, error: 'note_not_found' });
+        }
+
+        const title = Object.prototype.hasOwnProperty.call(req.body, 'title')
+            ? normalizeStickyText(req.body.title, 120)
+            : String(existing.title || '');
+        const content = Object.prototype.hasOwnProperty.call(req.body, 'content')
+            ? normalizeStickyText(req.body.content, 8000)
+            : String(existing.content || '');
+        const color = Object.prototype.hasOwnProperty.call(req.body, 'color')
+            ? normalizeStickyColor(req.body.color)
+            : normalizeStickyColor(existing.color);
+        const x = Object.prototype.hasOwnProperty.call(req.body, 'x')
+            ? clampStickyNumber(req.body.x, -500, 6000, Number(existing.pos_x || 36))
+            : Number(existing.pos_x || 36);
+        const y = Object.prototype.hasOwnProperty.call(req.body, 'y')
+            ? clampStickyNumber(req.body.y, -500, 6000, Number(existing.pos_y || 36))
+            : Number(existing.pos_y || 36);
+        const width = Object.prototype.hasOwnProperty.call(req.body, 'width')
+            ? clampStickyNumber(req.body.width, 200, 480, Number(existing.width || 260))
+            : Number(existing.width || 260);
+        const height = Object.prototype.hasOwnProperty.call(req.body, 'height')
+            ? clampStickyNumber(req.body.height, 180, 620, Number(existing.height || 220))
+            : Number(existing.height || 220);
+        const zIndex = Object.prototype.hasOwnProperty.call(req.body, 'zIndex')
+            ? clampStickyNumber(req.body.zIndex, 1, 9999, Number(existing.z_index || 1))
+            : Number(existing.z_index || 1);
+
+        await run(
+            `UPDATE dashboard_sticky_notes
+             SET title = ?,
+                 content = ?,
+                 color = ?,
+                 pos_x = ?,
+                 pos_y = ?,
+                 width = ?,
+                 height = ?,
+                 z_index = ?
+             WHERE id = ? AND user_id = ?`,
+            [title, content, color, x, y, width, height, zIndex, noteId, userId]
+        );
+
+        const updated = await getOne(
+            `SELECT id, title, content, color, pos_x, pos_y, width, height, z_index, created_at, updated_at
+             FROM dashboard_sticky_notes
+             WHERE id = ? AND user_id = ?`,
+            [noteId, userId]
+        );
+
+        return res.json({ success: true, note: mapStickyNote(updated) });
+    } catch (error) {
+        console.error('[Sticky Notes] Error actualizando nota:', error);
+        return res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+router.delete('/notes/api/:id', async (req, res) => {
+    try {
+        const userId = getStickyNotesUserId(req);
+        if (!userId) {
+            return res.status(401).json({ success: false, error: 'unauthorized' });
+        }
+
+        const noteId = Number(req.params.id || 0);
+        if (!Number.isInteger(noteId) || noteId <= 0) {
+            return res.status(400).json({ success: false, error: 'invalid_note_id' });
+        }
+
+        await ensureStickyNotesTable();
+        const deleteResult = await run(
+            'DELETE FROM dashboard_sticky_notes WHERE id = ? AND user_id = ?',
+            [noteId, userId]
+        );
+
+        if (Number(deleteResult.changes || 0) === 0) {
+            return res.status(404).json({ success: false, error: 'note_not_found' });
+        }
+
+        return res.json({ success: true, noteId });
+    } catch (error) {
+        console.error('[Sticky Notes] Error borrando nota:', error);
+        return res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+router.delete('/notes/api', async (req, res) => {
+    try {
+        const userId = getStickyNotesUserId(req);
+        if (!userId) {
+            return res.status(401).json({ success: false, error: 'unauthorized' });
+        }
+
+        await ensureStickyNotesTable();
+        const deleteResult = await run(
+            'DELETE FROM dashboard_sticky_notes WHERE user_id = ?',
+            [userId]
+        );
+
+        return res.json({
+            success: true,
+            deletedCount: Number(deleteResult.changes || 0)
+        });
+    } catch (error) {
+        console.error('[Sticky Notes] Error limpiando notas:', error);
+        return res.status(500).json({ success: false, error: error.message });
+    }
 });
 
 router.get('/minidisc-generator', (req, res) => {

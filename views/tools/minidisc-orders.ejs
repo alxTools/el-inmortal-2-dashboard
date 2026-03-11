@@ -13,6 +13,47 @@
             margin: 12px 0 22px;
         }
 
+        .origin-box {
+            margin: 10px 0 14px;
+            border: 1px solid rgba(14, 165, 233, 0.35);
+            background: rgba(14, 165, 233, 0.12);
+            border-radius: 10px;
+            padding: 10px 12px;
+            color: #cffafe;
+            font-size: 0.82rem;
+            line-height: 1.45;
+        }
+
+        .origin-title {
+            color: #67e8f9;
+            font-weight: 700;
+            text-transform: uppercase;
+            font-size: 0.7rem;
+            letter-spacing: 0.06em;
+            margin-bottom: 4px;
+        }
+
+        .top-actions {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+
+        .btn-top-secondary {
+            border: 1px solid rgba(148, 163, 184, 0.35);
+            background: rgba(148, 163, 184, 0.14);
+            color: #e2e8f0;
+            border-radius: 10px;
+            padding: 9px 12px;
+            text-decoration: none;
+            font-weight: 700;
+            font-size: 0.76rem;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
         .summary-card {
             border: 1px solid rgba(255, 255, 255, 0.12);
             background: rgba(255, 255, 255, 0.04);
@@ -117,6 +158,70 @@
             background: rgba(34, 197, 94, 0.12);
         }
 
+        .ready-pill {
+            margin-top: 6px;
+            display: inline-block;
+            font-size: 0.66rem;
+            color: #67e8f9;
+            border: 1px solid rgba(6, 182, 212, 0.45);
+            background: rgba(6, 182, 212, 0.15);
+            border-radius: 999px;
+            padding: 3px 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .usps-badge {
+            margin-top: 6px;
+            display: inline-block;
+            border-radius: 999px;
+            padding: 3px 8px;
+            font-size: 0.66rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            border: 1px solid rgba(255, 255, 255, 0.25);
+        }
+
+        .usps-domestic {
+            color: #86efac;
+            border-color: rgba(34, 197, 94, 0.45);
+            background: rgba(34, 197, 94, 0.13);
+        }
+
+        .usps-intl {
+            color: #fde68a;
+            border-color: rgba(245, 158, 11, 0.45);
+            background: rgba(245, 158, 11, 0.14);
+        }
+
+        .amount-chip {
+            display: inline-block;
+            border-radius: 8px;
+            border: 1px solid rgba(34, 197, 94, 0.4);
+            background: rgba(34, 197, 94, 0.14);
+            color: #bbf7d0;
+            font-weight: 700;
+            font-size: 0.78rem;
+            padding: 4px 8px;
+            white-space: nowrap;
+        }
+
+        .address-card {
+            line-height: 1.5;
+            color: #e2e8f0;
+            font-size: 0.8rem;
+        }
+
+        .address-missing {
+            color: #fca5a5;
+            font-size: 0.76rem;
+            border: 1px solid rgba(248, 113, 113, 0.45);
+            background: rgba(248, 113, 113, 0.12);
+            border-radius: 8px;
+            padding: 6px 8px;
+            max-width: 220px;
+        }
+
         .action-stack {
             display: flex;
             flex-direction: column;
@@ -160,23 +265,30 @@
             color: #bbf7d0;
         }
 
-        .btn-secondary-inline {
-            border-color: rgba(148, 163, 184, 0.45);
-            background: rgba(148, 163, 184, 0.2);
-            color: #e2e8f0;
-        }
-
         .btn-warning-inline {
             border-color: rgba(245, 158, 11, 0.5);
             background: rgba(245, 158, 11, 0.18);
             color: #fde68a;
         }
 
+        .btn-secondary-inline {
+            border-color: rgba(148, 163, 184, 0.45);
+            background: rgba(148, 163, 184, 0.2);
+            color: #e2e8f0;
+        }
+
+        .btn-inline-link {
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
         .btn-inline:disabled,
         .btn-inline[disabled] {
             cursor: not-allowed;
             opacity: 0.55;
-            filter: saturate(0.35);
+            filter: saturate(0.4);
             box-shadow: none;
         }
 
@@ -201,12 +313,29 @@
         <section class="section">
             <div class="section-header">
                 <h2><span class="section-icon">💿</span> Mini-Disc Orders</h2>
-                <a href="/tools" class="btn btn-secondary">Volver a Tools</a>
+                <div class="top-actions">
+                    <a href="/tools/minidisc-orders/labels/print" target="_blank" rel="noopener" class="btn">
+                        Imprimir Labels Ready (<%= stats.readyPending %>)
+                    </a>
+                    <a href="/tools" class="btn btn-secondary">Volver a Tools</a>
+                </div>
             </div>
 
             <p style="color:#9ca3af; margin-bottom: 10px;">
                 Gestiona fulfillment de compras capturadas, marca envio con tracking y notifica al comprador automaticamente.
             </p>
+
+            <% const safeSenderAddress = (typeof senderAddress !== 'undefined' && senderAddress) ? senderAddress : null; %>
+            <% if (safeSenderAddress && Array.isArray(safeSenderAddress.lines) && safeSenderAddress.lines.length > 0) { %>
+                <div class="origin-box">
+                    <div class="origin-title">Origen de envio</div>
+                    <div>
+                        <% safeSenderAddress.lines.forEach((line, index) => { %>
+                            <%= line %><%= index < safeSenderAddress.lines.length - 1 ? ' | ' : '' %>
+                        <% }) %>
+                    </div>
+                </div>
+            <% } %>
 
             <% if (flash && flash.message) { %>
                 <div class="flash flash-<%= flash.type || 'info' %>">
@@ -227,6 +356,26 @@
                     <div class="summary-label">Completas</div>
                     <div class="summary-value"><%= stats.completed %></div>
                 </div>
+                <div class="summary-card">
+                    <div class="summary-label">Pendientes ready</div>
+                    <div class="summary-value"><%= stats.readyPending %></div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-label">USPS Domestic ready</div>
+                    <div class="summary-value"><%= stats.uspsDomesticReady %></div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-label">USPS Intl ready</div>
+                    <div class="summary-value"><%= stats.uspsInternationalReady %></div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-label">Total ventas</div>
+                    <div class="summary-value">$<%= Number(stats.totalRevenue || 0).toFixed(2) %></div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-label">Pendiente por enviar</div>
+                    <div class="summary-value">$<%= Number(stats.pendingRevenue || 0).toFixed(2) %></div>
+                </div>
             </div>
 
             <h3 style="color:#fbbf24; margin: 18px 0 10px;">Pendientes (sin enviar)</h3>
@@ -238,6 +387,9 @@
                             <th>Cliente</th>
                             <th>Fecha</th>
                             <th>PayPal</th>
+                            <th>Total</th>
+                            <th>Direccion envio</th>
+                            <th>USPS</th>
                             <th>NFC</th>
                             <th>Estado</th>
                             <th>Accion</th>
@@ -245,7 +397,7 @@
                     </thead>
                     <tbody>
                         <% if (pendingOrders.length === 0) { %>
-                            <tr><td colspan="7" class="empty">No hay ordenes pendientes.</td></tr>
+                            <tr><td colspan="10" class="empty">No hay ordenes pendientes.</td></tr>
                         <% } %>
 
                         <% pendingOrders.forEach((order) => { %>
@@ -263,6 +415,27 @@
                                     <span class="code"><%= order.paypal_order_id || '-' %></span><br>
                                     <span style="color:#86efac;"><%= order.paypal_payment_status %></span>
                                 </td>
+                                <td><span class="amount-chip"><%= order.amount_display %></span></td>
+                                <td>
+                                    <% if (order.shipping_ready) { %>
+                                        <div class="address-card">
+                                            <% order.address_lines.forEach((line) => { %>
+                                                <div><%= line %></div>
+                                            <% }) %>
+                                        </div>
+                                    <% } else { %>
+                                        <div class="address-missing">Falta direccion completa en PayPal.</div>
+                                    <% } %>
+                                </td>
+                                <td>
+                                    <% if (order.usps_domestic) { %>
+                                        <span class="usps-badge usps-domestic">Domestic</span>
+                                    <% } else if (order.usps_international) { %>
+                                        <span class="usps-badge usps-intl">Intl + Customs</span>
+                                    <% } else { %>
+                                        <span style="color:#94a3b8;">-</span>
+                                    <% } %>
+                                </td>
                                 <td>
                                     <% if (order.nfc_unique_code) { %>
                                         <span class="code"><%= order.nfc_unique_code %></span>
@@ -272,6 +445,9 @@
                                 </td>
                                 <td>
                                     <span class="status-badge-local status-pending-local">Pendiente</span>
+                                    <% if (order.shipping_ready) { %>
+                                        <div class="ready-pill">Ready para label</div>
+                                    <% } %>
                                 </td>
                                 <td>
                                     <div class="action-stack">
@@ -285,19 +461,21 @@
                                             >
                                             <button type="submit" class="btn-inline btn-primary-inline">Completar + Notificar</button>
                                         </form>
-
                                         <form method="POST" action="/tools/minidisc-orders/<%= order.id %>/send-delay-email" class="inline-form">
                                             <button
                                                 type="submit"
                                                 class="btn-inline btn-warning-inline"
-                                                <%= order.minidisc_delay_email_sent ? 'disabled title="Ya se envio un aviso de retraso"' : '' %>
+                                                <%= order.delay_email_sent ? 'disabled title="Ya se envio un aviso de retraso"' : '' %>
                                             >
-                                                <%= order.minidisc_delay_email_sent ? 'Aviso de retraso enviado' : 'Avisar retraso (3-5 dias)' %>
+                                                <%= order.delay_email_sent ? 'Aviso de retraso enviado' : 'Avisar retraso (3-5 dias)' %>
                                             </button>
-                                            <% if (order.minidisc_delay_email_sent_at) { %>
-                                                <span class="action-note">Enviado: <%= new Date(order.minidisc_delay_email_sent_at).toLocaleString('es-PR') %></span>
+                                            <% if (order.delay_email_sent_at) { %>
+                                                <span class="action-note">Enviado: <%= new Date(order.delay_email_sent_at).toLocaleString('es-PR') %></span>
                                             <% } %>
                                         </form>
+                                        <% if (order.shipping_ready) { %>
+                                            <a href="/tools/minidisc-orders/labels/print?scope=all&ids=<%= order.id %>" target="_blank" rel="noopener" class="btn-inline btn-secondary-inline btn-inline-link">Ver Label</a>
+                                        <% } %>
                                     </div>
                                 </td>
                             </tr>
@@ -315,6 +493,9 @@
                             <th>Cliente</th>
                             <th>Fecha</th>
                             <th>PayPal</th>
+                            <th>Total</th>
+                            <th>Direccion envio</th>
+                            <th>USPS</th>
                             <th>Tracking</th>
                             <th>Estado</th>
                             <th>Accion</th>
@@ -322,7 +503,7 @@
                     </thead>
                     <tbody>
                         <% if (completedOrders.length === 0) { %>
-                            <tr><td colspan="7" class="empty">No hay ordenes completadas.</td></tr>
+                            <tr><td colspan="10" class="empty">No hay ordenes completadas.</td></tr>
                         <% } %>
 
                         <% completedOrders.forEach((order) => { %>
@@ -336,6 +517,27 @@
                                 <td>
                                     <span class="code"><%= order.paypal_order_id || '-' %></span><br>
                                     <span style="color:#86efac;"><%= order.paypal_payment_status %></span>
+                                </td>
+                                <td><span class="amount-chip"><%= order.amount_display %></span></td>
+                                <td>
+                                    <% if (order.address_lines.length > 0) { %>
+                                        <div class="address-card">
+                                            <% order.address_lines.forEach((line) => { %>
+                                                <div><%= line %></div>
+                                            <% }) %>
+                                        </div>
+                                    <% } else { %>
+                                        <span style="color:#94a3b8;">-</span>
+                                    <% } %>
+                                </td>
+                                <td>
+                                    <% if (order.usps_domestic) { %>
+                                        <span class="usps-badge usps-domestic">Domestic</span>
+                                    <% } else if (order.usps_international) { %>
+                                        <span class="usps-badge usps-intl">Intl + Customs</span>
+                                    <% } else { %>
+                                        <span style="color:#94a3b8;">-</span>
+                                    <% } %>
                                 </td>
                                 <td><span class="code"><%= order.tracking_number || '-' %></span></td>
                                 <td>

@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %></title>
+    <style>
+        @page {
+            size: Letter;
+            margin: 0.5in;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            background: #ffffff;
+            color: #111827;
+            font-family: Arial, sans-serif;
+            line-height: 1.35;
+        }
+
+        .toolbar {
+            padding: 16px 20px;
+            border-bottom: 1px solid #e5e7eb;
+            background: #f8fafc;
+            position: sticky;
+            top: 0;
+        }
+
+        .toolbar h1 {
+            margin: 0 0 8px;
+            font-size: 1.1rem;
+        }
+
+        .toolbar-meta {
+            color: #4b5563;
+            font-size: 0.9rem;
+            margin-bottom: 10px;
+        }
+
+        .toolbar-actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            background: #ffffff;
+            color: #111827;
+            text-decoration: none;
+            padding: 8px 12px;
+            font-size: 0.82rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            cursor: pointer;
+        }
+
+        .sheet {
+            width: 100%;
+            max-width: 7.35in;
+            min-height: 10in;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            grid-auto-rows: minmax(2.5in, auto);
+            justify-content: stretch;
+            align-content: start;
+            gap: 0.15in;
+            padding: 0.1in 0;
+        }
+
+        .label {
+            position: relative;
+            border: none;
+            border-radius: 0;
+            padding: 0.12in;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            min-height: 2.5in;
+            overflow: visible;
+            break-inside: avoid;
+            page-break-inside: avoid;
+        }
+
+        .label::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border: 1px dashed #94a3b8;
+            pointer-events: none;
+        }
+
+        .label-body {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 6px;
+        }
+
+        .section-title {
+            font-size: 0.56rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #64748b;
+            margin-bottom: 2px;
+            font-weight: 700;
+        }
+
+        .from-block {
+            border: 1px solid #dbeafe;
+            background: #f8fafc;
+            border-radius: 6px;
+            padding: 3px 6px;
+            font-size: 0.52rem;
+            color: #334155;
+            line-height: 1.25;
+            word-break: break-word;
+        }
+
+        .label-order {
+            font-size: 0.56rem;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 2px;
+            word-break: break-word;
+        }
+
+        .label-name {
+            font-size: 0.82rem;
+            font-weight: 700;
+            margin-bottom: 3px;
+            line-height: 1.2;
+            word-break: break-word;
+        }
+
+        .label-address {
+            font-size: 0.68rem;
+            color: #111827;
+            line-height: 1.2;
+            word-break: break-word;
+        }
+
+        .to-block {
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 5px 7px;
+            background: #ffffff;
+        }
+
+        .label-address div {
+            margin-bottom: 1px;
+        }
+
+        .label-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.58rem;
+            color: #64748b;
+            margin-top: 5px;
+            border-top: 1px solid #e5e7eb;
+            padding-top: 3px;
+            gap: 8px;
+            word-break: break-word;
+        }
+
+        .amount {
+            font-weight: 700;
+            color: #0f766e;
+        }
+
+        .page-break {
+            break-after: page;
+            page-break-after: always;
+        }
+
+        .empty {
+            max-width: 840px;
+            margin: 24px auto;
+            border: 1px solid #fca5a5;
+            background: #fef2f2;
+            color: #7f1d1d;
+            border-radius: 10px;
+            padding: 14px 16px;
+        }
+
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+
+            .sheet {
+                padding: 0;
+            }
+
+            .label::after {
+                border-color: #9ca3af;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="toolbar no-print">
+        <h1>Mini-Disc Shipping Labels</h1>
+        <div class="toolbar-meta">
+            Labels: <strong><%= orders.length %></strong>
+            | Total: <strong>$<%= Number(totalAmount || 0).toFixed(2) %></strong>
+            <% if (selectedCount > 0) { %>
+                | Seleccionadas: <strong><%= selectedCount %></strong>
+            <% } else { %>
+                | Fuente: <strong>pending + ready</strong>
+            <% } %>
+            | Generado: <strong><%= new Date(generatedAt).toLocaleString('es-PR') %></strong>
+        </div>
+        <div class="toolbar-actions">
+            <button type="button" class="btn" onclick="window.print()">Print</button>
+            <a href="/tools/minidisc-orders" class="btn">Back to Orders</a>
+        </div>
+    </div>
+
+    <% if (!orders || orders.length === 0) { %>
+        <div class="empty">
+            No hay ordenes pending ready con direccion completa para generar labels.
+        </div>
+    <% } %>
+
+    <% for (let i = 0; i < orders.length; i += 1) { %>
+        <% if (i % 6 === 0) { %>
+            <% if (i > 0) { %>
+                <div class="page-break"></div>
+            <% } %>
+            <div class="sheet">
+        <% } %>
+
+        <% const order = orders[i]; %>
+        <% const safeSenderAddress = (typeof senderAddress !== 'undefined' && senderAddress && Array.isArray(senderAddress.lines)) ? senderAddress : { lines: [] }; %>
+        <% const senderCompact = safeSenderAddress.lines.join(' | '); %>
+        <% const toLines = Array.isArray(order.address_lines) ? order.address_lines.slice(1).filter(Boolean) : []; %>
+        <% const fallbackToLines = [
+            String(order.shipping_address_line1 || '').trim(),
+            String(order.shipping_address_line2 || '').trim(),
+            [String(order.shipping_city || '').trim(), String(order.shipping_state || '').trim()].filter(Boolean).join(', ').trim(),
+            String(order.shipping_postal_code || '').trim(),
+            String(order.shipping_country_name || order.shipping_country_code || '').trim()
+        ].filter(Boolean); %>
+        <% const finalToLines = toLines.length > 0 ? toLines : fallbackToLines; %>
+        <article class="label">
+            <div class="label-body">
+                <div class="label-order">Order #<%= order.id %> | PayPal: <%= order.paypal_order_id || 'N/A' %></div>
+                <div class="from-block">
+                    <div class="section-title">From</div>
+                    <div><%= senderCompact %></div>
+                </div>
+
+                <div>
+                    <div class="section-title">To</div>
+                    <div class="to-block">
+                        <div class="label-name"><%= order.shipping_name || order.full_name || 'Cliente' %></div>
+                        <div class="label-address">
+                            <% finalToLines.forEach((line) => { %>
+                                <div><%= line %></div>
+                            <% }) %>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+            <div class="label-footer">
+                <span><%= order.email %></span>
+                <span class="amount"><%= order.amount_display %></span>
+            </div>
+        </article>
+
+        <% if (i % 6 === 5 || i === orders.length - 1) { %>
+            </div>
+        <% } %>
+    <% } %>
+</body>
+</html>

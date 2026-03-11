@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %></title>
+    <link rel="stylesheet" href="/css/dashboard.css">
+    <style>
+        .panel-grid {
+            display: grid;
+            grid-template-columns: 1.1fr 0.9fr;
+            gap: 16px;
+            align-items: start;
+        }
+
+        .tool-panel {
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 12px;
+            background: rgba(15, 23, 42, 0.65);
+            padding: 14px;
+        }
+
+        .tool-title {
+            color: #f8fafc;
+            margin: 0 0 10px;
+            font-size: 1rem;
+            font-weight: 700;
+        }
+
+        .tool-desc {
+            color: #94a3b8;
+            margin: 0 0 12px;
+            font-size: 0.88rem;
+        }
+
+        .inline-form {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .tool-input {
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            background: rgba(2, 6, 23, 0.55);
+            color: #f8fafc;
+            padding: 9px 10px;
+            font-size: 0.87rem;
+        }
+
+        .tool-input-q {
+            min-width: 240px;
+            flex: 1;
+        }
+
+        .warning {
+            border: 1px solid rgba(245, 158, 11, 0.4);
+            background: rgba(245, 158, 11, 0.14);
+            color: #fde68a;
+            border-radius: 10px;
+            padding: 10px 12px;
+            font-size: 0.84rem;
+            margin-bottom: 12px;
+        }
+
+        .flash {
+            border-radius: 10px;
+            padding: 10px 12px;
+            margin-bottom: 12px;
+            font-size: 0.86rem;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            background: rgba(255, 255, 255, 0.05);
+            color: #e2e8f0;
+        }
+
+        .flash-success {
+            border-color: rgba(34, 197, 94, 0.5);
+            background: rgba(34, 197, 94, 0.14);
+            color: #86efac;
+        }
+
+        .flash-error {
+            border-color: rgba(248, 113, 113, 0.5);
+            background: rgba(248, 113, 113, 0.12);
+            color: #fecaca;
+        }
+
+        .flash-warn {
+            border-color: rgba(245, 158, 11, 0.5);
+            background: rgba(245, 158, 11, 0.14);
+            color: #fde68a;
+        }
+
+        .results-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 10px;
+            margin-top: 12px;
+        }
+
+        .track-card {
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 10px;
+            background: rgba(2, 6, 23, 0.45);
+            overflow: hidden;
+            cursor: pointer;
+            transition: transform 0.15s ease, border-color 0.15s ease;
+        }
+
+        .track-card:hover {
+            transform: translateY(-2px);
+            border-color: rgba(56, 189, 248, 0.6);
+        }
+
+        .track-card.active {
+            border-color: rgba(250, 204, 21, 0.75);
+            box-shadow: 0 0 0 1px rgba(250, 204, 21, 0.45) inset;
+        }
+
+        .track-cover {
+            width: 100%;
+            aspect-ratio: 1/1;
+            object-fit: cover;
+            background: linear-gradient(135deg, #1e293b, #0f172a);
+        }
+
+        .track-body {
+            padding: 8px;
+        }
+
+        .track-title {
+            color: #f8fafc;
+            font-size: 0.82rem;
+            font-weight: 700;
+            margin: 0 0 4px;
+            line-height: 1.25;
+        }
+
+        .track-sub {
+            color: #94a3b8;
+            font-size: 0.75rem;
+            line-height: 1.25;
+        }
+
+        .preview-wrap {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 12px;
+        }
+
+        .disc-shell {
+            width: 100%;
+            max-width: 300px;
+            margin: 0 auto;
+            padding: 14px;
+            border-radius: 16px;
+            background: linear-gradient(155deg, rgba(250, 204, 21, 0.2), rgba(30, 41, 59, 0.75));
+            border: 1px solid rgba(250, 204, 21, 0.35);
+        }
+
+        .disc {
+            width: 100%;
+            aspect-ratio: 1/1;
+            border-radius: 999px;
+            position: relative;
+            overflow: hidden;
+            border: 2px solid rgba(255, 255, 255, 0.15);
+            background: radial-gradient(circle at 30% 30%, #334155, #0f172a 70%);
+        }
+
+        .disc img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            opacity: 0.92;
+        }
+
+        .disc-hole {
+            width: 22%;
+            aspect-ratio: 1/1;
+            border-radius: 999px;
+            position: absolute;
+            top: 39%;
+            left: 39%;
+            background: rgba(15, 23, 42, 0.85);
+            border: 2px solid rgba(255, 255, 255, 0.35);
+        }
+
+        .disc-meta {
+            margin-top: 10px;
+            text-align: center;
+        }
+
+        .disc-meta strong {
+            color: #f8fafc;
+            font-size: 0.95rem;
+            line-height: 1.25;
+            display: block;
+        }
+
+        .disc-meta span {
+            color: #94a3b8;
+            font-size: 0.82rem;
+        }
+
+        .cart-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.82rem;
+            margin-top: 10px;
+        }
+
+        .cart-table th,
+        .cart-table td {
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            padding: 8px;
+            text-align: left;
+            vertical-align: top;
+        }
+
+        .cart-table th {
+            color: #facc15;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            font-size: 0.72rem;
+        }
+
+        .cart-cover {
+            width: 38px;
+            height: 38px;
+            border-radius: 6px;
+            object-fit: cover;
+            background: #0f172a;
+        }
+
+        .cart-summary {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            margin-top: 12px;
+            flex-wrap: wrap;
+            color: #e2e8f0;
+            font-size: 0.88rem;
+        }
+
+        .muted {
+            color: #94a3b8;
+        }
+
+        .checkout-form {
+            margin-top: 12px;
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+            padding-top: 12px;
+            display: grid;
+            gap: 8px;
+        }
+
+        .checkout-label {
+            color: #cbd5e1;
+            font-size: 0.78rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .checkout-feedback {
+            margin-top: 8px;
+            font-size: 0.8rem;
+            color: #94a3b8;
+        }
+
+        @media (max-width: 980px) {
+            .panel-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <%- include('../partials/navbar') %>
+
+    <div class="container" style="padding-top: 30px;">
+        <section class="section">
+            <div class="section-header">
+                <h2><span class="section-icon">💿</span> Mini-Disc Generator</h2>
+                <a href="/tools" class="btn btn-secondary">Volver a Tools</a>
+            </div>
+
+            <p class="tool-desc">
+                Busca tracks en Spotify, selecciona uno y genera un preview de Mini-Disc con caratula listo para agregar al carrito.
+            </p>
+
+            <% if (!spotifyConfigured) { %>
+                <div class="warning">
+                    Spotify API no esta configurado. Agrega <code>SPOTIFY_CLIENT_ID</code> y <code>SPOTIFY_CLIENT_SECRET</code> en .env para habilitar el search.
+                </div>
+            <% } %>
+
+            <% if (checkoutFlash && checkoutFlash.message) { %>
+                <div class="flash flash-<%= checkoutFlash.type || 'info' %>">
+                    <%= checkoutFlash.message %>
+                </div>
+            <% } %>
+
+            <div class="panel-grid">
+                <div class="tool-panel">
+                    <h3 class="tool-title">Search Spotify Track</h3>
+                    <form id="spotify-search-form" class="inline-form">
+                        <input id="spotify-query" class="tool-input tool-input-q" type="text" placeholder="Buscar tema..." minlength="2" required>
+                        <input id="spotify-artist" class="tool-input" type="text" value="<%= defaultArtistFilter %>" placeholder="Artista filtro">
+                        <button type="submit" class="btn" <%= spotifyConfigured ? '' : 'disabled' %>>Buscar</button>
+                    </form>
+
+                    <div id="search-feedback" class="muted" style="margin-top:10px;">Escribe y busca para ver resultados.</div>
+                    <div id="search-results" class="results-grid"></div>
+                </div>
+
+                <div class="preview-wrap">
+                    <div class="tool-panel">
+                        <h3 class="tool-title">Mini-Disc Preview</h3>
+                        <div class="disc-shell">
+                            <div class="disc" id="selected-disc">
+                                <div class="disc-hole"></div>
+                            </div>
+                            <div class="disc-meta">
+                                <strong id="selected-title">Selecciona un track</strong>
+                                <span id="selected-artist">-</span>
+                            </div>
+                        </div>
+
+                        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:12px; justify-content:center;">
+                            <button id="add-to-cart-btn" class="btn" disabled>Add to Cart</button>
+                            <a id="open-spotify-btn" class="btn btn-secondary" href="#" target="_blank" rel="noopener" style="display:none;">Abrir en Spotify</a>
+                        </div>
+                    </div>
+
+                    <div class="tool-panel">
+                        <h3 class="tool-title">Mini-Disc Cart</h3>
+                        <table class="cart-table">
+                            <thead>
+                                <tr>
+                                    <th></th>
+                                    <th>Tema</th>
+                                    <th>Cant.</th>
+                                    <th>Precio</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody id="cart-body">
+                                <tr><td colspan="5" class="muted">Tu carrito esta vacio.</td></tr>
+                            </tbody>
+                        </table>
+
+                        <div class="cart-summary">
+                            <div><strong id="cart-count">0</strong> items</div>
+                            <div>Total: <strong id="cart-total">$0.00</strong></div>
+                        </div>
+
+                        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;">
+                            <button id="clear-cart-btn" class="btn btn-secondary">Vaciar carrito</button>
+                            <button id="proceed-checkout-btn" class="btn">Enviar a Checkout</button>
+                        </div>
+
+                        <div class="checkout-form">
+                            <div class="checkout-label">Datos del comprador</div>
+                            <input id="customer-full-name" class="tool-input" type="text" placeholder="Nombre y apellido" required>
+                            <input id="customer-email" class="tool-input" type="email" placeholder="email@dominio.com" required>
+                            <input id="customer-country" class="tool-input" type="text" placeholder="Pais" required>
+                            <div class="muted" style="font-size:0.78rem;">
+                                Precio por Mini-Disc en este flujo: <strong>$<%= Number(unitPrice || 15).toFixed(2) %> USD</strong>
+                            </div>
+                            <div id="checkout-feedback" class="checkout-feedback">Completa datos y envia al checkout real.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <%- include('../partials/footer') %>
+
+    <script>
+        (() => {
+            const UNIT_PRICE = Number('<%= Number(unitPrice || 15).toFixed(2) %>') || 15;
+            const STORAGE_KEY = 'ei2_minidisc_spotify_cart_v1';
+            const CUSTOMER_STORAGE_KEY = 'ei2_minidisc_checkout_customer_v1';
+
+            const form = document.getElementById('spotify-search-form');
+            const queryInput = document.getElementById('spotify-query');
+            const artistInput = document.getElementById('spotify-artist');
+            const feedbackEl = document.getElementById('search-feedback');
+            const resultsEl = document.getElementById('search-results');
+
+            const discEl = document.getElementById('selected-disc');
+            const selectedTitleEl = document.getElementById('selected-title');
+            const selectedArtistEl = document.getElementById('selected-artist');
+            const addToCartBtn = document.getElementById('add-to-cart-btn');
+            const openSpotifyBtn = document.getElementById('open-spotify-btn');
+
+            const cartBodyEl = document.getElementById('cart-body');
+            const cartCountEl = document.getElementById('cart-count');
+            const cartTotalEl = document.getElementById('cart-total');
+            const clearCartBtn = document.getElementById('clear-cart-btn');
+            const proceedCheckoutBtn = document.getElementById('proceed-checkout-btn');
+            const checkoutFeedbackEl = document.getElementById('checkout-feedback');
+            const customerFullNameEl = document.getElementById('customer-full-name');
+            const customerEmailEl = document.getElementById('customer-email');
+            const customerCountryEl = document.getElementById('customer-country');
+
+            let searchResults = [];
+            let selectedTrack = null;
+            let cart = [];
+
+            function formatMoney(amount) {
+                return `$${Number(amount || 0).toFixed(2)}`;
+            }
+
+            function isValidEmail(email) {
+                return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email || '').trim());
+            }
+
+            function loadCart() {
+                try {
+                    const raw = localStorage.getItem(STORAGE_KEY);
+                    if (!raw) return [];
+                    const parsed = JSON.parse(raw);
+                    if (!Array.isArray(parsed)) return [];
+                    return parsed;
+                } catch (_) {
+                    return [];
+                }
+            }
+
+            function saveCart() {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(cart));
+            }
+
+            function loadCustomerInfo() {
+                try {
+                    const raw = localStorage.getItem(CUSTOMER_STORAGE_KEY);
+                    if (!raw) return { fullName: '', email: '', country: '' };
+                    const parsed = JSON.parse(raw);
+                    return {
+                        fullName: String(parsed?.fullName || ''),
+                        email: String(parsed?.email || ''),
+                        country: String(parsed?.country || '')
+                    };
+                } catch (_) {
+                    return { fullName: '', email: '', country: '' };
+                }
+            }
+
+            function saveCustomerInfo() {
+                const payload = {
+                    fullName: String(customerFullNameEl.value || '').trim(),
+                    email: String(customerEmailEl.value || '').trim(),
+                    country: String(customerCountryEl.value || '').trim()
+                };
+                localStorage.setItem(CUSTOMER_STORAGE_KEY, JSON.stringify(payload));
+            }
+
+            function renderSelectedTrack() {
+                if (!selectedTrack) {
+                    discEl.innerHTML = '<div class="disc-hole"></div>';
+                    selectedTitleEl.textContent = 'Selecciona un track';
+                    selectedArtistEl.textContent = '-';
+                    addToCartBtn.disabled = true;
+                    openSpotifyBtn.style.display = 'none';
+                    return;
+                }
+
+                const img = selectedTrack.cover
+                    ? `<img src="${selectedTrack.cover}" alt="${selectedTrack.title.replace(/"/g, '&quot;')}">`
+                    : '';
+                discEl.innerHTML = `${img}<div class="disc-hole"></div>`;
+                selectedTitleEl.textContent = selectedTrack.title;
+                selectedArtistEl.textContent = selectedTrack.artistsLabel || '-';
+                addToCartBtn.disabled = false;
+
+                if (selectedTrack.spotifyUrl) {
+                    openSpotifyBtn.href = selectedTrack.spotifyUrl;
+                    openSpotifyBtn.style.display = 'inline-block';
+                } else {
+                    openSpotifyBtn.style.display = 'none';
+                }
+            }
+
+            function renderResults() {
+                if (!searchResults.length) {
+                    resultsEl.innerHTML = '';
+                    return;
+                }
+
+                resultsEl.innerHTML = searchResults.map((track, idx) => {
+                    const activeClass = selectedTrack && selectedTrack.id === track.id ? 'active' : '';
+                    const safeTitle = track.title || 'Sin titulo';
+                    const safeArtists = track.artistsLabel || '-';
+                    const safeAlbum = track.albumName || '';
+
+                    return `
+                        <article class="track-card ${activeClass}" data-track-index="${idx}">
+                            ${track.cover ? `<img src="${track.cover}" alt="${safeTitle.replace(/"/g, '&quot;')}" class="track-cover">` : '<div class="track-cover"></div>'}
+                            <div class="track-body">
+                                <h4 class="track-title">${safeTitle}</h4>
+                                <div class="track-sub">${safeArtists}</div>
+                                <div class="track-sub" style="margin-top:3px;">${safeAlbum}</div>
+                            </div>
+                        </article>
+                    `;
+                }).join('');
+            }
+
+            function renderCart() {
+                if (!cart.length) {
+                    cartBodyEl.innerHTML = '<tr><td colspan="5" class="muted">Tu carrito esta vacio.</td></tr>';
+                    cartCountEl.textContent = '0';
+                    cartTotalEl.textContent = formatMoney(0);
+                    proceedCheckoutBtn.disabled = true;
+                    return;
+                }
+
+                let totalQty = 0;
+                let totalAmount = 0;
+
+                cartBodyEl.innerHTML = cart.map((item, idx) => {
+                    const qty = Number(item.qty || 1);
+                    const itemTotal = qty * UNIT_PRICE;
+                    totalQty += qty;
+                    totalAmount += itemTotal;
+
+                    return `
+                        <tr>
+                            <td>${item.cover ? `<img src="${item.cover}" alt="${(item.title || '').replace(/"/g, '&quot;')}" class="cart-cover">` : ''}</td>
+                            <td>
+                                <strong>${item.title || 'Sin titulo'}</strong><br>
+                                <span class="muted">${item.artistsLabel || '-'}</span>
+                            </td>
+                            <td>
+                                <div style="display:flex; align-items:center; gap:6px;">
+                                    <button class="btn btn-secondary" data-dec-index="${idx}" style="padding:2px 7px; font-size:0.72rem;">-</button>
+                                    <strong>${qty}</strong>
+                                    <button class="btn btn-secondary" data-inc-index="${idx}" style="padding:2px 7px; font-size:0.72rem;">+</button>
+                                </div>
+                            </td>
+                            <td>${formatMoney(itemTotal)}</td>
+                            <td>
+                                <button class="btn btn-secondary" data-remove-index="${idx}" style="padding:4px 8px; font-size:0.72rem;">Quitar</button>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+
+                cartCountEl.textContent = String(totalQty);
+                cartTotalEl.textContent = formatMoney(totalAmount);
+                proceedCheckoutBtn.disabled = false;
+            }
+
+            function addSelectedTrackToCart() {
+                if (!selectedTrack) return;
+
+                const existing = cart.find((item) => item.id === selectedTrack.id);
+                if (existing) {
+                    existing.qty = Number(existing.qty || 1) + 1;
+                } else {
+                    cart.push({
+                        id: selectedTrack.id,
+                        title: selectedTrack.title,
+                        artistsLabel: selectedTrack.artistsLabel,
+                        cover: selectedTrack.cover,
+                        spotifyUrl: selectedTrack.spotifyUrl,
+                        qty: 1
+                    });
+                }
+
+                saveCart();
+                renderCart();
+            }
+
+            async function runSearch(event) {
+                event.preventDefault();
+
+                const query = String(queryInput.value || '').trim();
+                const artist = String(artistInput.value || '').trim();
+
+                if (query.length < 2) {
+                    feedbackEl.textContent = 'Escribe al menos 2 caracteres.';
+                    return;
+                }
+
+                feedbackEl.textContent = 'Buscando en Spotify...';
+                resultsEl.innerHTML = '';
+
+                try {
+                    const params = new URLSearchParams({ q: query, artist, limit: '12' });
+                    const response = await fetch(`/tools/minidisc-generator/search?${params.toString()}`);
+                    const payload = await response.json();
+
+                    if (!response.ok || !payload.success) {
+                        feedbackEl.textContent = 'No se pudo completar la busqueda de Spotify.';
+                        searchResults = [];
+                        renderResults();
+                        return;
+                    }
+
+                    searchResults = Array.isArray(payload.tracks) ? payload.tracks : [];
+                    selectedTrack = searchResults[0] || null;
+
+                    if (!searchResults.length) {
+                        feedbackEl.textContent = 'No se encontraron tracks con ese criterio.';
+                    } else {
+                        feedbackEl.textContent = `Encontrados ${searchResults.length} tracks.`;
+                    }
+
+                    renderResults();
+                    renderSelectedTrack();
+                } catch (error) {
+                    feedbackEl.textContent = 'Error de red buscando tracks.';
+                    searchResults = [];
+                    renderResults();
+                }
+            }
+
+            async function proceedToCheckout() {
+                const fullName = String(customerFullNameEl.value || '').trim();
+                const email = String(customerEmailEl.value || '').trim().toLowerCase();
+                const country = String(customerCountryEl.value || '').trim();
+
+                if (!cart.length) {
+                    checkoutFeedbackEl.textContent = 'Agrega al menos un track al carrito.';
+                    return;
+                }
+
+                if (!fullName) {
+                    checkoutFeedbackEl.textContent = 'Ingresa nombre y apellido del comprador.';
+                    customerFullNameEl.focus();
+                    return;
+                }
+
+                if (!isValidEmail(email)) {
+                    checkoutFeedbackEl.textContent = 'Ingresa un email valido.';
+                    customerEmailEl.focus();
+                    return;
+                }
+
+                if (!country) {
+                    checkoutFeedbackEl.textContent = 'Ingresa el pais del comprador.';
+                    customerCountryEl.focus();
+                    return;
+                }
+
+                saveCustomerInfo();
+
+                checkoutFeedbackEl.textContent = 'Preparando checkout real...';
+                proceedCheckoutBtn.disabled = true;
+
+                try {
+                    const response = await fetch('/tools/minidisc-generator/checkout/prepare', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            fullName,
+                            email,
+                            country,
+                            cartItems: cart
+                        })
+                    });
+
+                    const payload = await response.json();
+                    if (!response.ok || !payload.success) {
+                        checkoutFeedbackEl.textContent = 'No se pudo preparar el checkout. Revisa datos e intenta de nuevo.';
+                        proceedCheckoutBtn.disabled = false;
+                        return;
+                    }
+
+                    window.location.href = payload.checkoutUrl;
+                } catch (error) {
+                    checkoutFeedbackEl.textContent = 'Error de red preparando checkout.';
+                    proceedCheckoutBtn.disabled = false;
+                }
+            }
+
+            form.addEventListener('submit', runSearch);
+
+            resultsEl.addEventListener('click', (event) => {
+                const card = event.target.closest('[data-track-index]');
+                if (!card) return;
+
+                const idx = Number(card.dataset.trackIndex);
+                if (!Number.isInteger(idx) || !searchResults[idx]) return;
+
+                selectedTrack = searchResults[idx];
+                renderResults();
+                renderSelectedTrack();
+            });
+
+            addToCartBtn.addEventListener('click', () => {
+                addSelectedTrackToCart();
+            });
+
+            cartBodyEl.addEventListener('click', (event) => {
+                const incBtn = event.target.closest('[data-inc-index]');
+                if (incBtn) {
+                    const idx = Number(incBtn.dataset.incIndex);
+                    if (Number.isInteger(idx) && cart[idx]) {
+                        cart[idx].qty = Math.min((Number(cart[idx].qty) || 1) + 1, 25);
+                        saveCart();
+                        renderCart();
+                    }
+                    return;
+                }
+
+                const decBtn = event.target.closest('[data-dec-index]');
+                if (decBtn) {
+                    const idx = Number(decBtn.dataset.decIndex);
+                    if (Number.isInteger(idx) && cart[idx]) {
+                        const nextQty = Math.max((Number(cart[idx].qty) || 1) - 1, 1);
+                        cart[idx].qty = nextQty;
+                        saveCart();
+                        renderCart();
+                    }
+                    return;
+                }
+
+                const removeBtn = event.target.closest('[data-remove-index]');
+                if (!removeBtn) return;
+
+                const idx = Number(removeBtn.dataset.removeIndex);
+                if (!Number.isInteger(idx) || !cart[idx]) return;
+
+                cart.splice(idx, 1);
+                saveCart();
+                renderCart();
+            });
+
+            clearCartBtn.addEventListener('click', () => {
+                cart = [];
+                saveCart();
+                renderCart();
+                checkoutFeedbackEl.textContent = 'Carrito vaciado.';
+            });
+
+            proceedCheckoutBtn.addEventListener('click', () => {
+                proceedToCheckout();
+            });
+
+            [customerFullNameEl, customerEmailEl, customerCountryEl].forEach((input) => {
+                input.addEventListener('change', saveCustomerInfo);
+                input.addEventListener('blur', saveCustomerInfo);
+            });
+
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('clearCart') === '1') {
+                localStorage.removeItem(STORAGE_KEY);
+            }
+
+            cart = loadCart();
+            const customerInfo = loadCustomerInfo();
+            customerFullNameEl.value = customerInfo.fullName;
+            customerEmailEl.value = customerInfo.email;
+            customerCountryEl.value = customerInfo.country;
+            renderCart();
+            renderSelectedTrack();
+        })();
+    </script>
+</body>
+</html>

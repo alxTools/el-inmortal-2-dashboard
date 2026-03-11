@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %></title>
+    <link rel="stylesheet" href="/css/dashboard.css">
+    <% if (paypalConfigured) { %>
+        <script src="https://www.paypal.com/sdk/js?client-id=<%= paypalClientId %>&currency=USD&intent=capture&commit=true&vault=false&components=buttons&locale=es_ES&disable-funding=card"></script>
+    <% } %>
+    <style>
+        .checkout-shell {
+            max-width: 980px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1.05fr 0.95fr;
+            gap: 16px;
+            align-items: start;
+        }
+
+        .checkout-panel {
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 12px;
+            background: rgba(15, 23, 42, 0.68);
+            padding: 14px;
+        }
+
+        .checkout-title {
+            margin: 0 0 10px;
+            color: #f8fafc;
+            font-size: 1rem;
+            font-weight: 700;
+        }
+
+        .checkout-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.82rem;
+        }
+
+        .checkout-table th,
+        .checkout-table td {
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            text-align: left;
+            padding: 8px;
+            vertical-align: top;
+        }
+
+        .checkout-table th {
+            color: #facc15;
+            font-size: 0.72rem;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .muted {
+            color: #94a3b8;
+        }
+
+        .summary-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 10px;
+            color: #e2e8f0;
+            font-size: 0.88rem;
+            gap: 10px;
+        }
+
+        .customer-box {
+            margin-top: 10px;
+            border: 1px solid rgba(56, 189, 248, 0.35);
+            border-radius: 10px;
+            background: rgba(56, 189, 248, 0.12);
+            padding: 10px;
+            color: #e0f2fe;
+            font-size: 0.84rem;
+            line-height: 1.45;
+        }
+
+        .status-box {
+            margin-top: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 10px;
+            padding: 10px;
+            color: #cbd5e1;
+            font-size: 0.84rem;
+            background: rgba(255, 255, 255, 0.04);
+        }
+
+        .status-error {
+            border-color: rgba(248, 113, 113, 0.5);
+            background: rgba(248, 113, 113, 0.14);
+            color: #fecaca;
+        }
+
+        .status-warn {
+            border-color: rgba(245, 158, 11, 0.5);
+            background: rgba(245, 158, 11, 0.14);
+            color: #fde68a;
+        }
+
+        .status-success {
+            border-color: rgba(34, 197, 94, 0.5);
+            background: rgba(34, 197, 94, 0.14);
+            color: #86efac;
+        }
+
+        @media (max-width: 980px) {
+            .checkout-shell {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <%- include('../partials/navbar') %>
+
+    <div class="container" style="padding-top: 30px;">
+        <section class="section">
+            <div class="section-header">
+                <h2><span class="section-icon">🧾</span> Checkout Mini-Disc</h2>
+                <a href="/tools/minidisc-generator" class="btn btn-secondary">Volver al Generator</a>
+            </div>
+
+            <p class="muted" style="margin-bottom: 12px;">
+                Confirma carrito y procesa pago real con PayPal.
+            </p>
+
+            <div class="checkout-shell">
+                <div class="checkout-panel">
+                    <h3 class="checkout-title">Resumen del carrito</h3>
+
+                    <table class="checkout-table">
+                        <thead>
+                            <tr>
+                                <th>Tema</th>
+                                <th>Cant.</th>
+                                <th>Subtotal</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% (checkoutState.cartItems || []).forEach((item) => { %>
+                                <tr>
+                                    <td>
+                                        <strong><%= item.title %></strong><br>
+                                        <span class="muted"><%= item.artistsLabel || '-' %></span>
+                                    </td>
+                                    <td><%= item.qty %></td>
+                                    <td>$<%= (Number(item.qty || 0) * Number(item.unitPrice || 0)).toFixed(2) %></td>
+                                </tr>
+                            <% }) %>
+                        </tbody>
+                    </table>
+
+                    <div class="summary-row">
+                        <span>Total items:</span>
+                        <strong><%= checkoutState.itemCount %></strong>
+                    </div>
+                    <div class="summary-row">
+                        <span>Total a cobrar:</span>
+                        <strong>$<%= Number(checkoutState.totalAmount || 0).toFixed(2) %> <%= checkoutState.currency || 'USD' %></strong>
+                    </div>
+
+                    <div class="customer-box">
+                        <strong>Comprador:</strong> <%= checkoutState.fullName %><br>
+                        <strong>Email:</strong> <%= checkoutState.email %><br>
+                        <strong>Pais:</strong> <%= checkoutState.country %>
+                    </div>
+                </div>
+
+                <div class="checkout-panel">
+                    <h3 class="checkout-title">Pago PayPal</h3>
+
+                    <% if (!paypalConfigured) { %>
+                        <div class="status-box status-error">
+                            PayPal no esta configurado en el servidor. Define PAYPAL_CLIENT_ID y PAYPAL_SECRET para completar checkout.
+                        </div>
+                    <% } else { %>
+                        <div id="paypal-button-container"></div>
+                        <div id="checkout-status" class="status-box">Listo para procesar pago.</div>
+                    <% } %>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <%- include('../partials/footer') %>
+
+    <% if (paypalConfigured) { %>
+    <script>
+        (() => {
+            const checkoutState = <%- checkoutStateJson %>;
+            const statusEl = document.getElementById('checkout-status');
+
+            function setStatus(message, type) {
+                statusEl.textContent = message;
+                statusEl.className = 'status-box';
+                if (type === 'error') statusEl.classList.add('status-error');
+                if (type === 'warn') statusEl.classList.add('status-warn');
+                if (type === 'success') statusEl.classList.add('status-success');
+            }
+
+            async function readJsonSafe(response) {
+                const text = await response.text();
+                try {
+                    return JSON.parse(text);
+                } catch (_) {
+                    return {
+                        success: false,
+                        error: text ? text.slice(0, 200) : `http_${response.status}`
+                    };
+                }
+            }
+
+            if (!window.paypal) {
+                setStatus('No se pudo cargar PayPal SDK.', 'error');
+                return;
+            }
+
+            paypal.Buttons({
+                style: {
+                    layout: 'vertical',
+                    color: 'gold',
+                    shape: 'rect',
+                    label: 'pay'
+                },
+
+                createOrder: async () => {
+                    setStatus('Creando orden de pago...', 'warn');
+                    const response = await fetch('/tools/minidisc-generator/checkout/create-order', {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            itemCount: checkoutState.itemCount
+                        })
+                    });
+
+                    const payload = await readJsonSafe(response);
+                    if (!response.ok || !payload.success || !payload.orderId) {
+                        const reason = payload.error || `http_${response.status}`;
+                        setStatus(`No se pudo crear la orden de PayPal (${reason}).`, 'error');
+                        throw new Error(payload.error || 'create_order_failed');
+                    }
+
+                    setStatus('Orden creada. Procesa el pago en PayPal.', 'warn');
+                    return payload.orderId;
+                },
+
+                onApprove: async (data) => {
+                    setStatus('Capturando pago...', 'warn');
+
+                    const response = await fetch('/tools/minidisc-generator/checkout/capture-order', {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            orderId: data.orderID
+                        })
+                    });
+
+                    const payload = await readJsonSafe(response);
+                    if (!response.ok || !payload.success) {
+                        const reason = payload.error || `http_${response.status}`;
+                        setStatus(`Pago recibido pero no se pudo registrar orden local (${reason}).`, 'error');
+                        return;
+                    }
+
+                    setStatus('Pago completado. Redirigiendo...', 'success');
+                    window.location.href = payload.redirectUrl || '/tools/minidisc-generator?checkout=success&clearCart=1';
+                },
+
+                onCancel: () => {
+                    setStatus('Checkout cancelado por el usuario.', 'warn');
+                },
+
+                onError: (err) => {
+                    console.error('[MiniDisc Checkout] PayPal error:', err);
+                    setStatus('Error en PayPal. Intenta nuevamente.', 'error');
+                }
+            }).render('#paypal-button-container');
+        })();
+    </script>
+    <% } %>
+</body>
+</html>

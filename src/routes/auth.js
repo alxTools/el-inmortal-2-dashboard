@@ -16,14 +16,23 @@ router.get('/login', (req, res) => {
 
 // POST login
 router.post('/login', async (req, res) => {
-    const { email, password, remember_me } = req.body;
+    const rawEmail = String(req.body?.email || '').trim();
+    const password = String(req.body?.password || '');
+    const remember_me = req.body?.remember_me;
+
+    if (!rawEmail || !password) {
+        return res.render('auth/login', {
+            title: 'Login - Galante Dashboard',
+            error: 'Email/usuario y contraseña son requeridos'
+        });
+    }
     
     try {
         let user;
-        if (email.includes('@')) {
-            user = await getOne('SELECT * FROM users WHERE email = ? AND status = "active"', [email]);
+        if (rawEmail.includes('@')) {
+            user = await getOne('SELECT * FROM users WHERE email = ? AND status = "active"', [rawEmail]);
         } else {
-            user = await getOne('SELECT * FROM users WHERE username = ? AND status = "active"', [email]);
+            user = await getOne('SELECT * FROM users WHERE username = ? AND status = "active"', [rawEmail]);
         }
         
         if (!user) {

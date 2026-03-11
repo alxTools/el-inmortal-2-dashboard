@@ -8,6 +8,7 @@ const { ensureLandingLeadsTable, saveNFCCode, syncToWordPress, getUnifiedStats, 
 const { createPayPalOrder, capturePayPalOrder, getPayPalConfig } = require('../utils/paypalHelper');
 const { scheduleMiniDiscEmail } = require('../utils/scheduledEmails');
 const { syncUserToNotion, isNotionConfigured, syncAllUsersToNotion, getNotionStats } = require('../utils/notionHelper');
+const { normalizePersonName } = require('../utils/nameCase');
 
 const router = express.Router();
 
@@ -286,7 +287,7 @@ router.get('/', async (_req, res) => {
 
 router.post('/subscribe', async (req, res) => {
     const email = String(req.body.email || '').trim().toLowerCase();
-    const fullName = String(req.body.full_name || req.body.name || '').trim();
+    const fullName = normalizePersonName(req.body.full_name || req.body.name);
     const country = String(req.body.country || '').trim();
     const sourceLabel = String(req.body.source || 'landing_el_inmortal_2').trim() || 'landing_el_inmortal_2';
     const wantsJson =
@@ -1019,7 +1020,8 @@ router.get('/paypal-config', (_req, res) => {
 // Crear orden de PayPal
 router.post('/create-paypal-order', async (req, res) => {
     try {
-        const { packageId, email, fullName } = req.body;
+        const { packageId, email } = req.body;
+        const fullName = normalizePersonName(req.body.fullName || req.body.full_name || req.body.name);
         
         if (!packageId || !email) {
             return res.status(400).json({ 

@@ -33,15 +33,45 @@ app.use(helmet({
         directives: {
             defaultSrc: ["'self'"],
             styleSrc: ["'self'", "'unsafe-inline'", "https:"],
-            scriptSrc: ["'self'", "'unsafe-inline'", "https://www.googletagmanager.com", "https://static.cloudflareinsights.com", "https://www.paypal.com", "https://www.sandbox.paypal.com"],
+            scriptSrc: [
+                "'self'",
+                "'unsafe-inline'",
+                "https://www.googletagmanager.com",
+                "https://static.cloudflareinsights.com",
+                "https://www.paypal.com",
+                "https://www.sandbox.paypal.com",
+                "https://www.paypalobjects.com",
+                "https://*.paypal.com",
+                "https://*.paypalobjects.com"
+            ],
             scriptSrcAttr: ["'unsafe-inline'"],
             imgSrc: ["'self'", "data:", "blob:", "https:"],
             fontSrc: ["'self'", "data:", "https:"],
-            connectSrc: ["'self'", "data:", "https:", "blob:", "https://www.googletagmanager.com", "https://www.paypal.com", "https://www.sandbox.paypal.com"],
+            connectSrc: [
+                "'self'",
+                "data:",
+                "https:",
+                "blob:",
+                "https://www.googletagmanager.com",
+                "https://www.paypal.com",
+                "https://www.sandbox.paypal.com",
+                "https://www.paypalobjects.com",
+                "https://*.paypal.com",
+                "https://*.paypalobjects.com"
+            ],
             mediaSrc: ["'self'", "data:", "blob:"],
-            frameSrc: ["'self'", "https://www.paypal.com", "https://www.sandbox.paypal.com"],
+            frameSrc: [
+                "'self'",
+                "https://www.paypal.com",
+                "https://www.sandbox.paypal.com",
+                "https://www.paypalobjects.com",
+                "https://*.paypal.com",
+                "https://*.paypalobjects.com"
+            ],
         },
     },
+    crossOriginOpenerPolicy: { policy: 'same-origin-allow-popups' },
+    crossOriginEmbedderPolicy: false,
 }));
 
 app.use(cors());
@@ -260,6 +290,26 @@ app.get('/admin', (req, res) => {
 // Alias de acceso rapido para el tool de Mini-Disc
 app.get('/minidisc-orders', (req, res) => {
     return res.redirect('/tools/minidisc-orders');
+});
+
+app.get('/minidisc-order', (req, res) => {
+    return res.redirect('/tools/minidisc-orders');
+});
+
+app.get('/minidisc-generator', (req, res) => {
+    return res.redirect('/tools/minidisc-generator');
+});
+
+app.get('/minidisc-gen', (req, res) => {
+    return res.redirect('/tools/minidisc-generator');
+});
+
+app.get('/notes', (req, res) => {
+    return res.redirect('/tools/notes');
+});
+
+app.get('/sticky-notes', (req, res) => {
+    return res.redirect('/tools/notes');
 });
 
 // Protected routes with role-based access

@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %></title>
+    <link rel="stylesheet" href="/css/dashboard.css">
+    <style>
+        .notes-toolbar {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            margin-bottom: 12px;
+        }
+
+        .notes-toolbar-left,
+        .notes-toolbar-right {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .notes-input {
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            background: rgba(15, 23, 42, 0.6);
+            color: #f8fafc;
+            padding: 9px 10px;
+            font-size: 0.86rem;
+            min-width: 220px;
+        }
+
+        .notes-status {
+            margin-bottom: 10px;
+            color: #94a3b8;
+            font-size: 0.82rem;
+            min-height: 18px;
+        }
+
+        .notes-board {
+            position: relative;
+            min-height: 72vh;
+            border-radius: 14px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            background:
+                radial-gradient(circle at 1px 1px, rgba(148, 163, 184, 0.28) 1px, transparent 0) 0 0/18px 18px,
+                linear-gradient(160deg, rgba(15, 23, 42, 0.9), rgba(2, 6, 23, 0.92));
+            overflow: auto;
+            padding: 12px;
+        }
+
+        .notes-empty {
+            color: #94a3b8;
+            text-align: center;
+            padding: 36px 16px;
+            font-size: 0.92rem;
+        }
+
+        .sticky-note {
+            position: absolute;
+            min-width: 200px;
+            min-height: 180px;
+            border-radius: 12px;
+            border: 1px solid rgba(0, 0, 0, 0.25);
+            box-shadow: 0 10px 24px rgba(2, 6, 23, 0.35);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .sticky-header {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 10px;
+            background: rgba(255, 255, 255, 0.2);
+            cursor: move;
+            user-select: none;
+        }
+
+        .sticky-title {
+            flex: 1;
+            border: 1px solid rgba(0, 0, 0, 0.18);
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.5);
+            color: #0f172a;
+            padding: 5px 7px;
+            font-size: 0.82rem;
+            font-weight: 700;
+        }
+
+        .sticky-delete {
+            border: 1px solid rgba(15, 23, 42, 0.2);
+            border-radius: 6px;
+            background: rgba(15, 23, 42, 0.1);
+            color: #7f1d1d;
+            font-size: 0.72rem;
+            padding: 5px 7px;
+            cursor: pointer;
+            font-weight: 700;
+        }
+
+        .sticky-expand {
+            border: 1px solid rgba(15, 23, 42, 0.2);
+            border-radius: 6px;
+            background: rgba(15, 23, 42, 0.1);
+            color: #0f172a;
+            font-size: 0.7rem;
+            padding: 5px 7px;
+            cursor: pointer;
+            font-weight: 700;
+            min-width: 56px;
+        }
+
+        .sticky-content {
+            flex: 1;
+            border: none;
+            background: transparent;
+            color: #0f172a;
+            padding: 10px;
+            font-size: 0.84rem;
+            line-height: 1.45;
+            resize: none;
+            min-height: 80px;
+        }
+
+        .sticky-content:focus,
+        .sticky-title:focus {
+            outline: 2px solid rgba(15, 23, 42, 0.35);
+            outline-offset: 0;
+        }
+
+        .sticky-footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            padding: 8px 10px;
+            background: rgba(255, 255, 255, 0.18);
+            border-top: 1px solid rgba(15, 23, 42, 0.15);
+        }
+
+        .sticky-updated {
+            font-size: 0.66rem;
+            color: rgba(15, 23, 42, 0.7);
+            white-space: nowrap;
+        }
+
+        .sticky-colors {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            flex-wrap: wrap;
+        }
+
+        .sticky-color-btn {
+            width: 14px;
+            height: 14px;
+            border-radius: 999px;
+            border: 1px solid rgba(15, 23, 42, 0.3);
+            cursor: pointer;
+            padding: 0;
+        }
+
+        .sticky-color-btn.active {
+            outline: 2px solid rgba(15, 23, 42, 0.65);
+            outline-offset: 1px;
+        }
+
+        @media (max-width: 900px) {
+            .notes-board {
+                min-height: 68vh;
+            }
+
+            .sticky-note {
+                width: min(92vw, 320px) !important;
+                left: 10px !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <%- include('../partials/navbar') %>
+
+    <div class="container" style="padding-top: 30px;">
+        <section class="section">
+            <div class="section-header">
+                <h2><span class="section-icon">📝</span> Notes</h2>
+                <a href="/tools" class="btn btn-secondary">Volver a Tools</a>
+            </div>
+
+            <p style="color:#94a3b8; margin-bottom: 12px;">
+                Tool de sticky notes flotantes estilo Keep para organizar ideas, tareas y pendientes de release.
+            </p>
+
+            <div class="notes-toolbar">
+                <div class="notes-toolbar-left">
+                    <button id="add-note-btn" class="btn">+ Nueva Nota</button>
+                    <button id="reload-notes-btn" class="btn btn-secondary">Recargar</button>
+                    <button id="clear-notes-btn" class="btn btn-secondary">Clear Notes</button>
+                </div>
+                <div class="notes-toolbar-right">
+                    <input id="search-notes-input" class="notes-input" type="text" placeholder="Buscar en notas...">
+                </div>
+            </div>
+
+            <div id="notes-status" class="notes-status"></div>
+            <div id="notes-board" class="notes-board">
+                <div class="notes-empty">Cargando notas...</div>
+            </div>
+        </section>
+    </div>
+
+    <%- include('../partials/footer') %>
+
+    <script>
+        (() => {
+            const NOTES_API_BASE = '/tools/notes/api';
+            const NOTE_COLORS = <%- JSON.stringify(Array.isArray(noteColors) ? noteColors : ['#FDE68A']) %>;
+
+            const boardEl = document.getElementById('notes-board');
+            const statusEl = document.getElementById('notes-status');
+            const addBtn = document.getElementById('add-note-btn');
+            const reloadBtn = document.getElementById('reload-notes-btn');
+            const clearBtn = document.getElementById('clear-notes-btn');
+            const searchInput = document.getElementById('search-notes-input');
+
+            const notes = [];
+            const noteMap = new Map();
+            const noteElements = new Map();
+            const updateQueue = new Map();
+            const updateTimers = new Map();
+            let topZ = 1;
+            const NOTE_EXPANDED_WIDTH = 460;
+            const NOTE_EXPANDED_HEIGHT = 420;
+            const NOTE_COLLAPSED_WIDTH = 260;
+            const NOTE_COLLAPSED_HEIGHT = 220;
+
+            function setStatus(message, tone) {
+                statusEl.textContent = message || '';
+                if (tone === 'error') {
+                    statusEl.style.color = '#fca5a5';
+                } else if (tone === 'success') {
+                    statusEl.style.color = '#86efac';
+                } else {
+                    statusEl.style.color = '#94a3b8';
+                }
+            }
+
+            function fmtDate(value) {
+                if (!value) return 'sin cambios';
+                const dt = new Date(value);
+                if (Number.isNaN(dt.getTime())) return 'sin cambios';
+                return dt.toLocaleString('es-PR', {
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+            }
+
+            async function parseJsonSafe(response) {
+                const text = await response.text();
+                try {
+                    return JSON.parse(text);
+                } catch (_) {
+                    return { success: false, error: text || `http_${response.status}` };
+                }
+            }
+
+            async function loadNotes() {
+                setStatus('Cargando notas...');
+                const response = await fetch(NOTES_API_BASE, { credentials: 'same-origin' });
+                const payload = await parseJsonSafe(response);
+
+                if (!response.ok || !payload.success) {
+                    throw new Error(payload.error || `http_${response.status}`);
+                }
+
+                notes.length = 0;
+                noteMap.clear();
+
+                const incoming = Array.isArray(payload.notes) ? payload.notes : [];
+                incoming.forEach((note) => {
+                    const safeNote = {
+                        id: Number(note.id),
+                        title: String(note.title || ''),
+                        content: String(note.content || ''),
+                        color: String(note.color || NOTE_COLORS[0] || '#FDE68A'),
+                        x: Number(note.x || 36),
+                        y: Number(note.y || 36),
+                        width: Number(note.width || 260),
+                        height: Number(note.height || 220),
+                        zIndex: Number(note.zIndex || 1),
+                        updatedAt: note.updatedAt || null
+                    };
+
+                    notes.push(safeNote);
+                    noteMap.set(safeNote.id, safeNote);
+                });
+
+                topZ = notes.reduce((max, note) => Math.max(max, note.zIndex || 1), 1);
+                renderNotes();
+                setStatus(`${notes.length} nota${notes.length === 1 ? '' : 's'} cargada${notes.length === 1 ? '' : 's'}.`, 'success');
+            }
+
+            function applySearchFilter() {
+                const term = String(searchInput.value || '').trim().toLowerCase();
+                noteElements.forEach((el, id) => {
+                    const note = noteMap.get(id);
+                    if (!note) return;
+                    if (!term) {
+                        el.style.display = 'flex';
+                        return;
+                    }
+
+                    const haystack = `${note.title} ${note.content}`.toLowerCase();
+                    el.style.display = haystack.includes(term) ? 'flex' : 'none';
+                });
+            }
+
+            function placeNoteElement(note, el) {
+                el.style.left = `${note.x}px`;
+                el.style.top = `${note.y}px`;
+                el.style.width = `${note.width}px`;
+                el.style.height = `${note.height}px`;
+                el.style.zIndex = String(note.zIndex);
+                el.style.background = note.color;
+            }
+
+            function isExpandedNote(note) {
+                return Number(note.width) >= NOTE_EXPANDED_WIDTH - 2 && Number(note.height) >= NOTE_EXPANDED_HEIGHT - 2;
+            }
+
+            function updateExpandButtonState(note, button) {
+                if (isExpandedNote(note)) {
+                    button.textContent = 'Shrink';
+                    button.title = 'Volver a tamano normal';
+                } else {
+                    button.textContent = 'Expand';
+                    button.title = 'Expandir nota';
+                }
+            }
+
+            function queueUpdate(noteId, patch, immediate = false) {
+                const pending = updateQueue.get(noteId) || {};
+                Object.assign(pending, patch);
+                updateQueue.set(noteId, pending);
+
+                if (updateTimers.has(noteId)) {
+                    clearTimeout(updateTimers.get(noteId));
+                }
+
+                if (immediate) {
+                    flushUpdate(noteId);
+                    return;
+                }
+
+                const timer = setTimeout(() => {
+                    flushUpdate(noteId);
+                }, 450);
+                updateTimers.set(noteId, timer);
+            }
+
+            async function flushUpdate(noteId) {
+                const pending = updateQueue.get(noteId);
+                if (!pending) return;
+
+                updateQueue.delete(noteId);
+                if (updateTimers.has(noteId)) {
+                    clearTimeout(updateTimers.get(noteId));
+                    updateTimers.delete(noteId);
+                }
+
+                const response = await fetch(`${NOTES_API_BASE}/${noteId}`, {
+                    method: 'PATCH',
+                    credentials: 'same-origin',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(pending)
+                });
+
+                const payload = await parseJsonSafe(response);
+                if (!response.ok || !payload.success || !payload.note) {
+                    setStatus(`No se pudo guardar nota #${noteId}.`, 'error');
+                    return;
+                }
+
+                const note = noteMap.get(noteId);
+                if (!note) return;
+
+                Object.assign(note, {
+                    title: String(payload.note.title || ''),
+                    content: String(payload.note.content || ''),
+                    color: String(payload.note.color || note.color),
+                    x: Number(payload.note.x || note.x),
+                    y: Number(payload.note.y || note.y),
+                    width: Number(payload.note.width || note.width),
+                    height: Number(payload.note.height || note.height),
+                    zIndex: Number(payload.note.zIndex || note.zIndex),
+                    updatedAt: payload.note.updatedAt || note.updatedAt
+                });
+
+                const noteEl = noteElements.get(noteId);
+                if (!noteEl) return;
+
+                placeNoteElement(note, noteEl);
+                const updatedLabel = noteEl.querySelector('[data-updated-label]');
+                if (updatedLabel) {
+                    updatedLabel.textContent = `editado ${fmtDate(note.updatedAt)}`;
+                }
+            }
+
+            function bringToFront(note) {
+                topZ += 1;
+                note.zIndex = topZ;
+                const noteEl = noteElements.get(note.id);
+                if (noteEl) {
+                    noteEl.style.zIndex = String(topZ);
+                }
+                queueUpdate(note.id, { zIndex: topZ });
+            }
+
+            function attachDrag(note, noteEl, dragHandle) {
+                let startX = 0;
+                let startY = 0;
+                let originX = 0;
+                let originY = 0;
+                let dragging = false;
+
+                function onMove(event) {
+                    if (!dragging) return;
+                    const dx = event.clientX - startX;
+                    const dy = event.clientY - startY;
+                    note.x = Math.round(originX + dx);
+                    note.y = Math.round(originY + dy);
+                    noteEl.style.left = `${note.x}px`;
+                    noteEl.style.top = `${note.y}px`;
+                }
+
+                function onUp() {
+                    if (!dragging) return;
+                    dragging = false;
+                    document.removeEventListener('mousemove', onMove);
+                    document.removeEventListener('mouseup', onUp);
+                    queueUpdate(note.id, { x: note.x, y: note.y }, true);
+                }
+
+                dragHandle.addEventListener('mousedown', (event) => {
+                    if (event.target.closest('input,button')) {
+                        return;
+                    }
+
+                    event.preventDefault();
+                    bringToFront(note);
+
+                    dragging = true;
+                    startX = event.clientX;
+                    startY = event.clientY;
+                    originX = note.x;
+                    originY = note.y;
+
+                    document.addEventListener('mousemove', onMove);
+                    document.addEventListener('mouseup', onUp);
+                });
+            }
+
+            function buildColorPalette(note, container, noteEl) {
+                NOTE_COLORS.forEach((color) => {
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = 'sticky-color-btn';
+                    if (String(note.color).toUpperCase() === String(color).toUpperCase()) {
+                        btn.classList.add('active');
+                    }
+                    btn.style.background = color;
+                    btn.title = color;
+
+                    btn.addEventListener('click', () => {
+                        note.color = color;
+                        noteEl.style.background = color;
+                        container.querySelectorAll('.sticky-color-btn').forEach((sw) => sw.classList.remove('active'));
+                        btn.classList.add('active');
+                        queueUpdate(note.id, { color }, true);
+                    });
+
+                    container.appendChild(btn);
+                });
+            }
+
+            function buildNoteElement(note) {
+                const noteEl = document.createElement('article');
+                noteEl.className = 'sticky-note';
+                noteEl.dataset.noteId = String(note.id);
+                placeNoteElement(note, noteEl);
+
+                const headerEl = document.createElement('div');
+                headerEl.className = 'sticky-header';
+
+                const titleInput = document.createElement('input');
+                titleInput.className = 'sticky-title';
+                titleInput.type = 'text';
+                titleInput.maxLength = 120;
+                titleInput.placeholder = 'Titulo';
+                titleInput.value = note.title;
+
+                const deleteBtn = document.createElement('button');
+                deleteBtn.type = 'button';
+                deleteBtn.className = 'sticky-delete';
+                deleteBtn.textContent = 'Delete';
+
+                const expandBtn = document.createElement('button');
+                expandBtn.type = 'button';
+                expandBtn.className = 'sticky-expand';
+                updateExpandButtonState(note, expandBtn);
+
+                headerEl.appendChild(titleInput);
+                headerEl.appendChild(expandBtn);
+                headerEl.appendChild(deleteBtn);
+
+                const contentEl = document.createElement('textarea');
+                contentEl.className = 'sticky-content';
+                contentEl.maxLength = 8000;
+                contentEl.placeholder = 'Escribe aqui...';
+                contentEl.value = note.content;
+
+                const footerEl = document.createElement('div');
+                footerEl.className = 'sticky-footer';
+
+                const updatedEl = document.createElement('span');
+                updatedEl.className = 'sticky-updated';
+                updatedEl.dataset.updatedLabel = '1';
+                updatedEl.textContent = `editado ${fmtDate(note.updatedAt)}`;
+
+                const colorsEl = document.createElement('div');
+                colorsEl.className = 'sticky-colors';
+
+                footerEl.appendChild(updatedEl);
+                footerEl.appendChild(colorsEl);
+
+                noteEl.appendChild(headerEl);
+                noteEl.appendChild(contentEl);
+                noteEl.appendChild(footerEl);
+
+                noteEl.addEventListener('mousedown', () => {
+                    bringToFront(note);
+                });
+
+                titleInput.addEventListener('input', () => {
+                    note.title = titleInput.value;
+                    queueUpdate(note.id, { title: note.title });
+                    applySearchFilter();
+                });
+
+                contentEl.addEventListener('input', () => {
+                    note.content = contentEl.value;
+                    queueUpdate(note.id, { content: note.content });
+                    applySearchFilter();
+                });
+
+                deleteBtn.addEventListener('click', async () => {
+                    const ok = confirm('Eliminar esta nota?');
+                    if (!ok) return;
+
+                    const response = await fetch(`${NOTES_API_BASE}/${note.id}`, {
+                        method: 'DELETE',
+                        credentials: 'same-origin'
+                    });
+
+                    const payload = await parseJsonSafe(response);
+                    if (!response.ok || !payload.success) {
+                        setStatus('No se pudo borrar la nota.', 'error');
+                        return;
+                    }
+
+                    noteMap.delete(note.id);
+                    const idx = notes.findIndex((item) => item.id === note.id);
+                    if (idx >= 0) notes.splice(idx, 1);
+
+                    noteEl.remove();
+                    noteElements.delete(note.id);
+
+                    if (!notes.length) {
+                        boardEl.innerHTML = '<div class="notes-empty">No hay notas. Crea tu primera sticky note.</div>';
+                    }
+
+                    setStatus('Nota eliminada.', 'success');
+                });
+
+                expandBtn.addEventListener('click', () => {
+                    bringToFront(note);
+
+                    if (isExpandedNote(note)) {
+                        note.width = Number(note._previousWidth || NOTE_COLLAPSED_WIDTH);
+                        note.height = Number(note._previousHeight || NOTE_COLLAPSED_HEIGHT);
+                    } else {
+                        note._previousWidth = Number(note.width || NOTE_COLLAPSED_WIDTH);
+                        note._previousHeight = Number(note.height || NOTE_COLLAPSED_HEIGHT);
+                        note.width = Math.max(Number(note.width || 0), NOTE_EXPANDED_WIDTH);
+                        note.height = Math.max(Number(note.height || 0), NOTE_EXPANDED_HEIGHT);
+                    }
+
+                    placeNoteElement(note, noteEl);
+                    updateExpandButtonState(note, expandBtn);
+
+                    queueUpdate(note.id, {
+                        width: note.width,
+                        height: note.height
+                    }, true);
+                });
+
+                attachDrag(note, noteEl, headerEl);
+                buildColorPalette(note, colorsEl, noteEl);
+
+                noteElements.set(note.id, noteEl);
+                return noteEl;
+            }
+
+            function renderNotes() {
+                boardEl.innerHTML = '';
+                noteElements.clear();
+
+                if (!notes.length) {
+                    boardEl.innerHTML = '<div class="notes-empty">No hay notas. Crea tu primera sticky note.</div>';
+                    return;
+                }
+
+                notes
+                    .slice()
+                    .sort((a, b) => (a.zIndex || 1) - (b.zIndex || 1))
+                    .forEach((note) => {
+                        const noteEl = buildNoteElement(note);
+                        boardEl.appendChild(noteEl);
+                    });
+
+                applySearchFilter();
+            }
+
+            async function createNote() {
+                const offset = notes.length * 16;
+                const payload = {
+                    title: 'Nueva nota',
+                    content: '',
+                    color: NOTE_COLORS[0] || '#FDE68A',
+                    x: 24 + offset,
+                    y: 24 + offset,
+                    width: 260,
+                    height: 220
+                };
+
+                const response = await fetch(NOTES_API_BASE, {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                const result = await parseJsonSafe(response);
+                if (!response.ok || !result.success || !result.note) {
+                    setStatus('No se pudo crear nota.', 'error');
+                    return;
+                }
+
+                const note = {
+                    id: Number(result.note.id),
+                    title: String(result.note.title || ''),
+                    content: String(result.note.content || ''),
+                    color: String(result.note.color || payload.color),
+                    x: Number(result.note.x || payload.x),
+                    y: Number(result.note.y || payload.y),
+                    width: Number(result.note.width || payload.width),
+                    height: Number(result.note.height || payload.height),
+                    zIndex: Number(result.note.zIndex || (topZ + 1)),
+                    updatedAt: result.note.updatedAt || null
+                };
+
+                notes.push(note);
+                noteMap.set(note.id, note);
+                topZ = Math.max(topZ, note.zIndex || 1);
+                renderNotes();
+
+                const noteEl = noteElements.get(note.id);
+                if (noteEl) {
+                    const titleInput = noteEl.querySelector('.sticky-title');
+                    if (titleInput) {
+                        titleInput.focus();
+                        titleInput.select();
+                    }
+                }
+
+                setStatus('Nota creada.', 'success');
+            }
+
+            async function clearAllNotes() {
+                if (!notes.length) {
+                    setStatus('No hay notas para borrar.');
+                    return;
+                }
+
+                const ok = confirm('Borrar todas tus sticky notes? Esta accion no se puede deshacer.');
+                if (!ok) return;
+
+                const response = await fetch(NOTES_API_BASE, {
+                    method: 'DELETE',
+                    credentials: 'same-origin'
+                });
+
+                const payload = await parseJsonSafe(response);
+                if (!response.ok || !payload.success) {
+                    setStatus('No se pudieron borrar todas las notas.', 'error');
+                    return;
+                }
+
+                notes.length = 0;
+                noteMap.clear();
+                noteElements.clear();
+                topZ = 1;
+                boardEl.innerHTML = '<div class="notes-empty">No hay notas. Crea tu primera sticky note.</div>';
+                setStatus(`Notas eliminadas: ${Number(payload.deletedCount || 0)}.`, 'success');
+            }
+
+            addBtn.addEventListener('click', () => {
+                createNote();
+            });
+
+            reloadBtn.addEventListener('click', async () => {
+                try {
+                    await loadNotes();
+                } catch (error) {
+                    setStatus(`No se pudo recargar: ${error.message}`, 'error');
+                }
+            });
+
+            clearBtn.addEventListener('click', async () => {
+                try {
+                    await clearAllNotes();
+                } catch (error) {
+                    setStatus(`No se pudo limpiar notas: ${error.message}`, 'error');
+                }
+            });
+
+            searchInput.addEventListener('input', () => {
+                applySearchFilter();
+            });
+
+            document.addEventListener('keydown', (event) => {
+                if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'n') {
+                    event.preventDefault();
+                    createNote();
+                }
+            });
+
+            loadNotes().catch((error) => {
+                boardEl.innerHTML = '<div class="notes-empty">No se pudieron cargar las notas.</div>';
+                setStatus(`Error cargando notas: ${error.message}`, 'error');
+            });
+        })();
+    </script>
+</body>
+</html>

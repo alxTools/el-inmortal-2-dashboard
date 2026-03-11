@@ -12,6 +12,7 @@ const proxyGeneratedRoot = path.join(__dirname, '../../scripts/proxy/generated')
 const { ensureLandingLeadsTable } = require('../utils/landingDb');
 const { syncUserToNotion } = require('../utils/notionHelper');
 const { sendMiniDiscShippedEmail, sendMiniDiscDelayEmail } = require('../utils/emailHelper');
+const { getOrderStatus } = require('../utils/paypalHelper');
 
 const {
     ensureYoutubeMetadataTables,
@@ -139,6 +140,285 @@ async function syncMiniDiscOrderToNotion(orderId) {
     }
 }
 
+const MINI_DISC_ORDERS_BASE_SELECT = `SELECT
+    id,
+    email,
+    full_name,
+    country,
+    created_at,
+    paypal_order_id,
+    paypal_payment_status,
+    paypal_payer_email,
+    paypal_amount_value,
+    paypal_amount_currency,
+    paypal_capture_id,
+    shipping_name,
+    shipping_address_line1,
+    shipping_address_line2,
+    shipping_city,
+    shipping_state,
+    shipping_postal_code,
+    shipping_country_code,
+    nfc_unique_code,
+    nfc_link,
+    minidisc_delay_email_sent,
+    minidisc_delay_email_sent_at,
+    package_shipped,
+    tracking_number
+ FROM landing_email_leads`;
+
+function parseMiniDiscAmount(value) {
+    const parsed = Number.parseFloat(String(value || '').trim());
+    return Number.isFinite(parsed) ? parsed : null;
+}
+
+function formatMiniDiscAmount(value, currency) {
+    const amountNumber = parseMiniDiscAmount(value);
+    if (amountNumber === null) {
+        return 'N/A';
+    }
+
+    const normalizedCurrency = String(currency || 'USD').trim() || 'USD';
+    return `$${amountNumber.toFixed(2)} ${normalizedCurrency}`;
+}
+
+const MINI_DISC_COUNTRY_FALLBACK = {
+    MX: 'Mexico',
+    US: 'United States',
+    PR: 'Puerto Rico',
+    DO: 'Dominican Republic',
+    ES: 'Spain',
+    CO: 'Colombia',
+    AR: 'Argentina',
+    CL: 'Chile',
+    PE: 'Peru',
+    VE: 'Venezuela'
+};
+
+function resolveMiniDiscCountry(rawCountry) {
+    const trimmed = String(rawCountry || '').trim();
+    if (!trimmed) {
+        return { code: '', name: '' };
+    }
+
+    const normalizedCode = trimmed.toUpperCase();
+    const looksLikeIsoCode = /^[A-Z]{2}$/.test(normalizedCode);
+
+    if (!looksLikeIsoCode) {
+        return {
+            code: '',
+            name: trimmed
+        };
+    }
+
+    const fallbackName = MINI_DISC_COUNTRY_FALLBACK[normalizedCode] || normalizedCode;
+
+    let displayName = fallbackName;
+    try {
+        if (Intl && typeof Intl.DisplayNames === 'function') {
+            const regionNames = new Intl.DisplayNames(['en'], { type: 'region' });
+            const intlName = regionNames.of(normalizedCode);
+            if (intlName && intlName !== normalizedCode) {
+                displayName = intlName;
+            }
+        }
+    } catch (_error) {
+        // fallback map already assigned
+    }
+
+    return {
+        code: normalizedCode,
+        name: displayName
+    };
+}
+
+function normalizeMiniDiscOrder(order) {
+    const fullName = String(order.full_name || '').trim();
+    const shippingName = String(order.shipping_name || fullName).trim();
+    const shippingLine1 = String(order.shipping_address_line1 || '').trim();
+    const shippingLine2 = String(order.shipping_address_line2 || '').trim();
+    const shippingCity = String(order.shipping_city || '').trim();
+    const shippingState = String(order.shipping_state || '').trim();
+    const shippingPostalCode = String(order.shipping_postal_code || '').trim();
+    const resolvedCountry = resolveMiniDiscCountry(order.shipping_country_code);
+    const shippingCountryCode = resolvedCountry.code;
+    const shippingCountryName = resolvedCountry.name;
+    const amountValue = String(order.paypal_amount_value || '').trim();
+    const amountCurrency = String(order.paypal_amount_currency || 'USD').trim() || 'USD';
+    const amountNumber = parseMiniDiscAmount(amountValue);
+    const uspsDomestic = shippingCountryCode === 'US';
+    const uspsInternational = Boolean(shippingCountryCode) && !uspsDomestic;
+
+    const cityStatePostal = [
+        [shippingCity, shippingState].filter(Boolean).join(', ').trim(),
+        shippingPostalCode
+    ].filter(Boolean).join(' ').trim();
+
+    const addressLines = [
+        shippingName,
+        shippingLine1,
+        shippingLine2,
+        cityStatePostal,
+        shippingCountryName || shippingCountryCode
+    ].filter(Boolean);
+
+    const needsState = shippingCountryCode === 'US';
+    const hasCountry = Boolean(shippingCountryCode || shippingCountryName);
+    const shippingReady = Boolean(
+        shippingName &&
+        shippingLine1 &&
+        shippingCity &&
+        shippingPostalCode &&
+        hasCountry &&
+        (!needsState || shippingState)
+    );
+
+    return {
+        ...order,
+        full_name: fullName,
+        package_shipped: Number(order.package_shipped) === 1,
+        tracking_number: String(order.tracking_number || '').trim(),
+        minidisc_delay_email_sent: Number(order.minidisc_delay_email_sent) === 1,
+        minidisc_delay_email_sent_at: order.minidisc_delay_email_sent_at || null,
+        delay_email_sent: Number(order.minidisc_delay_email_sent) === 1,
+        delay_email_sent_at: order.minidisc_delay_email_sent_at || null,
+        shipping_name: shippingName,
+        shipping_address_line1: shippingLine1,
+        shipping_address_line2: shippingLine2,
+        shipping_city: shippingCity,
+        shipping_state: shippingState,
+        shipping_postal_code: shippingPostalCode,
+        shipping_country_code: shippingCountryCode,
+        shipping_country_name: shippingCountryName,
+        paypal_amount_value: amountValue,
+        paypal_amount_currency: amountCurrency,
+        amount_number: amountNumber,
+        amount_display: formatMiniDiscAmount(amountValue, amountCurrency),
+        address_lines: addressLines,
+        shipping_ready: shippingReady,
+        usps_domestic: uspsDomestic,
+        usps_international: uspsInternational,
+        usps_customs_required: uspsInternational
+    };
+}
+
+function needsMiniDiscPayPalBackfill(order) {
+    if (!order || !order.paypal_order_id) {
+        return false;
+    }
+
+    const country = String(order.shipping_country_code || '').trim().toUpperCase();
+    const needsState = country === 'US';
+
+    return (
+        !order.paypal_amount_value ||
+        !order.shipping_address_line1 ||
+        !order.shipping_city ||
+        !order.shipping_postal_code ||
+        !order.shipping_country_code ||
+        (needsState && !order.shipping_state)
+    );
+}
+
+async function backfillMiniDiscOrderFromPayPal(order) {
+    if (!needsMiniDiscPayPalBackfill(order)) {
+        return false;
+    }
+
+    try {
+        const status = await getOrderStatus(order.paypal_order_id);
+        if (!status.success || !Array.isArray(status.purchaseUnits) || status.purchaseUnits.length === 0) {
+            return false;
+        }
+
+        const purchaseUnit = status.purchaseUnits[0] || {};
+        const amount = purchaseUnit.amount || {};
+        const shipping = purchaseUnit.shipping || {};
+        const address = shipping.address || {};
+
+        const amountValue = String(amount.value || order.paypal_amount_value || '').trim() || null;
+        const amountCurrency = String(amount.currency_code || order.paypal_amount_currency || 'USD').trim() || 'USD';
+        const shippingName = String(shipping?.name?.full_name || order.shipping_name || order.full_name || '').trim() || null;
+        const shippingAddressLine1 = String(address.address_line_1 || order.shipping_address_line1 || '').trim() || null;
+        const shippingAddressLine2 = String(address.address_line_2 || order.shipping_address_line2 || '').trim() || null;
+        const shippingCity = String(address.admin_area_2 || order.shipping_city || '').trim() || null;
+        const shippingState = String(address.admin_area_1 || order.shipping_state || '').trim() || null;
+        const shippingPostalCode = String(address.postal_code || order.shipping_postal_code || '').trim() || null;
+        const shippingCountryCode = String(address.country_code || order.shipping_country_code || '').trim().toUpperCase() || null;
+
+        await run(
+            `UPDATE landing_email_leads
+             SET paypal_amount_value = ?,
+                 paypal_amount_currency = ?,
+                 shipping_name = ?,
+                 shipping_address_line1 = ?,
+                 shipping_address_line2 = ?,
+                 shipping_city = ?,
+                 shipping_state = ?,
+                 shipping_postal_code = ?,
+                 shipping_country_code = ?
+             WHERE id = ?`,
+            [
+                amountValue,
+                amountCurrency,
+                shippingName,
+                shippingAddressLine1,
+                shippingAddressLine2,
+                shippingCity,
+                shippingState,
+                shippingPostalCode,
+                shippingCountryCode,
+                order.id
+            ]
+        );
+
+        return true;
+    } catch (error) {
+        console.error(`[MiniDisc Orders] Error backfilling PayPal order ${order.paypal_order_id}:`, error.message);
+        return false;
+    }
+}
+
+async function getMiniDiscCapturedOrders() {
+    return await getAll(
+        `${MINI_DISC_ORDERS_BASE_SELECT}
+         WHERE paypal_payment_status = 'captured'
+         ORDER BY package_shipped ASC, created_at DESC`
+    );
+}
+
+function parseMiniDiscOrderIds(rawIds) {
+    const candidates = Array.isArray(rawIds)
+        ? rawIds
+        : String(rawIds || '')
+            .split(',')
+            .map((value) => value.trim())
+            .filter(Boolean);
+
+    const normalized = candidates
+        .map((value) => Number(value))
+        .filter((value) => Number.isInteger(value) && value > 0);
+
+    return [...new Set(normalized)];
+}
+
+function getMiniDiscSenderAddress() {
+    const name = String(process.env.MINIDISC_SENDER_NAME || 'Alex Serrano').trim();
+    const line1 = String(process.env.MINIDISC_SENDER_LINE1 || '4431 Ave. Constancia').trim();
+    const line2 = String(process.env.MINIDISC_SENDER_LINE2 || 'Urb. Villa del Carmen').trim();
+    const cityStatePostal = String(process.env.MINIDISC_SENDER_CITY_STATE_POSTAL || 'Ponce, PR 00716').trim();
+    const country = String(process.env.MINIDISC_SENDER_COUNTRY || 'Puerto Rico, USA').trim();
+
+    return {
+        name,
+        line1,
+        line2,
+        cityStatePostal,
+        country,
+        lines: [name, line1, line2, cityStatePostal, country].filter(Boolean)
+    };
+}
+
 // Configure multer for video uploads
 const uploadDir = path.join(__dirname, '../../temp');
 if (!fs.existsSync(uploadDir)) {
@@ -205,38 +485,33 @@ router.get('/exports', async (req, res) => {
 router.get('/minidisc-orders', async (req, res) => {
     try {
         await ensureLandingLeadsTable();
+        const senderAddress = getMiniDiscSenderAddress();
 
-        const orders = await getAll(
-            `SELECT
-                id,
-                email,
-                full_name,
-                country,
-                created_at,
-                paypal_order_id,
-                paypal_payment_status,
-                paypal_payer_email,
-                nfc_unique_code,
-                nfc_link,
-                minidisc_delay_email_sent,
-                minidisc_delay_email_sent_at,
-                package_shipped,
-                tracking_number
-             FROM landing_email_leads
-             WHERE paypal_payment_status = 'captured'
-             ORDER BY package_shipped ASC, created_at DESC`
-        );
+        let normalizedOrders = (await getMiniDiscCapturedOrders()).map(normalizeMiniDiscOrder);
 
-        const normalizedOrders = (orders || []).map((order) => ({
-            ...order,
-            package_shipped: Number(order.package_shipped) === 1,
-            tracking_number: String(order.tracking_number || '').trim(),
-            minidisc_delay_email_sent: Number(order.minidisc_delay_email_sent) === 1,
-            minidisc_delay_email_sent_at: order.minidisc_delay_email_sent_at || null
-        }));
+        const backfillCandidates = normalizedOrders
+            .filter((order) => needsMiniDiscPayPalBackfill(order))
+            .slice(0, 8);
+
+        let backfilledCount = 0;
+        for (const order of backfillCandidates) {
+            const backfilled = await backfillMiniDiscOrderFromPayPal(order);
+            if (backfilled) {
+                backfilledCount += 1;
+            }
+        }
+
+        if (backfilledCount > 0) {
+            normalizedOrders = (await getMiniDiscCapturedOrders()).map(normalizeMiniDiscOrder);
+        }
 
         const pendingOrders = normalizedOrders.filter((order) => !order.package_shipped);
         const completedOrders = normalizedOrders.filter((order) => order.package_shipped);
+        const readyPendingOrders = pendingOrders.filter((order) => order.shipping_ready);
+        const uspsDomesticReady = readyPendingOrders.filter((order) => order.usps_domestic).length;
+        const uspsInternationalReady = readyPendingOrders.filter((order) => order.usps_international).length;
+        const totalRevenue = normalizedOrders.reduce((sum, order) => sum + (order.amount_number || 0), 0);
+        const pendingRevenue = pendingOrders.reduce((sum, order) => sum + (order.amount_number || 0), 0);
 
         res.render('tools/minidisc-orders', {
             title: 'Mini-Disc Orders - El Inmortal 2 Dashboard',
@@ -245,8 +520,14 @@ router.get('/minidisc-orders', async (req, res) => {
             stats: {
                 total: normalizedOrders.length,
                 pending: pendingOrders.length,
-                completed: completedOrders.length
+                completed: completedOrders.length,
+                readyPending: readyPendingOrders.length,
+                uspsDomesticReady,
+                uspsInternationalReady,
+                totalRevenue,
+                pendingRevenue
             },
+            senderAddress,
             flash: parseMiniDiscFlash(req.query.flash)
         });
     } catch (error) {
@@ -255,7 +536,17 @@ router.get('/minidisc-orders', async (req, res) => {
             title: 'Mini-Disc Orders - El Inmortal 2 Dashboard',
             pendingOrders: [],
             completedOrders: [],
-            stats: { total: 0, pending: 0, completed: 0 },
+            stats: {
+                total: 0,
+                pending: 0,
+                completed: 0,
+                readyPending: 0,
+                uspsDomesticReady: 0,
+                uspsInternationalReady: 0,
+                totalRevenue: 0,
+                pendingRevenue: 0
+            },
+            senderAddress: getMiniDiscSenderAddress(),
             flash: {
                 type: 'error',
                 message: `No se pudo cargar el panel: ${error.message}`
@@ -270,6 +561,65 @@ router.get('/minidisc-order', (_req, res) => {
 
 router.get('/minidisc-fulfillment', (_req, res) => {
     return res.redirect('/tools/minidisc-orders');
+});
+
+router.get('/minidisc-orders/labels/print', async (req, res) => {
+    try {
+        await ensureLandingLeadsTable();
+        const senderAddress = getMiniDiscSenderAddress();
+
+        let pendingOrders = (await getAll(
+            `${MINI_DISC_ORDERS_BASE_SELECT}
+             WHERE paypal_payment_status = 'captured' AND package_shipped = 0
+             ORDER BY created_at DESC`
+        )).map(normalizeMiniDiscOrder);
+
+        const backfillCandidates = pendingOrders
+            .filter((order) => needsMiniDiscPayPalBackfill(order))
+            .slice(0, 20);
+
+        let backfilledCount = 0;
+        for (const order of backfillCandidates) {
+            const backfilled = await backfillMiniDiscOrderFromPayPal(order);
+            if (backfilled) {
+                backfilledCount += 1;
+            }
+        }
+
+        if (backfilledCount > 0) {
+            pendingOrders = (await getAll(
+                `${MINI_DISC_ORDERS_BASE_SELECT}
+                 WHERE paypal_payment_status = 'captured' AND package_shipped = 0
+                 ORDER BY created_at DESC`
+            )).map(normalizeMiniDiscOrder);
+        }
+
+        const requestedIds = parseMiniDiscOrderIds(req.query.ids);
+        if (requestedIds.length > 0) {
+            const requestedSet = new Set(requestedIds);
+            pendingOrders = pendingOrders.filter((order) => requestedSet.has(Number(order.id)));
+        }
+
+        const readyOrders = pendingOrders.filter((order) => order.shipping_ready);
+
+        const totalAmount = readyOrders.reduce((sum, order) => sum + (order.amount_number || 0), 0);
+        const domesticCount = readyOrders.filter((order) => order.usps_domestic).length;
+        const internationalCount = readyOrders.filter((order) => order.usps_international).length;
+
+        res.render('tools/minidisc-labels-print', {
+            title: 'Print Labels - Mini-Disc Orders',
+            orders: readyOrders,
+            selectedCount: requestedIds.length,
+            totalAmount,
+            senderAddress,
+            domesticCount,
+            internationalCount,
+            generatedAt: new Date().toISOString()
+        });
+    } catch (error) {
+        console.error('[MiniDisc Orders] Error generando labels para imprimir:', error);
+        return redirectMiniDiscOrders(res, 'error', `No se pudieron generar labels: ${error.message}`);
+    }
 });
 
 router.post('/minidisc-orders/:id/send-delay-email', async (req, res) => {

@@ -12,6 +12,8 @@ if (!fetch) {
     }
 }
 
+const { normalizePersonName } = require('./nameCase');
+
 /**
  * Obtiene el access token de PayPal
  */
@@ -165,6 +167,165 @@ async function createPayPalOrder({ packageId, customerEmail, customerName }) {
     }
 }
 
+function sanitizePayPalItemName(value) {
+    const normalized = String(value || 'Mini-Disc Personalizado')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+    return normalized.slice(0, 120) || 'Mini-Disc Personalizado';
+}
+
+function sanitizePayPalSku(value) {
+    const normalized = String(value || 'EI2-MINIDISC-CUSTOM')
+        .replace(/[^a-zA-Z0-9_-]/g, '')
+        .trim();
+
+    return normalized.slice(0, 127) || 'EI2-MINIDISC-CUSTOM';
+}
+
+/**
+ * Crea una orden personalizada de PayPal para carrito Mini-Disc
+ * @param {Object} options
+ * @param {string} options.customerEmail
+ * @param {string} options.customerName
+ * @param {Array} options.cartItems
+ * @param {string} [options.currency]
+ * @param {string} [options.returnUrl]
+ * @param {string} [options.cancelUrl]
+ * @returns {Promise<Object>}
+ */
+async function createPayPalCartOrder({
+    customerEmail,
+    customerName,
+    cartItems,
+    currency = 'USD',
+    returnUrl,
+    cancelUrl
+}) {
+    try {
+        const accessToken = await getPayPalAccessToken();
+        const mode = process.env.PAYPAL_MODE || 'sandbox';
+        const baseUrl = mode === 'live'
+            ? 'https://api-m.paypal.com'
+            : 'https://api-m.sandbox.paypal.com';
+
+        const normalizedCustomerName = normalizePersonName(customerName) || 'Customer';
+        const normalizedCurrency = String(currency || 'USD').trim().toUpperCase() || 'USD';
+
+        const safeItems = Array.isArray(cartItems)
+            ? cartItems
+                .map((item) => {
+                    const qty = Math.min(Math.max(Number(item?.qty) || 1, 1), 25);
+                    const rawUnitPrice = Number(item?.unitPrice);
+                    const unitPrice = Number.isFinite(rawUnitPrice) && rawUnitPrice > 0 ? rawUnitPrice : 15;
+                    const title = sanitizePayPalItemName(item?.title);
+                    const artists = String(item?.artistsLabel || '').trim();
+                    const fullName = artists ? `${title} - ${artists}` : title;
+
+                    return {
+                        name: sanitizePayPalItemName(fullName),
+                        description: sanitizePayPalItemName(`Mini-Disc personalizado: ${title}`),
+                        sku: sanitizePayPalSku(item?.sku || item?.id || `EI2-CUSTOM-${Date.now()}`),
+                        quantity: String(qty),
+                        unitPrice
+                    };
+                })
+                .filter((item) => item.name)
+            : [];
+
+        if (!safeItems.length) {
+            throw new Error('empty_cart');
+        }
+
+        const totalAmount = safeItems.reduce(
+            (sum, item) => sum + (item.unitPrice * Number(item.quantity)),
+            0
+        );
+
+        const invoiceId = `EI2-CART-${Date.now()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+        const appBaseUrl = String(process.env.BASE_URL || 'https://ei2.galantealx.com').trim();
+        const resolvedReturnUrl = returnUrl || `${appBaseUrl}/tools/minidisc-generator/checkout/success`;
+        const resolvedCancelUrl = cancelUrl || `${appBaseUrl}/tools/minidisc-generator/checkout/cancel`;
+
+        const orderData = {
+            intent: 'CAPTURE',
+            purchase_units: [{
+                reference_id: 'EI2-MINIDISC-CART',
+                description: `Mini-Disc personalizado (${safeItems.length} item${safeItems.length > 1 ? 's' : ''})`,
+                amount: {
+                    currency_code: normalizedCurrency,
+                    value: totalAmount.toFixed(2),
+                    breakdown: {
+                        item_total: {
+                            currency_code: normalizedCurrency,
+                            value: totalAmount.toFixed(2)
+                        }
+                    }
+                },
+                items: safeItems.map((item) => ({
+                    name: item.name,
+                    description: item.description,
+                    sku: item.sku,
+                    unit_amount: {
+                        currency_code: normalizedCurrency,
+                        value: item.unitPrice.toFixed(2)
+                    },
+                    quantity: item.quantity,
+                    category: 'PHYSICAL_GOODS'
+                })),
+                shipping: {
+                    name: {
+                        full_name: normalizedCustomerName
+                    },
+                    type: 'SHIPPING'
+                },
+                custom_id: customerEmail,
+                invoice_id: invoiceId
+            }],
+            application_context: {
+                brand_name: 'Galante el Emperador',
+                landing_page: 'BILLING',
+                shipping_preference: 'GET_FROM_FILE',
+                user_action: 'PAY_NOW',
+                return_url: resolvedReturnUrl,
+                cancel_url: resolvedCancelUrl
+            }
+        };
+
+        const response = await fetch(`${baseUrl}/v2/checkout/orders`, {
+            method: 'POST',
+            headers: {
+                Authorization: `Bearer ${accessToken}`,
+                'Content-Type': 'application/json',
+                'PayPal-Request-Id': `cart-${Date.now()}`
+            },
+            body: JSON.stringify(orderData)
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`PayPal cart order creation failed: ${errorText}`);
+        }
+
+        const order = await response.json();
+        return {
+            success: true,
+            orderId: order.id,
+            status: order.status,
+            amount: totalAmount.toFixed(2),
+            currency: normalizedCurrency,
+            itemsCount: safeItems.length,
+            approvalUrl: order.links.find((link) => link.rel === 'approve')?.href
+        };
+    } catch (error) {
+        console.error('[PayPal] Error creando orden de carrito:', error);
+        return {
+            success: false,
+            error: error.message
+        };
+    }
+}
+
 /**
  * Captura un pago de PayPal
  * @param {string} orderId - ID de la orden
@@ -278,6 +439,7 @@ function getPayPalConfig() {
 
 module.exports = {
     createPayPalOrder,
+    createPayPalCartOrder,
     capturePayPalOrder,
     getOrderStatus,
     getPayPalConfig

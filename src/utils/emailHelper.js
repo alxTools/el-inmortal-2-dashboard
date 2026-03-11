@@ -12,6 +12,8 @@ if (!fetch) {
     }
 }
 
+const { normalizePersonName } = require('./nameCase');
+
 /**
  * Envía email de bienvenida usando Microsoft Graph API
  * @param {Object} options
@@ -54,6 +56,7 @@ async function sendWelcomeEmail({ to, name, country, magicToken, userId }) {
 
         const tokenData = await tokenRes.json();
         const accessToken = tokenData.access_token;
+        const safeName = normalizePersonName(name) || 'Fan';
 
         // Crear magic link (usar /ei2/unlock porque el landing router está montado en /ei2)
         const baseUrl = process.env.BASE_URL || 'https://ei2.galantealx.com';
@@ -87,7 +90,7 @@ async function sendWelcomeEmail({ to, name, country, magicToken, userId }) {
                             <!-- Content -->
                             <tr>
                                 <td style="padding:40px 30px;">
-                                    <h2 style="color:#ffffff;font-size:24px;margin:0 0 20px 0;">¡Hola ${name || 'Fan'}! 🎵</h2>
+                                    <h2 style="color:#ffffff;font-size:24px;margin:0 0 20px 0;">¡Hola ${safeName}! 🎵</h2>
                                     
                                     <p style="color:#94a3b8;font-size:16px;line-height:1.6;margin:0 0 20px 0;">
                                         ¡Gracias por registrarte! Estás a un paso de acceder a <strong style="color:#facc15;">El Inmortal 2</strong>, el nuevo álbum de Galante el Emperador con 21 temas que están rompiendo la escena del reggaeton.
@@ -262,6 +265,7 @@ async function sendMiniDiscOfferEmail({ to, name, country, userId }) {
 
         const tokenData = await tokenRes.json();
         const accessToken = tokenData.access_token;
+        const safeName = normalizePersonName(name) || 'Fan';
 
         // Generar token de seguridad para el checkout
         const checkoutToken = Buffer.from(`${userId}:${Date.now()}`).toString('base64');
@@ -304,7 +308,7 @@ async function sendMiniDiscOfferEmail({ to, name, country, userId }) {
                             <!-- Content -->
                             <tr>
                                 <td style="padding:40px 30px;">
-                                    <h2 style="color:#ffffff;font-size:22px;margin:0 0 20px 0;">Hey ${name || 'Fan'}! 👋</h2>
+                                    <h2 style="color:#ffffff;font-size:22px;margin:0 0 20px 0;">Hey ${safeName}! 👋</h2>
                                     
                                     <p style="color:#94a3b8;font-size:16px;line-height:1.6;margin:0 0 20px 0;">
                                         Hace 30 minutos desbloqueaste <strong style="color:#facc15;">El Inmortal 2</strong> y ya estás disfrutando de las 21 canciones. 
@@ -488,6 +492,7 @@ async function sendMiniDiscConfirmationEmail({ to, name, orderId, amount, nfcCod
         const tokenRes = await fetch(tokenUrl, { method: 'POST', body: form });
         const tokenData = await tokenRes.json();
         const accessToken = tokenData.access_token;
+        const safeName = normalizePersonName(name) || 'Fan';
 
         const subject = `🎉 ¡Confirmado! Tu Mini-Disc de El Inmortal 2 está en camino`;
         
@@ -516,7 +521,7 @@ async function sendMiniDiscConfirmationEmail({ to, name, orderId, amount, nfcCod
                             <!-- Content -->
                             <tr>
                                 <td style="padding:40px 30px;">
-                                    <h2 style="color:#ffffff;font-size:22px;margin:0 0 20px 0;">¡Gracias ${name || 'Fan'}! 💿</h2>
+                                    <h2 style="color:#ffffff;font-size:22px;margin:0 0 20px 0;">¡Gracias ${safeName}! 💿</h2>
                                     
                                     <p style="color:#94a3b8;font-size:16px;line-height:1.6;margin:0 0 20px 0;">
                                         Tu pago de <strong style="color:#22c55e;">$${amount}</strong> ha sido procesado exitosamente. 
@@ -668,7 +673,7 @@ async function sendMiniDiscShippedEmail({ to, name, orderId, trackingNumber, nfc
         const accessToken = tokenData.access_token;
 
         const safeOrderId = String(orderId || '').trim() || 'N/A';
-        const safeName = String(name || '').trim() || 'Fan';
+        const safeName = normalizePersonName(name) || 'Fan';
         const safeNfcCode = String(nfcCode || '').trim();
         const safeNfcLink = String(nfcLink || '').trim();
         const hasNfc = Boolean(safeNfcCode || safeNfcLink);
@@ -779,7 +784,7 @@ async function sendMiniDiscShippedEmail({ to, name, orderId, trackingNumber, nfc
 }
 
 /**
- * Envia email de aviso de retraso para Mini-Disc
+ * Envia email de aviso de retraso para ordenes Mini-Disc
  * @param {Object} options
  * @param {string} options.to - Email del destinatario
  * @param {string} options.name - Nombre del destinatario
@@ -793,13 +798,9 @@ async function sendMiniDiscDelayEmail({ to, name, orderId }) {
         const senderUser = process.env.MS_GRAPH_SENDER_USER || 'info@galantealx.com';
 
         if (!tenantId || !clientId || !clientSecret) {
-            console.log('[Email] Microsoft Graph no configurado para aviso de retraso');
+            console.log('[Email] Microsoft Graph no configurado');
             return { success: false, skipped: true, reason: 'not_configured' };
         }
-
-        const safeOrderId = String(orderId || '').trim() || 'N/A';
-        const safeName = String(name || '').trim() || 'Fan';
-        const estimatedDelay = '3-5 dias laborables';
 
         const tokenUrl = `https://login.microsoftonline.com/${encodeURIComponent(tenantId)}/oauth2/v2.0/token`;
         const form = new FormData();
@@ -811,49 +812,61 @@ async function sendMiniDiscDelayEmail({ to, name, orderId }) {
         const tokenRes = await fetch(tokenUrl, { method: 'POST', body: form });
         if (!tokenRes.ok) {
             const tokenErr = await tokenRes.text();
-            console.error('[Email] Error obteniendo token para aviso de retraso:', tokenErr);
+            console.error('[Email] Error obteniendo token para email de retraso:', tokenErr);
             throw new Error('auth_failed');
         }
 
         const tokenData = await tokenRes.json();
         const accessToken = tokenData.access_token;
 
-        const subject = `⚠️ Actualizacion de envio Mini-Disc - Orden ${safeOrderId}`;
+        const safeName = normalizePersonName(name) || 'Fan';
+        const safeOrderId = String(orderId || '').trim() || 'N/A';
+        const estimatedDelay = '3 a 5 dias laborables';
+        const delayReason = 'USPS nos pidio una validacion manual adicional en el centro regional por alto volumen de envios y para prevenir devoluciones por formato de direccion.';
+
+        const subject = 'Actualizacion de envio Mini-Disc: retraso de 3-5 dias';
+
         const htmlBody = `
         <!DOCTYPE html>
         <html>
         <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Aviso de retraso Mini-Disc</title>
+            <title>Actualizacion de tu Mini-Disc</title>
         </head>
-        <body style="margin:0;padding:0;background-color:#060b15;font-family:Arial,sans-serif;">
-            <table width="100%" cellpadding="0" cellspacing="0" style="background:linear-gradient(135deg, #060b15 0%, #0f172a 100%);">
+        <body style="margin:0;padding:0;background-color:#0b1120;font-family:Arial,sans-serif;">
+            <table width="100%" cellpadding="0" cellspacing="0" style="background:linear-gradient(135deg, #0b1120 0%, #0f172a 100%);">
                 <tr>
-                    <td align="center" style="padding:40px 20px;">
-                        <table width="600" cellpadding="0" cellspacing="0" style="background:rgba(15,23,42,0.95);border-radius:20px;overflow:hidden;border:1px solid rgba(245,158,11,0.35);">
+                    <td align="center" style="padding:36px 18px;">
+                        <table width="600" cellpadding="0" cellspacing="0" style="background:#0f172a;border-radius:18px;overflow:hidden;border:1px solid rgba(245,158,11,0.45);">
                             <tr>
-                                <td style="background:linear-gradient(135deg, rgba(245,158,11,0.18), rgba(15,23,42,0.85));padding:32px 30px;text-align:center;border-bottom:2px solid rgba(245,158,11,0.4);">
-                                    <div style="font-size:52px;margin-bottom:12px;">⏳</div>
-                                    <h1 style="color:#fbbf24;font-size:27px;margin:0;font-weight:bold;letter-spacing:1px;">ACTUALIZACION DE ENVIO</h1>
-                                    <p style="color:#e2e8f0;margin:10px 0 0 0;font-size:15px;">Mini-Disc El Inmortal 2</p>
+                                <td style="padding:30px 26px;background:linear-gradient(135deg, rgba(245,158,11,0.2), rgba(15,23,42,0.85));border-bottom:1px solid rgba(245,158,11,0.35);text-align:center;">
+                                    <div style="font-size:44px;margin-bottom:8px;">⏳</div>
+                                    <h1 style="margin:0;color:#f59e0b;font-size:25px;letter-spacing:0.5px;">ACTUALIZACION DE TU ORDEN</h1>
+                                    <p style="margin:10px 0 0;color:#f8fafc;font-size:14px;">Mini-Disc El Inmortal 2</p>
                                 </td>
                             </tr>
                             <tr>
-                                <td style="padding:34px 30px;">
-                                    <h2 style="color:#ffffff;font-size:22px;margin:0 0 14px 0;">Hola ${safeName} 👋</h2>
-                                    <p style="color:#94a3b8;font-size:16px;line-height:1.7;margin:0 0 20px 0;">
-                                        Queremos informarte que tu orden de Mini-Disc lleva un pequeño retraso operativo.
+                                <td style="padding:28px 26px;">
+                                    <p style="margin:0 0 14px;color:#f8fafc;font-size:20px;font-weight:700;">Hola ${safeName},</p>
+
+                                    <p style="margin:0 0 14px;color:#cbd5e1;line-height:1.7;font-size:15px;">
+                                        Queremos avisarte que tu Mini-Disc lleva un retraso aproximado de <strong style="color:#fcd34d;">${estimatedDelay}</strong>.
                                     </p>
-                                    <div style="background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.35);border-radius:14px;padding:22px;margin:20px 0;">
-                                        <p style="color:#fde68a;font-size:14px;margin:0;line-height:1.8;">
-                                            <strong>Orden #:</strong> ${safeOrderId}<br>
-                                            <strong>Nuevo estimado:</strong> ${estimatedDelay}<br>
-                                            <strong>Fecha de aviso:</strong> ${new Date().toLocaleDateString('es-ES')}
+
+                                    <div style="margin:16px 0;padding:16px;border-radius:12px;border:1px solid rgba(245,158,11,0.35);background:rgba(245,158,11,0.1);">
+                                        <p style="margin:0;color:#fde68a;font-size:14px;line-height:1.7;">
+                                            <strong>Motivo:</strong> ${delayReason}
                                         </p>
                                     </div>
-                                    <p style="color:#94a3b8;font-size:14px;line-height:1.6;margin:0;">
-                                        Agradecemos tu paciencia. Te enviaremos el tracking tan pronto salga el paquete.
+
+                                    <p style="margin:0 0 12px;color:#cbd5e1;line-height:1.7;font-size:15px;">
+                                        Estamos priorizando tu envio para despacharlo en cuanto salga de validacion. No necesitas hacer nada adicional.
+                                    </p>
+
+                                    <p style="margin:0;color:#94a3b8;font-size:13px;border-top:1px solid rgba(255,255,255,0.08);padding-top:14px;">
+                                        Orden #: ${safeOrderId}<br>
+                                        Si tienes preguntas, responde este correo y te ayudamos rapido.
                                     </p>
                                 </td>
                             </tr>
@@ -887,11 +900,11 @@ async function sendMiniDiscDelayEmail({ to, name, orderId }) {
 
         if (!sendRes.ok) {
             const sendErr = await sendRes.text();
-            console.error('[Email] Error enviando aviso de retraso:', sendErr);
+            console.error('[Email] Error enviando email de retraso:', sendErr);
             throw new Error('send_failed');
         }
 
-        console.log('[Email] Aviso de retraso Mini-Disc enviado a:', to);
+        console.log('[Email] Email de retraso Mini-Disc enviado a:', to);
         return { success: true, to, estimatedDelay };
     } catch (error) {
         console.error('[Email] Error en sendMiniDiscDelayEmail:', error);

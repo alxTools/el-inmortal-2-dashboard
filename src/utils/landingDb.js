@@ -1,5 +1,6 @@
 const { getAll, getOne, query, run } = require('../config/database');
 const crypto = require('crypto');
+const { normalizePersonName } = require('./nameCase');
 
 /**
  * Genera un magic token único
@@ -34,6 +35,16 @@ async function ensureLandingLeadsTable() {
                     paypal_order_id TEXT,
                     paypal_payment_status TEXT,
                     paypal_payer_email TEXT,
+                    paypal_amount_value TEXT,
+                    paypal_amount_currency TEXT,
+                    paypal_capture_id TEXT,
+                    shipping_name TEXT,
+                    shipping_address_line1 TEXT,
+                    shipping_address_line2 TEXT,
+                    shipping_city TEXT,
+                    shipping_state TEXT,
+                    shipping_postal_code TEXT,
+                    shipping_country_code TEXT,
                     minidisc_email_sent_at DATETIME,
                     minidisc_email_sent INTEGER DEFAULT 0,
                     minidisc_delay_email_sent_at DATETIME,
@@ -74,6 +85,36 @@ async function ensureLandingLeadsTable() {
             }
             if (!columnSet.has('paypal_payer_email')) {
                 await query('ALTER TABLE landing_email_leads ADD COLUMN paypal_payer_email TEXT');
+            }
+            if (!columnSet.has('paypal_amount_value')) {
+                await query('ALTER TABLE landing_email_leads ADD COLUMN paypal_amount_value TEXT');
+            }
+            if (!columnSet.has('paypal_amount_currency')) {
+                await query('ALTER TABLE landing_email_leads ADD COLUMN paypal_amount_currency TEXT');
+            }
+            if (!columnSet.has('paypal_capture_id')) {
+                await query('ALTER TABLE landing_email_leads ADD COLUMN paypal_capture_id TEXT');
+            }
+            if (!columnSet.has('shipping_name')) {
+                await query('ALTER TABLE landing_email_leads ADD COLUMN shipping_name TEXT');
+            }
+            if (!columnSet.has('shipping_address_line1')) {
+                await query('ALTER TABLE landing_email_leads ADD COLUMN shipping_address_line1 TEXT');
+            }
+            if (!columnSet.has('shipping_address_line2')) {
+                await query('ALTER TABLE landing_email_leads ADD COLUMN shipping_address_line2 TEXT');
+            }
+            if (!columnSet.has('shipping_city')) {
+                await query('ALTER TABLE landing_email_leads ADD COLUMN shipping_city TEXT');
+            }
+            if (!columnSet.has('shipping_state')) {
+                await query('ALTER TABLE landing_email_leads ADD COLUMN shipping_state TEXT');
+            }
+            if (!columnSet.has('shipping_postal_code')) {
+                await query('ALTER TABLE landing_email_leads ADD COLUMN shipping_postal_code TEXT');
+            }
+            if (!columnSet.has('shipping_country_code')) {
+                await query('ALTER TABLE landing_email_leads ADD COLUMN shipping_country_code TEXT');
             }
             if (!columnSet.has('minidisc_email_sent_at')) {
                 await query('ALTER TABLE landing_email_leads ADD COLUMN minidisc_email_sent_at DATETIME');
@@ -116,6 +157,16 @@ async function ensureLandingLeadsTable() {
                     paypal_order_id VARCHAR(255) NULL,
                     paypal_payment_status VARCHAR(50) NULL,
                     paypal_payer_email VARCHAR(255) NULL,
+                    paypal_amount_value VARCHAR(20) NULL,
+                    paypal_amount_currency VARCHAR(10) NULL,
+                    paypal_capture_id VARCHAR(255) NULL,
+                    shipping_name VARCHAR(255) NULL,
+                    shipping_address_line1 VARCHAR(255) NULL,
+                    shipping_address_line2 VARCHAR(255) NULL,
+                    shipping_city VARCHAR(120) NULL,
+                    shipping_state VARCHAR(120) NULL,
+                    shipping_postal_code VARCHAR(40) NULL,
+                    shipping_country_code VARCHAR(10) NULL,
                     minidisc_email_sent_at DATETIME NULL,
                     minidisc_email_sent TINYINT DEFAULT 0,
                     minidisc_delay_email_sent_at DATETIME NULL,
@@ -165,6 +216,16 @@ async function ensureLandingLeadsTable() {
             await addColumnIfNotExists('paypal_order_id', 'VARCHAR(255) NULL');
             await addColumnIfNotExists('paypal_payment_status', 'VARCHAR(50) NULL');
             await addColumnIfNotExists('paypal_payer_email', 'VARCHAR(255) NULL');
+            await addColumnIfNotExists('paypal_amount_value', 'VARCHAR(20) NULL');
+            await addColumnIfNotExists('paypal_amount_currency', 'VARCHAR(10) NULL');
+            await addColumnIfNotExists('paypal_capture_id', 'VARCHAR(255) NULL');
+            await addColumnIfNotExists('shipping_name', 'VARCHAR(255) NULL');
+            await addColumnIfNotExists('shipping_address_line1', 'VARCHAR(255) NULL');
+            await addColumnIfNotExists('shipping_address_line2', 'VARCHAR(255) NULL');
+            await addColumnIfNotExists('shipping_city', 'VARCHAR(120) NULL');
+            await addColumnIfNotExists('shipping_state', 'VARCHAR(120) NULL');
+            await addColumnIfNotExists('shipping_postal_code', 'VARCHAR(40) NULL');
+            await addColumnIfNotExists('shipping_country_code', 'VARCHAR(10) NULL');
             await addColumnIfNotExists('minidisc_email_sent_at', 'DATETIME NULL');
             await addColumnIfNotExists('minidisc_email_sent', 'TINYINT DEFAULT 0');
             await addColumnIfNotExists('minidisc_delay_email_sent_at', 'DATETIME NULL');
@@ -346,6 +407,8 @@ async function getUnifiedStats() {
  */
 async function registerOrUpdateLead({ email, fullName, country, ipAddress, userAgent, sourceLabel = 'landing_el_inmortal_2' }) {
     try {
+        const normalizedFullName = normalizePersonName(fullName);
+
         // Buscar si el email ya existe
         const existingUser = await getOne(
             'SELECT id, email FROM landing_email_leads WHERE email = ?',
@@ -366,8 +429,8 @@ async function registerOrUpdateLead({ email, fullName, country, ipAddress, userA
                      full_name = COALESCE(?, full_name),
                      country = COALESCE(?, country),
                      updated_at = NOW()
-                 WHERE id = ?`,
-                [magicToken, expiresAtFormatted, fullName, country, existingUser.id]
+                  WHERE id = ?`,
+                [magicToken, expiresAtFormatted, normalizedFullName, country, existingUser.id]
             );
             
             return {
@@ -381,9 +444,9 @@ async function registerOrUpdateLead({ email, fullName, country, ipAddress, userA
             const result = await run(
                 `INSERT INTO landing_email_leads 
                  (email, full_name, country, source_label, ip_address, user_agent, 
-                  magic_token, magic_token_expires_at, email_verified)
+                   magic_token, magic_token_expires_at, email_verified)
                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)`,
-                [email, fullName, country, sourceLabel, ipAddress, userAgent, magicToken, expiresAtFormatted]
+                [email, normalizedFullName, country, sourceLabel, ipAddress, userAgent, magicToken, expiresAtFormatted]
             );
             
             return {

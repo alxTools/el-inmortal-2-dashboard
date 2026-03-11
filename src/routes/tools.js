@@ -9,10 +9,16 @@ const ytdl = require('youtube-dl-exec');
 const multer = require('multer');
 const execAsync = promisify(exec);
 const proxyGeneratedRoot = path.join(__dirname, '../../scripts/proxy/generated');
-const { ensureLandingLeadsTable } = require('../utils/landingDb');
+const { ensureLandingLeadsTable, saveNFCCode, registerOrUpdateLead } = require('../utils/landingDb');
 const { syncUserToNotion } = require('../utils/notionHelper');
-const { sendMiniDiscShippedEmail, sendMiniDiscDelayEmail } = require('../utils/emailHelper');
-const { getOrderStatus } = require('../utils/paypalHelper');
+const { sendMiniDiscShippedEmail, sendMiniDiscDelayEmail, sendMiniDiscConfirmationEmail } = require('../utils/emailHelper');
+const { getOrderStatus, createPayPalCartOrder, capturePayPalOrder, getPayPalConfig } = require('../utils/paypalHelper');
+const { normalizePersonName } = require('../utils/nameCase');
+const {
+    isSpotifyConfigured,
+    normalizeSpotifyArtistFilter,
+    searchSpotifyTracks
+} = require('../utils/spotifyHelper');
 
 const {
     ensureYoutubeMetadataTables,
@@ -419,6 +425,113 @@ function getMiniDiscSenderAddress() {
     };
 }
 
+const MINI_DISC_GENERATOR_CART_SESSION_KEY = 'minidiscGeneratorCheckout';
+const MINI_DISC_GENERATOR_UNIT_PRICE = (() => {
+    const configured = Number(process.env.MINIDISC_GENERATOR_UNIT_PRICE || 15);
+    return Number.isFinite(configured) && configured > 0 ? configured : 15;
+})();
+
+function isValidEmailAddress(value) {
+    const email = String(value || '').trim().toLowerCase();
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+function normalizeMiniDiscGeneratorCartItems(rawItems) {
+    const items = Array.isArray(rawItems) ? rawItems : [];
+    const aggregated = new Map();
+
+    for (const rawItem of items) {
+        const trackId = String(rawItem?.id || '').trim();
+        if (!trackId) {
+            continue;
+        }
+
+        const title = String(rawItem?.title || 'Mini-Disc Personalizado').trim().slice(0, 120);
+        const artistsLabel = String(rawItem?.artistsLabel || '').trim().slice(0, 140);
+        const cover = String(rawItem?.cover || '').trim();
+        const spotifyUrl = String(rawItem?.spotifyUrl || '').trim();
+        const qty = Math.min(Math.max(Number.parseInt(rawItem?.qty, 10) || 1, 1), 25);
+
+        const current = aggregated.get(trackId);
+        if (current) {
+            current.qty = Math.min(current.qty + qty, 25);
+            continue;
+        }
+
+        aggregated.set(trackId, {
+            id: trackId,
+            title: title || 'Mini-Disc Personalizado',
+            artistsLabel,
+            cover,
+            spotifyUrl,
+            qty,
+            unitPrice: MINI_DISC_GENERATOR_UNIT_PRICE
+        });
+    }
+
+    return [...aggregated.values()];
+}
+
+function getMiniDiscGeneratorCartSummary(items) {
+    const safeItems = Array.isArray(items) ? items : [];
+    const itemCount = safeItems.reduce((sum, item) => sum + (Number(item?.qty) || 0), 0);
+    const totalAmount = safeItems.reduce(
+        (sum, item) => sum + ((Number(item?.qty) || 0) * (Number(item?.unitPrice) || MINI_DISC_GENERATOR_UNIT_PRICE)),
+        0
+    );
+
+    return {
+        itemCount,
+        totalAmount,
+        currency: 'USD'
+    };
+}
+
+async function ensureMiniDiscGeneratorOrderItemsTable() {
+    const isSQLite = process.env.DB_TYPE === 'sqlite' || !process.env.DB_HOST;
+
+    if (isSQLite) {
+        await run(
+            `CREATE TABLE IF NOT EXISTS minidisc_generator_order_items (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                lead_id INTEGER NOT NULL,
+                paypal_order_id TEXT NOT NULL,
+                paypal_capture_id TEXT,
+                track_id TEXT NOT NULL,
+                track_title TEXT NOT NULL,
+                track_artists TEXT,
+                track_cover_url TEXT,
+                spotify_url TEXT,
+                quantity INTEGER NOT NULL DEFAULT 1,
+                unit_price TEXT NOT NULL DEFAULT '15.00',
+                currency TEXT NOT NULL DEFAULT 'USD',
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )`
+        );
+        return;
+    }
+
+    await run(
+        `CREATE TABLE IF NOT EXISTS minidisc_generator_order_items (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            lead_id INT NOT NULL,
+            paypal_order_id VARCHAR(255) NOT NULL,
+            paypal_capture_id VARCHAR(255) NULL,
+            track_id VARCHAR(120) NOT NULL,
+            track_title VARCHAR(255) NOT NULL,
+            track_artists VARCHAR(255) NULL,
+            track_cover_url VARCHAR(1000) NULL,
+            spotify_url VARCHAR(1000) NULL,
+            quantity INT NOT NULL DEFAULT 1,
+            unit_price DECIMAL(10,2) NOT NULL DEFAULT 15.00,
+            currency VARCHAR(10) NOT NULL DEFAULT 'USD',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            KEY idx_mdgoi_lead_id (lead_id),
+            KEY idx_mdgoi_paypal_order_id (paypal_order_id)
+        )`
+    );
+}
+
 // Configure multer for video uploads
 const uploadDir = path.join(__dirname, '../../temp');
 if (!fs.existsSync(uploadDir)) {
@@ -450,6 +563,330 @@ router.get('/thumbnail-generator', (req, res) => {
     res.render('tools/thumbnail-generator', {
         title: 'Thumbnail Generator - El Inmortal 2 Dashboard'
     });
+});
+
+router.get('/minidisc-generator', (req, res) => {
+    const checkoutStatus = String(req.query.checkout || '').trim().toLowerCase();
+    let checkoutFlash = null;
+
+    if (checkoutStatus === 'success') {
+        checkoutFlash = {
+            type: 'success',
+            message: 'Pago completado. La orden del Mini-Disc fue registrada exitosamente.'
+        };
+    } else if (checkoutStatus === 'success-email-warning') {
+        checkoutFlash = {
+            type: 'warn',
+            message: 'Pago completado, pero el email de confirmacion no se pudo enviar automaticamente.'
+        };
+    } else if (checkoutStatus === 'cancel') {
+        checkoutFlash = {
+            type: 'warn',
+            message: 'Checkout cancelado. Tu carrito sigue guardado.'
+        };
+    } else if (checkoutStatus === 'missing-cart') {
+        checkoutFlash = {
+            type: 'error',
+            message: 'No hay un carrito listo para checkout. Agrega tracks primero.'
+        };
+    }
+
+    res.render('tools/minidisc-generator', {
+        title: 'Mini-Disc Generator - El Inmortal 2 Dashboard',
+        spotifyConfigured: isSpotifyConfigured(),
+        defaultArtistFilter: normalizeSpotifyArtistFilter(),
+        unitPrice: MINI_DISC_GENERATOR_UNIT_PRICE,
+        checkoutFlash
+    });
+});
+
+router.get('/minidisc-generator/search', async (req, res) => {
+    const query = String(req.query.q || '').trim();
+    const artistFilter = normalizeSpotifyArtistFilter(req.query.artist);
+    const limit = Math.min(Math.max(Number(req.query.limit) || 12, 1), 25);
+
+    if (!isSpotifyConfigured()) {
+        return res.status(503).json({
+            success: false,
+            error: 'spotify_not_configured'
+        });
+    }
+
+    if (query.length < 2) {
+        return res.status(400).json({
+            success: false,
+            error: 'query_too_short'
+        });
+    }
+
+    const result = await searchSpotifyTracks({
+        query,
+        limit,
+        artistFilter
+    });
+
+    if (!result.success) {
+        return res.status(502).json(result);
+    }
+
+    return res.json(result);
+});
+
+router.post('/minidisc-generator/checkout/prepare', async (req, res) => {
+    try {
+        const email = String(req.body.email || '').trim().toLowerCase();
+        const fullName = normalizePersonName(req.body.fullName || req.body.full_name || req.body.name);
+        const country = String(req.body.country || '').trim();
+        const cartItems = normalizeMiniDiscGeneratorCartItems(req.body.cartItems || req.body.items);
+        const summary = getMiniDiscGeneratorCartSummary(cartItems);
+
+        if (!isValidEmailAddress(email)) {
+            return res.status(400).json({ success: false, error: 'invalid_email' });
+        }
+
+        if (!fullName) {
+            return res.status(400).json({ success: false, error: 'missing_full_name' });
+        }
+
+        if (!country) {
+            return res.status(400).json({ success: false, error: 'missing_country' });
+        }
+
+        if (!cartItems.length || summary.itemCount <= 0) {
+            return res.status(400).json({ success: false, error: 'empty_cart' });
+        }
+
+        await ensureLandingLeadsTable();
+
+        const userResult = await registerOrUpdateLead({
+            email,
+            fullName,
+            country,
+            ipAddress: req.ip,
+            userAgent: String(req.headers['user-agent'] || '').slice(0, 255),
+            sourceLabel: 'tools_minidisc_generator'
+        });
+
+        if (!req.session) {
+            return res.status(500).json({ success: false, error: 'session_unavailable' });
+        }
+
+        req.session[MINI_DISC_GENERATOR_CART_SESSION_KEY] = {
+            userId: userResult.userId,
+            email,
+            fullName,
+            country,
+            cartItems,
+            itemCount: summary.itemCount,
+            totalAmount: Number(summary.totalAmount.toFixed(2)),
+            currency: summary.currency,
+            preparedAt: new Date().toISOString()
+        };
+
+        req.session.save((sessionError) => {
+            if (sessionError) {
+                console.error('[MiniDisc Generator] Error guardando session checkout:', sessionError);
+                return res.status(500).json({ success: false, error: 'session_save_failed' });
+            }
+
+            return res.json({
+                success: true,
+                checkoutUrl: '/tools/minidisc-generator/checkout',
+                summary
+            });
+        });
+    } catch (error) {
+        console.error('[MiniDisc Generator] Error preparando checkout:', error);
+        return res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+router.get('/minidisc-generator/checkout', (req, res) => {
+    const checkoutState = req.session?.[MINI_DISC_GENERATOR_CART_SESSION_KEY];
+    if (!checkoutState || !Array.isArray(checkoutState.cartItems) || checkoutState.cartItems.length === 0) {
+        return res.redirect('/tools/minidisc-generator?checkout=missing-cart');
+    }
+
+    const paypalConfig = getPayPalConfig();
+    const paypalConfigured = Boolean(paypalConfig.clientId && process.env.PAYPAL_SECRET);
+
+    res.render('tools/minidisc-generator-checkout', {
+        title: 'Mini-Disc Checkout - El Inmortal 2 Dashboard',
+        checkoutState,
+        checkoutStateJson: JSON.stringify(checkoutState).replace(/</g, '\\u003c'),
+        paypalConfigured,
+        paypalClientId: paypalConfig.clientId || '',
+        paypalMode: paypalConfig.mode || 'sandbox'
+    });
+});
+
+router.post('/minidisc-generator/checkout/create-order', async (req, res) => {
+    try {
+        const checkoutState = req.session?.[MINI_DISC_GENERATOR_CART_SESSION_KEY];
+        if (!checkoutState || !Array.isArray(checkoutState.cartItems) || checkoutState.cartItems.length === 0) {
+            return res.status(400).json({ success: false, error: 'checkout_state_missing' });
+        }
+
+        if (!process.env.PAYPAL_CLIENT_ID || !process.env.PAYPAL_SECRET) {
+            return res.status(503).json({ success: false, error: 'paypal_not_configured' });
+        }
+
+        const baseUrl = String(process.env.BASE_URL || 'https://ei2.galantealx.com').trim();
+        const orderResult = await createPayPalCartOrder({
+            customerEmail: checkoutState.email,
+            customerName: checkoutState.fullName,
+            cartItems: checkoutState.cartItems,
+            currency: checkoutState.currency || 'USD',
+            returnUrl: `${baseUrl}/tools/minidisc-generator/checkout/success`,
+            cancelUrl: `${baseUrl}/tools/minidisc-generator/checkout/cancel`
+        });
+
+        if (!orderResult.success) {
+            return res.status(502).json(orderResult);
+        }
+
+        checkoutState.pendingOrderId = orderResult.orderId;
+        req.session[MINI_DISC_GENERATOR_CART_SESSION_KEY] = checkoutState;
+
+        req.session.save((sessionError) => {
+            if (sessionError) {
+                console.error('[MiniDisc Generator] Error guardando orden en session:', sessionError);
+                return res.status(500).json({ success: false, error: 'session_save_failed' });
+            }
+
+            return res.json({
+                success: true,
+                orderId: orderResult.orderId
+            });
+        });
+    } catch (error) {
+        console.error('[MiniDisc Generator] Error creando orden de checkout:', error);
+        return res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+router.post('/minidisc-generator/checkout/capture-order', async (req, res) => {
+    try {
+        const checkoutState = req.session?.[MINI_DISC_GENERATOR_CART_SESSION_KEY];
+        if (!checkoutState || !Array.isArray(checkoutState.cartItems) || checkoutState.cartItems.length === 0) {
+            return res.status(400).json({ success: false, error: 'checkout_state_missing' });
+        }
+
+        const orderId = String(req.body.orderId || '').trim();
+        if (!orderId) {
+            return res.status(400).json({ success: false, error: 'order_id_required' });
+        }
+
+        await ensureLandingLeadsTable();
+
+        const captureResult = await capturePayPalOrder(orderId);
+        if (!captureResult.success) {
+            return res.status(502).json({ success: false, error: captureResult.error || 'capture_failed' });
+        }
+
+        const amountValue = String(captureResult.amount || checkoutState.totalAmount || 0).trim() || '0.00';
+        const amountCurrency = String(captureResult.currency || checkoutState.currency || 'USD').trim() || 'USD';
+
+        await run(
+            `UPDATE landing_email_leads
+             SET paypal_order_id = ?,
+                 paypal_payment_status = ?,
+                 paypal_payer_email = ?,
+                 paypal_amount_value = ?,
+                 paypal_amount_currency = ?,
+                 paypal_capture_id = ?,
+                 interested_in_minidisc = 1
+             WHERE id = ?`,
+            [
+                captureResult.orderId,
+                'captured',
+                captureResult.payerEmail || checkoutState.email,
+                amountValue,
+                amountCurrency,
+                captureResult.captureId || null,
+                checkoutState.userId
+            ]
+        );
+
+        await ensureMiniDiscGeneratorOrderItemsTable();
+        await run(
+            'DELETE FROM minidisc_generator_order_items WHERE paypal_order_id = ?',
+            [captureResult.orderId]
+        );
+
+        for (const item of checkoutState.cartItems) {
+            const quantity = Math.min(Math.max(Number(item?.qty) || 1, 1), 25);
+            const unitPrice = Number(item?.unitPrice);
+            const normalizedUnitPrice = Number.isFinite(unitPrice) && unitPrice > 0
+                ? unitPrice
+                : MINI_DISC_GENERATOR_UNIT_PRICE;
+
+            await run(
+                `INSERT INTO minidisc_generator_order_items
+                 (lead_id, paypal_order_id, paypal_capture_id, track_id, track_title, track_artists,
+                  track_cover_url, spotify_url, quantity, unit_price, currency)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [
+                    checkoutState.userId,
+                    captureResult.orderId,
+                    captureResult.captureId || null,
+                    String(item?.id || '').trim() || 'custom-track',
+                    String(item?.title || 'Mini-Disc Personalizado').trim().slice(0, 255),
+                    String(item?.artistsLabel || '').trim().slice(0, 255) || null,
+                    String(item?.cover || '').trim().slice(0, 1000) || null,
+                    String(item?.spotifyUrl || '').trim().slice(0, 1000) || null,
+                    quantity,
+                    normalizedUnitPrice.toFixed(2),
+                    amountCurrency
+                ]
+            );
+        }
+
+        const nfcData = await saveNFCCode(checkoutState.userId);
+        const userData = await getOne(
+            'SELECT email, full_name FROM landing_email_leads WHERE id = ?',
+            [checkoutState.userId]
+        );
+
+        const emailResult = await sendMiniDiscConfirmationEmail({
+            to: userData?.email || checkoutState.email,
+            name: normalizePersonName(userData?.full_name || checkoutState.fullName),
+            orderId: captureResult.orderId,
+            amount: amountValue,
+            nfcCode: nfcData?.code,
+            nfcLink: nfcData?.link
+        });
+
+        const notionSync = await syncMiniDiscOrderToNotion(checkoutState.userId);
+        if (notionSync?.success) {
+            console.log('[MiniDisc Generator] Notion actualizado para orden:', checkoutState.userId);
+        }
+
+        delete req.session[MINI_DISC_GENERATOR_CART_SESSION_KEY];
+
+        req.session.save((sessionError) => {
+            if (sessionError) {
+                console.error('[MiniDisc Generator] Error limpiando session checkout:', sessionError);
+            }
+
+            const checkoutQuery = emailResult?.success ? 'success' : 'success-email-warning';
+            return res.json({
+                success: true,
+                redirectUrl: `/tools/minidisc-generator?checkout=${checkoutQuery}&clearCart=1`
+            });
+        });
+    } catch (error) {
+        console.error('[MiniDisc Generator] Error capturando orden de checkout:', error);
+        return res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+router.get('/minidisc-generator/checkout/success', (_req, res) => {
+    return res.redirect('/tools/minidisc-generator?checkout=success&clearCart=1');
+});
+
+router.get('/minidisc-generator/checkout/cancel', (_req, res) => {
+    return res.redirect('/tools/minidisc-generator?checkout=cancel');
 });
 
 router.get('/exports', async (req, res) => {

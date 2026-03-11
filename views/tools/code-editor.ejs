@@ -220,6 +220,21 @@
             overflow: hidden;
         }
 
+        .code-editor-textarea {
+            width: 100%;
+            min-height: 72vh;
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            background: #0b1220;
+            color: #e2e8f0;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+            font-size: 13px;
+            line-height: 1.4;
+            padding: 10px;
+            resize: vertical;
+            display: none;
+        }
+
         .editor-footer-note {
             margin-top: 8px;
             color: #64748b;
@@ -329,6 +344,7 @@
 
                         <div id="editor-status" class="editor-status"></div>
                         <div id="code-editor-surface"></div>
+                        <textarea id="code-editor-textarea" class="code-editor-textarea" spellcheck="false"></textarea>
                         <div class="editor-footer-note">
                             Limite por archivo: <strong id="max-size-label"></strong>. No se abren binarios.
                         </div>
@@ -366,18 +382,47 @@
             const currentFileEl = document.getElementById('current-file');
             const statusEl = document.getElementById('editor-status');
             const maxSizeLabelEl = document.getElementById('max-size-label');
+            const editorSurfaceEl = document.getElementById('code-editor-surface');
+            const editorTextareaEl = document.getElementById('code-editor-textarea');
 
-            const editor = ace.edit('code-editor-surface');
-            editor.setTheme('ace/theme/one_dark');
-            editor.session.setMode('ace/mode/text');
-            editor.session.setUseWrapMode(false);
-            editor.setShowPrintMargin(false);
-            editor.setOptions({
-                fontSize: '14px',
-                tabSize: 2,
-                useSoftTabs: true,
-                showInvisibles: false
-            });
+            const hasAce = Boolean(window.ace && typeof window.ace.edit === 'function');
+            let editor;
+
+            if (hasAce) {
+                editor = ace.edit('code-editor-surface');
+                editor.setTheme('ace/theme/one_dark');
+                editor.session.setMode('ace/mode/text');
+                editor.session.setUseWrapMode(false);
+                editor.setShowPrintMargin(false);
+                editor.setOptions({
+                    fontSize: '14px',
+                    tabSize: 2,
+                    useSoftTabs: true,
+                    showInvisibles: false
+                });
+            } else {
+                editorSurfaceEl.style.display = 'none';
+                editorTextareaEl.style.display = 'block';
+
+                editor = {
+                    getValue() {
+                        return editorTextareaEl.value;
+                    },
+                    setValue(nextValue) {
+                        editorTextareaEl.value = String(nextValue || '');
+                        editorTextareaEl.scrollTop = 0;
+                    },
+                    session: {
+                        setMode() {},
+                        setUseWrapMode() {},
+                        on(eventName, handler) {
+                            if (eventName === 'change') {
+                                editorTextareaEl.addEventListener('input', handler);
+                            }
+                        }
+                    }
+                };
+            }
 
             let codeServerRunning = false;
             let codeServerFrameLoaded = false;
@@ -562,6 +607,9 @@
             }
 
             function setEditorMode(filePath) {
+                if (!hasAce) {
+                    return;
+                }
                 const mode = modeFromPath(filePath);
                 editor.session.setMode(`ace/mode/${mode}`);
             }
@@ -807,7 +855,11 @@
             });
 
             maxSizeLabelEl.textContent = formatBytes(MAX_BYTES);
-            setStatus('Cargando explorador de archivos...');
+            if (hasAce) {
+                setStatus('Cargando explorador de archivos...');
+            } else {
+                setStatus('ACE no cargo (bloqueado por CSP/red). Usando editor de texto fallback.', 'warn');
+            }
 
             refreshCodeServerStatus().catch((error) => {
                 setVsCodeStatus(`No se pudo consultar VS Code: ${error.message}`, 'error');

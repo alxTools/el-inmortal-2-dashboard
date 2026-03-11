@@ -505,12 +505,33 @@ function handleCodeEditorUpgrade(req, socket, head) {
 
 function proxyCodeServerHttp(req, res) {
     const targetPath = normalizeCodeServerTargetPath(req.originalUrl || req.url);
+
+    let bufferedBody = null;
+    if (req.readableEnded || req.complete) {
+        if (typeof req.body === 'string' && req.body.length > 0) {
+            bufferedBody = Buffer.from(req.body);
+        } else if (Buffer.isBuffer(req.body) && req.body.length > 0) {
+            bufferedBody = req.body;
+        } else if (req.body && typeof req.body === 'object' && Object.keys(req.body).length > 0) {
+            bufferedBody = Buffer.from(JSON.stringify(req.body));
+        }
+    }
+
     const proxyHeaders = {
         ...req.headers,
         host: `${CODE_SERVER_HOST}:${CODE_SERVER_PORT}`,
         'x-forwarded-host': req.headers.host || '',
         'x-forwarded-proto': req.headers['x-forwarded-proto'] || 'https'
     };
+
+    if (bufferedBody) {
+        proxyHeaders['content-length'] = String(bufferedBody.length);
+        if (!proxyHeaders['content-type']) {
+            proxyHeaders['content-type'] = 'application/json';
+        }
+    } else {
+        delete proxyHeaders['content-length'];
+    }
 
     const options = {
         hostname: CODE_SERVER_HOST,
@@ -543,11 +564,8 @@ function proxyCodeServerHttp(req, res) {
     });
 
     if (req.readableEnded || req.complete) {
-        if (typeof req.body === 'string' && req.body.length > 0) {
-            upstreamRequest.write(req.body);
-        } else if (req.body && typeof req.body === 'object' && Object.keys(req.body).length > 0) {
-            const serialized = JSON.stringify(req.body);
-            upstreamRequest.write(serialized);
+        if (bufferedBody) {
+            upstreamRequest.write(bufferedBody);
         }
         upstreamRequest.end();
         return;

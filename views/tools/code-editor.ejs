@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %></title>
+    <link rel="stylesheet" href="/css/dashboard.css">
+    <style>
+        .editor-layout {
+            display: grid;
+            grid-template-columns: 320px 1fr;
+            gap: 14px;
+            align-items: start;
+        }
+
+        .editor-panel {
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            background: rgba(2, 6, 23, 0.75);
+            padding: 12px;
+        }
+
+        .path-box {
+            margin: 8px 0;
+            font-size: 0.76rem;
+            color: #a5b4fc;
+            line-height: 1.4;
+            border: 1px solid rgba(99, 102, 241, 0.32);
+            border-radius: 8px;
+            padding: 8px;
+            background: rgba(99, 102, 241, 0.1);
+            word-break: break-all;
+        }
+
+        .path-actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 10px;
+        }
+
+        .path-input {
+            width: 100%;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            background: rgba(15, 23, 42, 0.85);
+            color: #f8fafc;
+            padding: 8px 10px;
+            font-size: 0.82rem;
+            margin-bottom: 8px;
+        }
+
+        .file-list {
+            margin: 10px 0 0;
+            padding: 0;
+            list-style: none;
+            max-height: 68vh;
+            overflow: auto;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            background: rgba(15, 23, 42, 0.6);
+        }
+
+        .file-list-item {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+            padding: 8px;
+            font-size: 0.78rem;
+        }
+
+        .file-list-item:last-child {
+            border-bottom: none;
+        }
+
+        .file-entry-btn {
+            border: none;
+            background: transparent;
+            color: #e2e8f0;
+            text-align: left;
+            cursor: pointer;
+            width: 100%;
+            font-size: 0.78rem;
+            padding: 0;
+            font-family: inherit;
+            word-break: break-word;
+        }
+
+        .file-entry-btn:hover {
+            color: #7dd3fc;
+        }
+
+        .file-entry-meta {
+            color: #64748b;
+            font-size: 0.7rem;
+            white-space: nowrap;
+        }
+
+        .empty-list {
+            color: #94a3b8;
+            font-size: 0.8rem;
+            padding: 16px;
+            text-align: center;
+        }
+
+        .editor-main-toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 10px;
+        }
+
+        .current-file {
+            color: #facc15;
+            font-size: 0.82rem;
+            word-break: break-all;
+            font-family: monospace;
+        }
+
+        .toolbar-actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .editor-status {
+            min-height: 18px;
+            margin-bottom: 8px;
+            color: #94a3b8;
+            font-size: 0.8rem;
+        }
+
+        .editor-status.success {
+            color: #86efac;
+        }
+
+        .editor-status.error {
+            color: #fca5a5;
+        }
+
+        .editor-status.warn {
+            color: #fde68a;
+        }
+
+        #code-editor-surface {
+            width: 100%;
+            min-height: 72vh;
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            overflow: hidden;
+        }
+
+        .editor-footer-note {
+            margin-top: 8px;
+            color: #64748b;
+            font-size: 0.72rem;
+        }
+
+        @media (max-width: 980px) {
+            .editor-layout {
+                grid-template-columns: 1fr;
+            }
+
+            .file-list {
+                max-height: 34vh;
+            }
+
+            #code-editor-surface {
+                min-height: 60vh;
+            }
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.6/ace.js"></script>
+</head>
+<body>
+    <%- include('../partials/navbar') %>
+
+    <div class="container" style="padding-top: 30px;">
+        <section class="section">
+            <div class="section-header">
+                <h2><span class="section-icon">🧑‍💻</span> Code Editor</h2>
+                <a href="/tools" class="btn btn-secondary">Volver a Tools</a>
+            </div>
+
+            <p style="color:#94a3b8; margin-bottom: 10px;">
+                Editor interno para abrir y modificar archivos del proyecto desde el dashboard.
+            </p>
+
+            <div class="editor-layout">
+                <aside class="editor-panel">
+                    <strong style="color:#f8fafc; font-size:0.85rem;">Project Root</strong>
+                    <div class="path-box"><%= editorRoot %></div>
+
+                    <input id="path-input" class="path-input" type="text" placeholder="Ruta relativa (ej: src/routes/tools.js)">
+                    <div class="path-actions">
+                        <button id="open-path-btn" class="btn">Abrir Path</button>
+                        <button id="open-root-btn" class="btn btn-secondary">Root</button>
+                        <button id="refresh-dir-btn" class="btn btn-secondary">Recargar</button>
+                    </div>
+
+                    <ul id="file-list" class="file-list">
+                        <li class="empty-list">Cargando archivos...</li>
+                    </ul>
+                </aside>
+
+                <main class="editor-panel">
+                    <div class="editor-main-toolbar">
+                        <div id="current-file" class="current-file">Sin archivo abierto</div>
+                        <div class="toolbar-actions">
+                            <button id="reload-file-btn" class="btn btn-secondary">Reload File</button>
+                            <button id="save-file-btn" class="btn">Guardar (Ctrl+S)</button>
+                        </div>
+                    </div>
+
+                    <div id="editor-status" class="editor-status"></div>
+                    <div id="code-editor-surface"></div>
+                    <div class="editor-footer-note">
+                        Limite por archivo: <strong id="max-size-label"></strong>. No se abren binarios.
+                    </div>
+                </main>
+            </div>
+        </section>
+    </div>
+
+    <%- include('../partials/footer') %>
+
+    <script>
+        (() => {
+            const MAX_BYTES = Number('<%= Number(maxBytes || 0) %>') || (2 * 1024 * 1024);
+            const listEl = document.getElementById('file-list');
+            const pathInput = document.getElementById('path-input');
+            const openPathBtn = document.getElementById('open-path-btn');
+            const openRootBtn = document.getElementById('open-root-btn');
+            const refreshDirBtn = document.getElementById('refresh-dir-btn');
+            const reloadFileBtn = document.getElementById('reload-file-btn');
+            const saveFileBtn = document.getElementById('save-file-btn');
+            const currentFileEl = document.getElementById('current-file');
+            const statusEl = document.getElementById('editor-status');
+            const maxSizeLabelEl = document.getElementById('max-size-label');
+
+            const editor = ace.edit('code-editor-surface');
+            editor.setTheme('ace/theme/one_dark');
+            editor.session.setMode('ace/mode/text');
+            editor.session.setUseWrapMode(false);
+            editor.setShowPrintMargin(false);
+            editor.setOptions({
+                fontSize: '14px',
+                tabSize: 2,
+                useSoftTabs: true,
+                showInvisibles: false
+            });
+
+            let currentDirectory = '';
+            let currentFilePath = '';
+            let originalContent = '';
+            let isDirty = false;
+
+            function normalizeInputPath(rawValue) {
+                return String(rawValue || '')
+                    .replace(/\\/g, '/')
+                    .replace(/^\/+/, '')
+                    .trim();
+            }
+
+            function formatBytes(bytes) {
+                const value = Number(bytes || 0);
+                if (!Number.isFinite(value) || value <= 0) return '0 B';
+                if (value < 1024) return `${value} B`;
+                if (value < (1024 * 1024)) return `${(value / 1024).toFixed(1)} KB`;
+                return `${(value / (1024 * 1024)).toFixed(2)} MB`;
+            }
+
+            function setStatus(message, tone) {
+                statusEl.textContent = message || '';
+                statusEl.className = 'editor-status';
+                if (tone) {
+                    statusEl.classList.add(tone);
+                }
+            }
+
+            function updateCurrentFileLabel() {
+                if (!currentFilePath) {
+                    currentFileEl.textContent = 'Sin archivo abierto';
+                    return;
+                }
+
+                currentFileEl.textContent = `${isDirty ? '* ' : ''}${currentFilePath}`;
+            }
+
+            function setDirty(value) {
+                isDirty = Boolean(value);
+                updateCurrentFileLabel();
+            }
+
+            function modeFromPath(filePath) {
+                const fileName = String(filePath || '').split('/').pop() || '';
+                if (!fileName) return 'text';
+
+                if (fileName === 'Dockerfile') return 'dockerfile';
+                if (fileName === '.env') return 'sh';
+
+                const extension = fileName.includes('.')
+                    ? fileName.split('.').pop().toLowerCase()
+                    : '';
+
+                const modes = {
+                    js: 'javascript',
+                    cjs: 'javascript',
+                    mjs: 'javascript',
+                    ts: 'typescript',
+                    jsx: 'javascript',
+                    tsx: 'typescript',
+                    json: 'json',
+                    md: 'markdown',
+                    html: 'html',
+                    ejs: 'html',
+                    css: 'css',
+                    scss: 'scss',
+                    less: 'less',
+                    yml: 'yaml',
+                    yaml: 'yaml',
+                    sh: 'sh',
+                    sql: 'sql',
+                    py: 'python',
+                    txt: 'text',
+                    log: 'text'
+                };
+
+                return modes[extension] || 'text';
+            }
+
+            function setEditorMode(filePath) {
+                const mode = modeFromPath(filePath);
+                editor.session.setMode(`ace/mode/${mode}`);
+            }
+
+            async function parseJsonSafe(response) {
+                const raw = await response.text();
+                try {
+                    return JSON.parse(raw);
+                } catch (_) {
+                    return {
+                        success: false,
+                        error: raw || `http_${response.status}`
+                    };
+                }
+            }
+
+            function confirmDiscard() {
+                if (!isDirty) return true;
+                return window.confirm('Tienes cambios sin guardar. Deseas descartarlos?');
+            }
+
+            function renderDirectoryList(entries) {
+                listEl.innerHTML = '';
+                const safeEntries = Array.isArray(entries) ? entries : [];
+
+                const appendEntry = (label, onClick, meta, isDim) => {
+                    const item = document.createElement('li');
+                    item.className = 'file-list-item';
+
+                    const button = document.createElement('button');
+                    button.type = 'button';
+                    button.className = 'file-entry-btn';
+                    button.textContent = label;
+                    if (isDim) {
+                        button.style.color = '#94a3b8';
+                    }
+                    button.addEventListener('click', onClick);
+
+                    const metaEl = document.createElement('span');
+                    metaEl.className = 'file-entry-meta';
+                    metaEl.textContent = meta || '';
+
+                    item.appendChild(button);
+                    item.appendChild(metaEl);
+                    listEl.appendChild(item);
+                };
+
+                if (currentDirectory) {
+                    appendEntry('..', () => {
+                        const parent = currentDirectory.includes('/')
+                            ? currentDirectory.split('/').slice(0, -1).join('/')
+                            : '';
+                        loadDirectory(parent);
+                    }, 'up', true);
+                }
+
+                safeEntries.forEach((entry) => {
+                    const entryPath = String(entry.path || '');
+                    const type = String(entry.type || 'file');
+                    const icon = type === 'directory' ? '📁' : '📄';
+                    const meta = type === 'directory' ? 'dir' : formatBytes(entry.size);
+
+                    appendEntry(`${icon} ${entry.name}`, () => {
+                        if (type === 'directory') {
+                            loadDirectory(entryPath);
+                        } else {
+                            openFile(entryPath);
+                        }
+                    }, meta);
+                });
+
+                if (!currentDirectory && safeEntries.length === 0) {
+                    listEl.innerHTML = '<li class="empty-list">No hay archivos visibles.</li>';
+                    return;
+                }
+
+                if (safeEntries.length === 0 && currentDirectory) {
+                    listEl.innerHTML += '<li class="empty-list">Directorio vacio.</li>';
+                }
+            }
+
+            async function loadDirectory(rawPath) {
+                const targetPath = normalizeInputPath(rawPath);
+
+                setStatus(`Cargando directorio ${targetPath || '/'}...`);
+                const response = await fetch(`/tools/code-editor/api/list?path=${encodeURIComponent(targetPath)}`, {
+                    credentials: 'same-origin'
+                });
+                const payload = await parseJsonSafe(response);
+
+                if (!response.ok || !payload.success) {
+                    if ((payload.error || '').includes('not_a_directory') && targetPath) {
+                        await openFile(targetPath);
+                        return;
+                    }
+
+                    setStatus(`No se pudo abrir directorio: ${payload.error || response.status}`, 'error');
+                    return;
+                }
+
+                currentDirectory = String(payload.currentPath || '');
+                pathInput.value = currentDirectory;
+                renderDirectoryList(payload.entries || []);
+                setStatus(`Directorio cargado: ${currentDirectory || '/'}`, 'success');
+            }
+
+            async function openFile(rawPath) {
+                const targetPath = normalizeInputPath(rawPath);
+                if (!targetPath) {
+                    setStatus('Selecciona un archivo valido.', 'error');
+                    return;
+                }
+
+                if (currentFilePath !== targetPath && !confirmDiscard()) {
+                    return;
+                }
+
+                setStatus(`Abriendo archivo: ${targetPath}...`);
+                const response = await fetch(`/tools/code-editor/api/file?path=${encodeURIComponent(targetPath)}`, {
+                    credentials: 'same-origin'
+                });
+                const payload = await parseJsonSafe(response);
+
+                if (!response.ok || !payload.success) {
+                    setStatus(`No se pudo abrir archivo: ${payload.error || response.status}`, 'error');
+                    return;
+                }
+
+                currentFilePath = String(payload.path || targetPath);
+                originalContent = String(payload.content || '');
+                editor.setValue(originalContent, -1);
+                setEditorMode(currentFilePath);
+                setDirty(false);
+
+                pathInput.value = currentFilePath;
+                setStatus(`Archivo cargado (${formatBytes(payload.size)}).`, 'success');
+            }
+
+            async function saveCurrentFile() {
+                if (!currentFilePath) {
+                    setStatus('Abre un archivo antes de guardar.', 'warn');
+                    return;
+                }
+
+                const content = editor.getValue();
+                const payloadSize = new TextEncoder().encode(content).length;
+                if (payloadSize > MAX_BYTES) {
+                    setStatus(`El contenido excede el limite (${formatBytes(MAX_BYTES)}).`, 'error');
+                    return;
+                }
+
+                saveFileBtn.disabled = true;
+                setStatus(`Guardando ${currentFilePath}...`, 'warn');
+
+                try {
+                    const response = await fetch('/tools/code-editor/api/file', {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            path: currentFilePath,
+                            content
+                        })
+                    });
+
+                    const payload = await parseJsonSafe(response);
+                    if (!response.ok || !payload.success) {
+                        setStatus(`No se pudo guardar: ${payload.error || response.status}`, 'error');
+                        return;
+                    }
+
+                    originalContent = content;
+                    setDirty(false);
+                    setStatus(`Archivo guardado (${formatBytes(payload.size)}).`, 'success');
+                } finally {
+                    saveFileBtn.disabled = false;
+                }
+            }
+
+            async function reloadCurrentFile() {
+                if (!currentFilePath) {
+                    setStatus('No hay archivo abierto para recargar.', 'warn');
+                    return;
+                }
+
+                if (!confirmDiscard()) {
+                    return;
+                }
+
+                await openFile(currentFilePath);
+            }
+
+            editor.session.on('change', () => {
+                if (!currentFilePath) return;
+                setDirty(editor.getValue() !== originalContent);
+            });
+
+            openPathBtn.addEventListener('click', () => {
+                const value = normalizeInputPath(pathInput.value);
+                if (!value) {
+                    loadDirectory('');
+                    return;
+                }
+                loadDirectory(value);
+            });
+
+            openRootBtn.addEventListener('click', () => {
+                loadDirectory('');
+            });
+
+            refreshDirBtn.addEventListener('click', () => {
+                loadDirectory(currentDirectory);
+            });
+
+            saveFileBtn.addEventListener('click', () => {
+                saveCurrentFile();
+            });
+
+            reloadFileBtn.addEventListener('click', () => {
+                reloadCurrentFile();
+            });
+
+            pathInput.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter') {
+                    event.preventDefault();
+                    openPathBtn.click();
+                }
+            });
+
+            window.addEventListener('keydown', (event) => {
+                const isSaveShortcut = (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's';
+                if (!isSaveShortcut) return;
+                event.preventDefault();
+                saveCurrentFile();
+            });
+
+            maxSizeLabelEl.textContent = formatBytes(MAX_BYTES);
+            setStatus('Cargando explorador de archivos...');
+            loadDirectory('');
+        })();
+    </script>
+</body>
+</html>

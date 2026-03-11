@@ -232,6 +232,56 @@ async function ensureStickyNotesTable() {
     );
 }
 
+const CODE_EDITOR_ROOT = path.resolve(
+    String(process.env.DASHBOARD_CODE_EDITOR_ROOT || path.join(__dirname, '../..')).trim() || path.join(__dirname, '../..')
+);
+const CODE_EDITOR_MAX_BYTES = Number.parseInt(process.env.CODE_EDITOR_MAX_BYTES || `${2 * 1024 * 1024}`, 10) || (2 * 1024 * 1024);
+const CODE_EDITOR_BLOCKED_DIRS = new Set(['.git', 'node_modules']);
+
+function toCodeEditorPosixPath(value) {
+    return String(value || '').replace(/\\/g, '/');
+}
+
+function resolveCodeEditorPath(rawPath) {
+    const requested = toCodeEditorPosixPath(rawPath)
+        .replace(/\u0000/g, '')
+        .trim();
+    const normalizedRelative = requested.replace(/^\/+/, '');
+    const absolutePath = path.resolve(CODE_EDITOR_ROOT, normalizedRelative || '.');
+    const relativePath = path.relative(CODE_EDITOR_ROOT, absolutePath);
+
+    if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
+        const error = new Error('path_outside_root');
+        error.statusCode = 400;
+        throw error;
+    }
+
+    return {
+        absolutePath,
+        relativePath: toCodeEditorPosixPath(relativePath)
+    };
+}
+
+function isLikelyBinary(buffer) {
+    if (!Buffer.isBuffer(buffer) || buffer.length === 0) {
+        return false;
+    }
+
+    const sampleSize = Math.min(buffer.length, 4096);
+    let suspicious = 0;
+    for (let idx = 0; idx < sampleSize; idx += 1) {
+        const value = buffer[idx];
+        if (value === 0) {
+            return true;
+        }
+        if ((value < 9 || (value > 13 && value < 32)) && value !== 27) {
+            suspicious += 1;
+        }
+    }
+
+    return (suspicious / sampleSize) > 0.2;
+}
+
 async function syncMiniDiscOrderToNotion(orderId) {
     if (process.env.NOTION_SYNC_ENABLED !== 'true') {
         return { skipped: true, reason: 'disabled' };
@@ -886,6 +936,183 @@ router.delete('/notes/api', async (req, res) => {
     } catch (error) {
         console.error('[Sticky Notes] Error limpiando notas:', error);
         return res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+router.get('/code-editor', (_req, res) => {
+    res.render('tools/code-editor', {
+        title: 'Code Editor - El Inmortal 2 Dashboard',
+        editorRoot: CODE_EDITOR_ROOT,
+        maxBytes: CODE_EDITOR_MAX_BYTES
+    });
+});
+
+router.get('/code-editor/api/list', async (req, res) => {
+    try {
+        const requestedPath = String(req.query.path || '');
+        const { absolutePath, relativePath } = resolveCodeEditorPath(requestedPath);
+        const rootStat = await fs.promises.stat(absolutePath);
+
+        if (!rootStat.isDirectory()) {
+            return res.status(400).json({ success: false, error: 'not_a_directory' });
+        }
+
+        const rawEntries = await fs.promises.readdir(absolutePath, { withFileTypes: true });
+        const entries = [];
+
+        for (const entry of rawEntries) {
+            if (!entry || !entry.name || entry.name === '.' || entry.name === '..') {
+                continue;
+            }
+
+            if (entry.isSymbolicLink()) {
+                continue;
+            }
+
+            const isDirectory = entry.isDirectory();
+            if (isDirectory && CODE_EDITOR_BLOCKED_DIRS.has(entry.name)) {
+                continue;
+            }
+
+            const childAbsolute = path.join(absolutePath, entry.name);
+            const childRelative = relativePath ? `${relativePath}/${entry.name}` : entry.name;
+
+            let childStat;
+            try {
+                childStat = await fs.promises.stat(childAbsolute);
+            } catch (_error) {
+                continue;
+            }
+
+            const childType = childStat.isDirectory() ? 'directory' : (childStat.isFile() ? 'file' : 'other');
+            if (childType === 'other') {
+                continue;
+            }
+
+            entries.push({
+                name: entry.name,
+                path: toCodeEditorPosixPath(childRelative),
+                type: childType,
+                size: childType === 'file' ? Number(childStat.size || 0) : null,
+                modifiedAt: childStat.mtime?.toISOString?.() || null
+            });
+        }
+
+        entries.sort((a, b) => {
+            if (a.type !== b.type) {
+                return a.type === 'directory' ? -1 : 1;
+            }
+            return a.name.localeCompare(b.name, 'en', { sensitivity: 'base' });
+        });
+
+        return res.json({
+            success: true,
+            rootPath: CODE_EDITOR_ROOT,
+            currentPath: relativePath,
+            entries
+        });
+    } catch (error) {
+        console.error('[Code Editor] Error listando directorio:', error);
+        return res.status(error.statusCode || 500).json({ success: false, error: error.message });
+    }
+});
+
+router.get('/code-editor/api/file', async (req, res) => {
+    try {
+        const requestedPath = String(req.query.path || '').trim();
+        if (!requestedPath) {
+            return res.status(400).json({ success: false, error: 'path_required' });
+        }
+
+        const { absolutePath, relativePath } = resolveCodeEditorPath(requestedPath);
+        const fileStat = await fs.promises.stat(absolutePath);
+
+        if (!fileStat.isFile()) {
+            return res.status(400).json({ success: false, error: 'not_a_file' });
+        }
+
+        if (Number(fileStat.size || 0) > CODE_EDITOR_MAX_BYTES) {
+            return res.status(413).json({ success: false, error: 'file_too_large' });
+        }
+
+        const buffer = await fs.promises.readFile(absolutePath);
+        if (isLikelyBinary(buffer)) {
+            return res.status(415).json({ success: false, error: 'binary_file_not_supported' });
+        }
+
+        return res.json({
+            success: true,
+            path: relativePath,
+            content: buffer.toString('utf8'),
+            size: Number(fileStat.size || 0),
+            modifiedAt: fileStat.mtime?.toISOString?.() || null
+        });
+    } catch (error) {
+        console.error('[Code Editor] Error leyendo archivo:', error);
+        const statusCode = error.code === 'ENOENT' ? 404 : (error.statusCode || 500);
+        return res.status(statusCode).json({ success: false, error: error.message });
+    }
+});
+
+router.post('/code-editor/api/file', async (req, res) => {
+    try {
+        const requestedPath = String(req.body?.path || '').trim();
+        const content = req.body?.content;
+
+        if (!requestedPath) {
+            return res.status(400).json({ success: false, error: 'path_required' });
+        }
+
+        if (typeof content !== 'string') {
+            return res.status(400).json({ success: false, error: 'content_must_be_string' });
+        }
+
+        const payloadBytes = Buffer.byteLength(content, 'utf8');
+        if (payloadBytes > CODE_EDITOR_MAX_BYTES) {
+            return res.status(413).json({ success: false, error: 'content_too_large' });
+        }
+
+        const { absolutePath, relativePath } = resolveCodeEditorPath(requestedPath);
+        const parentPath = path.dirname(absolutePath);
+        const parentStat = await fs.promises.stat(parentPath);
+        if (!parentStat.isDirectory()) {
+            return res.status(400).json({ success: false, error: 'invalid_parent_directory' });
+        }
+
+        let existingIsBinary = false;
+        try {
+            const existingStat = await fs.promises.stat(absolutePath);
+            if (existingStat.isDirectory()) {
+                return res.status(400).json({ success: false, error: 'cannot_overwrite_directory' });
+            }
+
+            if (existingStat.isFile() && Number(existingStat.size || 0) <= CODE_EDITOR_MAX_BYTES) {
+                const existingBuffer = await fs.promises.readFile(absolutePath);
+                existingIsBinary = isLikelyBinary(existingBuffer);
+            }
+        } catch (error) {
+            if (error.code !== 'ENOENT') {
+                throw error;
+            }
+        }
+
+        if (existingIsBinary) {
+            return res.status(415).json({ success: false, error: 'binary_file_not_supported' });
+        }
+
+        await fs.promises.writeFile(absolutePath, content, 'utf8');
+        const updatedStat = await fs.promises.stat(absolutePath);
+
+        return res.json({
+            success: true,
+            path: relativePath,
+            size: Number(updatedStat.size || 0),
+            modifiedAt: updatedStat.mtime?.toISOString?.() || null
+        });
+    } catch (error) {
+        console.error('[Code Editor] Error guardando archivo:', error);
+        const statusCode = error.code === 'ENOENT' ? 404 : (error.statusCode || 500);
+        return res.status(statusCode).json({ success: false, error: error.message });
     }
 });
 

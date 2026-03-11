@@ -1,0 +1,30 @@
+version: "3.3"
+
+services:
+  code-server:
+    image: codercom/code-server:4.103.2
+    container_name: ${CODE_EDITOR_CONTAINER_NAME:-ei2-code-server}
+    restart: unless-stopped
+    user: "0:0"
+    working_dir: /workspace
+    environment:
+      TZ: ${TZ:-UTC}
+    command:
+      - code-server
+      - --bind-addr
+      - 0.0.0.0:13337
+      - --auth
+      - none
+      - --disable-telemetry
+      - --disable-update-check
+      - /workspace
+    ports:
+      - "127.0.0.1:${CODE_EDITOR_PORT:-13337}:13337"
+    volumes:
+      - ${DASHBOARD_CODE_EDITOR_ROOT:-/home/gtalx/el-inmortal-2-dashboard}:/workspace
+      - code_server_data:/root/.local/share/code-server
+      - code_server_config:/root/.config/code-server
+
+volumes:
+  code_server_data:
+  code_server_config:

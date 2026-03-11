@@ -171,7 +171,7 @@ try {
     console.error('Failed to initialize MySQL session store, falling back to memory store:', error.message);
 }
 
-app.use(session({
+const sessionMiddleware = session({
     name: process.env.SESSION_COOKIE_NAME || 'el2.sid',
     store: sessionStore,
     secret: process.env.SESSION_SECRET || 'el-inmortal-2-secret-key-2026',
@@ -185,7 +185,9 @@ app.use(session({
         sameSite: process.env.SESSION_COOKIE_SAMESITE || 'lax',
         maxAge: sessionMaxAgeMs
     }
-}));
+});
+
+app.use(sessionMiddleware);
 
 // View engine setup
 app.set('view engine', 'ejs');
@@ -193,6 +195,11 @@ app.set('views', path.join(__dirname, '../views'));
 
 // Import role middleware
 const { injectUser, requireAuth, requireAdmin, requireFanOrAdmin } = require('./middleware/roles');
+
+function isAdminSessionUser(user) {
+    const role = String(user?.role || '').trim().toLowerCase();
+    return role === 'admin' || role === 'super_admin';
+}
 
 // Inject user info with roles into all views
 app.use(injectUser);
@@ -350,8 +357,21 @@ app.use('/tools', (req, res, next) => {
 // Multer error handling
 app.use((err, req, res, next) => {
     if (err.code === 'LIMIT_FILE_SIZE') {
+        const limitBytes = Number(err.limit);
+        let limitLabel = 'el limite configurado';
+        if (Number.isFinite(limitBytes) && limitBytes > 0) {
+            const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+            let size = limitBytes;
+            let index = 0;
+            while (size >= 1024 && index < units.length - 1) {
+                size /= 1024;
+                index += 1;
+            }
+            const precision = index <= 1 ? 0 : 2;
+            limitLabel = `${size.toFixed(precision)} ${units[index]}`;
+        }
         return res.status(400).json({ 
-            error: 'Archivo demasiado grande. Máximo 150MB.' 
+            error: `Archivo demasiado grande. Maximo ${limitLabel}.`
         });
     }
     if (err.message && err.message.includes('Solo se permiten archivos')) {
@@ -429,8 +449,70 @@ async function startServer() {
             `);
         });
 
+        const uploadRequestTimeoutMs = parseIntSafe(process.env.UPLOAD_REQUEST_TIMEOUT_MS, 2 * 60 * 60 * 1000);
+        const keepAliveTimeoutMs = parseIntSafe(process.env.SERVER_KEEP_ALIVE_TIMEOUT_MS, 65 * 1000);
+
+        server.requestTimeout = uploadRequestTimeoutMs;
+        server.headersTimeout = Math.max(uploadRequestTimeoutMs + 60 * 1000, keepAliveTimeoutMs + 5 * 1000);
+        server.keepAliveTimeout = keepAliveTimeoutMs;
+
         server.on('error', (err) => {
             console.error('Server error:', err);
+        });
+
+        server.on('upgrade', (req, socket, head) => {
+            const isCodeEditorUpgrade = typeof toolsRouter.isCodeEditorUpgradeRequest === 'function'
+                && toolsRouter.isCodeEditorUpgradeRequest(req);
+
+            if (!isCodeEditorUpgrade) {
+                socket.destroy();
+                return;
+            }
+
+            const rejectUpgrade = (statusCode, reason) => {
+                if (socket.destroyed) {
+                    return;
+                }
+
+                const safeCode = Number(statusCode) || 500;
+                const safeReason = String(reason || 'Upgrade Error').replace(/[\r\n]+/g, ' ').trim() || 'Upgrade Error';
+                socket.write(`HTTP/1.1 ${safeCode} ${safeReason}\r\nConnection: close\r\n\r\n`);
+                socket.destroy();
+            };
+
+            const upgradeResponseStub = {
+                getHeader: () => undefined,
+                setHeader: () => {},
+                removeHeader: () => {},
+                writeHead: () => {},
+                end: () => {},
+                on: () => {},
+                once: () => {},
+                emit: () => {},
+                headersSent: false
+            };
+
+            try {
+                sessionMiddleware(req, upgradeResponseStub, () => {
+                    if (!isAdminSessionUser(req.session?.user)) {
+                        return rejectUpgrade(401, 'Unauthorized');
+                    }
+
+                    if (typeof toolsRouter.handleCodeEditorUpgrade !== 'function') {
+                        return rejectUpgrade(500, 'Code Editor upgrade handler missing');
+                    }
+
+                    try {
+                        return toolsRouter.handleCodeEditorUpgrade(req, socket, head);
+                    } catch (error) {
+                        console.error('Code Editor upgrade handling error:', error);
+                        return rejectUpgrade(502, `Bad Gateway (${error.message})`);
+                    }
+                });
+            } catch (error) {
+                console.error('Code Editor upgrade auth error:', error);
+                return rejectUpgrade(500, `Session Error (${error.message})`);
+            }
         });
         
     } catch (err) {

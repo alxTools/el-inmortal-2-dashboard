@@ -1,6 +1,8 @@
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
+const http = require('http');
+const net = require('net');
 const { exec, spawn } = require('child_process');
 const { promisify } = require('util');
 const { getAll, getOne, run } = require('../config/database');
@@ -237,6 +239,21 @@ const CODE_EDITOR_ROOT = path.resolve(
 );
 const CODE_EDITOR_MAX_BYTES = Number.parseInt(process.env.CODE_EDITOR_MAX_BYTES || `${2 * 1024 * 1024}`, 10) || (2 * 1024 * 1024);
 const CODE_EDITOR_BLOCKED_DIRS = new Set(['.git', 'node_modules']);
+const CODE_SERVER_PORT = Math.max(1024, Math.min(65535, Number.parseInt(process.env.CODE_EDITOR_PORT || '13337', 10) || 13337));
+const CODE_SERVER_HOST = String(process.env.CODE_EDITOR_HOST || '127.0.0.1').trim() || '127.0.0.1';
+const CODE_SERVER_CONTAINER_NAME = String(process.env.CODE_EDITOR_CONTAINER_NAME || 'ei2-code-server').trim() || 'ei2-code-server';
+const CODE_SERVER_SERVICE_NAME = String(process.env.CODE_EDITOR_SERVICE_NAME || 'code-server').trim() || 'code-server';
+const CODE_SERVER_PROXY_PREFIX = '/tools/code-editor/vscode/ide';
+const CODE_SERVER_COMPOSE_FILE = path.join(__dirname, '../../scripts/code-editor/docker-compose.code-server.yml');
+const CODE_SERVER_WORKSPACE_ROOT = path.resolve(
+    String(process.env.DASHBOARD_CODE_EDITOR_ROOT || CODE_EDITOR_ROOT).trim() || CODE_EDITOR_ROOT
+);
+const CODE_SERVER_STARTUP_TIMEOUT_MS = Math.max(
+    10000,
+    Math.min(180000, Number.parseInt(process.env.CODE_EDITOR_STARTUP_TIMEOUT_MS || '90000', 10) || 90000)
+);
+const CODE_SERVER_AUTO_START = String(process.env.CODE_EDITOR_AUTO_START || 'true').trim().toLowerCase() !== 'false';
+let dockerComposeCommandCache = null;
 
 function toCodeEditorPosixPath(value) {
     return String(value || '').replace(/\\/g, '/');
@@ -280,6 +297,263 @@ function isLikelyBinary(buffer) {
     }
 
     return (suspicious / sampleSize) > 0.2;
+}
+
+function normalizeCodeServerTargetPath(rawUrl) {
+    const urlValue = String(rawUrl || '/');
+    if (urlValue.startsWith(CODE_SERVER_PROXY_PREFIX)) {
+        const sliced = urlValue.slice(CODE_SERVER_PROXY_PREFIX.length);
+        return sliced || '/';
+    }
+
+    return urlValue || '/';
+}
+
+function buildCodeServerExecOptions(timeoutMs = CODE_SERVER_STARTUP_TIMEOUT_MS) {
+    return {
+        cwd: path.join(__dirname, '../..'),
+        timeout: timeoutMs,
+        maxBuffer: 1024 * 1024,
+        env: {
+            ...process.env,
+            DASHBOARD_CODE_EDITOR_ROOT: CODE_SERVER_WORKSPACE_ROOT,
+            CODE_EDITOR_PORT: String(CODE_SERVER_PORT),
+            CODE_EDITOR_CONTAINER_NAME: CODE_SERVER_CONTAINER_NAME,
+            CODE_EDITOR_SERVICE_NAME: CODE_SERVER_SERVICE_NAME
+        }
+    };
+}
+
+async function runCodeServerCompose(command, timeoutMs = CODE_SERVER_STARTUP_TIMEOUT_MS) {
+    if (!fs.existsSync(CODE_SERVER_COMPOSE_FILE)) {
+        throw new Error('missing_code_server_compose_file');
+    }
+
+    const composeCmd = await resolveDockerComposeCommand();
+    const composeCommand = `${composeCmd} -f "${CODE_SERVER_COMPOSE_FILE}" ${command}`;
+    return await execAsync(composeCommand, buildCodeServerExecOptions(timeoutMs));
+}
+
+async function resolveDockerComposeCommand() {
+    if (dockerComposeCommandCache) {
+        return dockerComposeCommandCache;
+    }
+
+    try {
+        await execAsync('docker compose version', buildCodeServerExecOptions(15000));
+        dockerComposeCommandCache = 'docker compose';
+        return dockerComposeCommandCache;
+    } catch (_error) {
+        try {
+            await execAsync('docker-compose --version', buildCodeServerExecOptions(15000));
+            dockerComposeCommandCache = 'docker-compose';
+            return dockerComposeCommandCache;
+        } catch (composeError) {
+            throw new Error(`docker_compose_not_available:${composeError.message}`);
+        }
+    }
+}
+
+async function getCodeServerStatus() {
+    try {
+        const { stdout } = await execAsync(
+            `docker ps -a --filter "name=^/${CODE_SERVER_CONTAINER_NAME}$" --format "{{.Names}}|{{.State}}|{{.Status}}"`,
+            buildCodeServerExecOptions(20000)
+        );
+
+        const line = String(stdout || '').trim();
+        if (!line) {
+            return {
+                exists: false,
+                running: false,
+                state: 'missing',
+                status: 'container_not_created'
+            };
+        }
+
+        const [name, state, status] = line.split('|');
+        return {
+            exists: true,
+            running: String(state || '').trim() === 'running',
+            container: String(name || CODE_SERVER_CONTAINER_NAME).trim(),
+            state: String(state || '').trim() || 'unknown',
+            status: String(status || '').trim() || 'unknown'
+        };
+    } catch (error) {
+        return {
+            exists: false,
+            running: false,
+            state: 'error',
+            status: error.message
+        };
+    }
+}
+
+async function startCodeServerContainer({ forceRecreate = false } = {}) {
+    const command = forceRecreate ? 'up -d --force-recreate' : 'up -d';
+    return await runCodeServerCompose(command);
+}
+
+async function stopCodeServerContainer() {
+    return await runCodeServerCompose('stop', 60000);
+}
+
+async function ensureCodeServerRunning() {
+    const status = await getCodeServerStatus();
+    if (status.running || !CODE_SERVER_AUTO_START) {
+        return status;
+    }
+
+    await startCodeServerContainer();
+    return await getCodeServerStatus();
+}
+
+async function waitForCodeServerRunning(timeoutMs = 30000) {
+    const startedAt = Date.now();
+
+    while ((Date.now() - startedAt) < timeoutMs) {
+        const status = await getCodeServerStatus();
+        if (status.running) {
+            return status;
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, 800));
+    }
+
+    return await getCodeServerStatus();
+}
+
+function writeUpgradeError(socket, statusCode, reason) {
+    if (!socket || socket.destroyed) {
+        return;
+    }
+
+    const safeCode = Number(statusCode) || 500;
+    const safeReason = String(reason || 'Error').replace(/[\r\n]+/g, ' ').trim() || 'Error';
+    socket.write(`HTTP/1.1 ${safeCode} ${safeReason}\r\nConnection: close\r\n\r\n`);
+    socket.destroy();
+}
+
+function isCodeEditorUpgradeRequest(req) {
+    const reqUrl = String(req?.url || '');
+    return reqUrl.startsWith(CODE_SERVER_PROXY_PREFIX);
+}
+
+function handleCodeEditorUpgrade(req, socket, head) {
+    const targetPath = normalizeCodeServerTargetPath(req.url);
+    const upstream = net.connect({ host: CODE_SERVER_HOST, port: CODE_SERVER_PORT });
+
+    let settled = false;
+
+    upstream.setNoDelay(true);
+    socket.setNoDelay(true);
+
+    upstream.on('connect', () => {
+        const requestLines = [`GET ${targetPath} HTTP/1.1`];
+        const seenHeaders = new Set();
+
+        for (let idx = 0; idx < req.rawHeaders.length; idx += 2) {
+            const key = req.rawHeaders[idx];
+            const value = req.rawHeaders[idx + 1];
+            if (!key) {
+                continue;
+            }
+
+            const lower = key.toLowerCase();
+            if (lower === 'host') {
+                continue;
+            }
+
+            seenHeaders.add(lower);
+            requestLines.push(`${key}: ${value}`);
+        }
+
+        requestLines.push(`Host: ${CODE_SERVER_HOST}:${CODE_SERVER_PORT}`);
+        if (!seenHeaders.has('x-forwarded-host')) {
+            requestLines.push(`X-Forwarded-Host: ${req.headers.host || ''}`);
+        }
+        if (!seenHeaders.has('x-forwarded-proto')) {
+            requestLines.push(`X-Forwarded-Proto: ${req.headers['x-forwarded-proto'] || 'https'}`);
+        }
+        requestLines.push('\r\n');
+
+        upstream.write(requestLines.join('\r\n'));
+        if (head && head.length) {
+            upstream.write(head);
+        }
+
+        settled = true;
+        socket.pipe(upstream).pipe(socket);
+    });
+
+    upstream.on('error', (error) => {
+        if (!settled) {
+            writeUpgradeError(socket, 502, `Bad Gateway (${error.message})`);
+        } else {
+            socket.destroy();
+        }
+    });
+
+    socket.on('error', () => {
+        upstream.destroy();
+    });
+
+    socket.on('close', () => {
+        upstream.destroy();
+    });
+}
+
+function proxyCodeServerHttp(req, res) {
+    const targetPath = normalizeCodeServerTargetPath(req.originalUrl || req.url);
+    const proxyHeaders = {
+        ...req.headers,
+        host: `${CODE_SERVER_HOST}:${CODE_SERVER_PORT}`,
+        'x-forwarded-host': req.headers.host || '',
+        'x-forwarded-proto': req.headers['x-forwarded-proto'] || 'https'
+    };
+
+    const options = {
+        hostname: CODE_SERVER_HOST,
+        port: CODE_SERVER_PORT,
+        method: req.method,
+        path: targetPath,
+        headers: proxyHeaders
+    };
+
+    const upstreamRequest = http.request(options, (upstreamResponse) => {
+        res.status(upstreamResponse.statusCode || 502);
+
+        for (const [headerKey, headerValue] of Object.entries(upstreamResponse.headers || {})) {
+            if (headerValue === undefined) {
+                continue;
+            }
+            res.setHeader(headerKey, headerValue);
+        }
+
+        upstreamResponse.pipe(res);
+    });
+
+    upstreamRequest.on('error', (error) => {
+        if (!res.headersSent) {
+            res.status(502).send(`Code Server proxy error: ${error.message}`);
+            return;
+        }
+
+        res.end();
+    });
+
+    if (req.readableEnded || req.complete) {
+        if (typeof req.body === 'string' && req.body.length > 0) {
+            upstreamRequest.write(req.body);
+        } else if (req.body && typeof req.body === 'object' && Object.keys(req.body).length > 0) {
+            const serialized = JSON.stringify(req.body);
+            upstreamRequest.write(serialized);
+        }
+        upstreamRequest.end();
+        return;
+    }
+
+    req.pipe(upstreamRequest);
 }
 
 async function syncMiniDiscOrderToNotion(orderId) {
@@ -943,7 +1217,11 @@ router.get('/code-editor', (_req, res) => {
     res.render('tools/code-editor', {
         title: 'Code Editor - El Inmortal 2 Dashboard',
         editorRoot: CODE_EDITOR_ROOT,
-        maxBytes: CODE_EDITOR_MAX_BYTES
+        maxBytes: CODE_EDITOR_MAX_BYTES,
+        codeServerProxyPath: `${CODE_SERVER_PROXY_PREFIX}/`,
+        codeServerHost: CODE_SERVER_HOST,
+        codeServerPort: CODE_SERVER_PORT,
+        codeServerContainerName: CODE_SERVER_CONTAINER_NAME
     });
 });
 
@@ -1113,6 +1391,97 @@ router.post('/code-editor/api/file', async (req, res) => {
         console.error('[Code Editor] Error guardando archivo:', error);
         const statusCode = error.code === 'ENOENT' ? 404 : (error.statusCode || 500);
         return res.status(statusCode).json({ success: false, error: error.message });
+    }
+});
+
+router.get('/code-editor/vscode/status', async (_req, res) => {
+    try {
+        const status = await getCodeServerStatus();
+        return res.json({
+            success: true,
+            ...status,
+            host: CODE_SERVER_HOST,
+            port: CODE_SERVER_PORT,
+            containerName: CODE_SERVER_CONTAINER_NAME,
+            serviceName: CODE_SERVER_SERVICE_NAME,
+            workspaceRoot: CODE_SERVER_WORKSPACE_ROOT,
+            composeFile: CODE_SERVER_COMPOSE_FILE,
+            proxyPath: `${CODE_SERVER_PROXY_PREFIX}/`,
+            autoStart: CODE_SERVER_AUTO_START
+        });
+    } catch (error) {
+        console.error('[Code Server] Error consultando status:', error);
+        return res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+router.post('/code-editor/vscode/start', async (req, res) => {
+    try {
+        const forceRecreate = req.body?.force === true || String(req.body?.force || '').trim() === '1';
+        await startCodeServerContainer({ forceRecreate });
+        const status = await waitForCodeServerRunning(45000);
+
+        return res.json({
+            success: status.running,
+            message: status.running
+                ? 'Code Server iniciado correctamente.'
+                : 'Code Server no alcanzo estado running dentro del timeout.',
+            ...status,
+            proxyPath: `${CODE_SERVER_PROXY_PREFIX}/`
+        });
+    } catch (error) {
+        console.error('[Code Server] Error iniciando container:', error);
+        return res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+router.post('/code-editor/vscode/restart', async (_req, res) => {
+    try {
+        await startCodeServerContainer({ forceRecreate: true });
+        const status = await waitForCodeServerRunning(60000);
+
+        return res.json({
+            success: status.running,
+            message: status.running
+                ? 'Code Server reiniciado correctamente.'
+                : 'Code Server no alcanzo estado running despues de restart.',
+            ...status,
+            proxyPath: `${CODE_SERVER_PROXY_PREFIX}/`
+        });
+    } catch (error) {
+        console.error('[Code Server] Error reiniciando container:', error);
+        return res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+router.post('/code-editor/vscode/stop', async (_req, res) => {
+    try {
+        await stopCodeServerContainer();
+        const status = await getCodeServerStatus();
+
+        return res.json({
+            success: true,
+            message: 'Code Server detenido.',
+            ...status,
+            proxyPath: `${CODE_SERVER_PROXY_PREFIX}/`
+        });
+    } catch (error) {
+        console.error('[Code Server] Error deteniendo container:', error);
+        return res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+router.use('/code-editor/vscode/ide', async (req, res) => {
+    try {
+        const status = await ensureCodeServerRunning();
+        if (!status.running) {
+            return res.status(503).send('Code Server container is offline. Use Start from the dashboard panel.');
+        }
+
+        return proxyCodeServerHttp(req, res);
+    } catch (error) {
+        console.error('[Code Server] HTTP proxy error:', error);
+        return res.status(502).send(`Code Server proxy failed: ${error.message}`);
     }
 });
 
@@ -2621,5 +2990,8 @@ router.post('/remotion-studio/stop', (req, res) => {
         res.json({ success: true, message: 'Remotion Studio was not running' });
     }
 });
+
+router.isCodeEditorUpgradeRequest = isCodeEditorUpgradeRequest;
+router.handleCodeEditorUpgrade = handleCodeEditorUpgrade;
 
 module.exports = router;

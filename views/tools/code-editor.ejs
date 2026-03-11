@@ -6,11 +6,77 @@
     <title><%= title %></title>
     <link rel="stylesheet" href="/css/dashboard.css">
     <style>
+        .vscode-shell {
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 14px;
+            background: rgba(2, 6, 23, 0.78);
+            padding: 12px;
+            margin-bottom: 14px;
+        }
+
+        .vscode-toolbar {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 10px;
+        }
+
+        .vscode-toolbar-title {
+            color: #f8fafc;
+            font-size: 0.96rem;
+            font-weight: 700;
+            margin: 0 0 3px;
+        }
+
+        .vscode-toolbar-subtitle {
+            color: #94a3b8;
+            font-size: 0.78rem;
+            margin: 0;
+        }
+
+        .vscode-actions {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .vscode-status {
+            min-height: 20px;
+            margin-bottom: 10px;
+            color: #94a3b8;
+            font-size: 0.82rem;
+        }
+
+        .vscode-status.success {
+            color: #86efac;
+        }
+
+        .vscode-status.warn {
+            color: #fde68a;
+        }
+
+        .vscode-status.error {
+            color: #fca5a5;
+        }
+
+        .vscode-frame {
+            width: 100%;
+            min-height: 74vh;
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: #020617;
+        }
+
         .editor-layout {
             display: grid;
             grid-template-columns: 320px 1fr;
             gap: 14px;
             align-items: start;
+            margin-top: 12px;
         }
 
         .editor-panel {
@@ -160,6 +226,21 @@
             font-size: 0.72rem;
         }
 
+        .manual-editor-shell {
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            background: rgba(2, 6, 23, 0.6);
+            padding: 10px;
+        }
+
+        .manual-editor-shell > summary {
+            cursor: pointer;
+            color: #bfdbfe;
+            font-weight: 700;
+            font-size: 0.84rem;
+            user-select: none;
+        }
+
         @media (max-width: 980px) {
             .editor-layout {
                 grid-template-columns: 1fr;
@@ -169,8 +250,9 @@
                 max-height: 34vh;
             }
 
-            #code-editor-surface {
-                min-height: 60vh;
+            #code-editor-surface,
+            .vscode-frame {
+                min-height: 62vh;
             }
         }
     </style>
@@ -187,42 +269,72 @@
             </div>
 
             <p style="color:#94a3b8; margin-bottom: 10px;">
-                Editor interno para abrir y modificar archivos del proyecto desde el dashboard.
+                VS Code Web en Docker persistente embebido en el dashboard. Debajo queda el editor ligero como fallback rapido.
             </p>
 
-            <div class="editor-layout">
-                <aside class="editor-panel">
-                    <strong style="color:#f8fafc; font-size:0.85rem;">Project Root</strong>
-                    <div class="path-box"><%= editorRoot %></div>
-
-                    <input id="path-input" class="path-input" type="text" placeholder="Ruta relativa (ej: src/routes/tools.js)">
-                    <div class="path-actions">
-                        <button id="open-path-btn" class="btn">Abrir Path</button>
-                        <button id="open-root-btn" class="btn btn-secondary">Root</button>
-                        <button id="refresh-dir-btn" class="btn btn-secondary">Recargar</button>
+            <div class="vscode-shell">
+                <div class="vscode-toolbar">
+                    <div>
+                        <p class="vscode-toolbar-title">VS Code Web (Container: <%= codeServerContainerName %>)</p>
+                        <p class="vscode-toolbar-subtitle">Proxy local: <code>/tools/code-editor/vscode/ide/</code> | Host interno: <%= codeServerHost %>:<%= codeServerPort %></p>
                     </div>
-
-                    <ul id="file-list" class="file-list">
-                        <li class="empty-list">Cargando archivos...</li>
-                    </ul>
-                </aside>
-
-                <main class="editor-panel">
-                    <div class="editor-main-toolbar">
-                        <div id="current-file" class="current-file">Sin archivo abierto</div>
-                        <div class="toolbar-actions">
-                            <button id="reload-file-btn" class="btn btn-secondary">Reload File</button>
-                            <button id="save-file-btn" class="btn">Guardar (Ctrl+S)</button>
-                        </div>
+                    <div class="vscode-actions">
+                        <button id="vscode-start-btn" class="btn">Start Container</button>
+                        <button id="vscode-restart-btn" class="btn btn-secondary">Restart</button>
+                        <button id="vscode-stop-btn" class="btn btn-secondary">Stop</button>
+                        <button id="vscode-open-tab-btn" class="btn btn-secondary">Open in Tab</button>
                     </div>
+                </div>
 
-                    <div id="editor-status" class="editor-status"></div>
-                    <div id="code-editor-surface"></div>
-                    <div class="editor-footer-note">
-                        Limite por archivo: <strong id="max-size-label"></strong>. No se abren binarios.
-                    </div>
-                </main>
+                <div id="vscode-status" class="vscode-status">Consultando estado de VS Code...</div>
+                <iframe
+                    id="vscode-frame"
+                    class="vscode-frame"
+                    title="VS Code Web"
+                    src="about:blank"
+                    loading="lazy"
+                    referrerpolicy="same-origin"
+                    allow="clipboard-read; clipboard-write"
+                ></iframe>
             </div>
+
+            <details class="manual-editor-shell">
+                <summary>Editor ligero integrado (fallback)</summary>
+
+                <div class="editor-layout">
+                    <aside class="editor-panel">
+                        <strong style="color:#f8fafc; font-size:0.85rem;">Project Root</strong>
+                        <div class="path-box"><%= editorRoot %></div>
+
+                        <input id="path-input" class="path-input" type="text" placeholder="Ruta relativa (ej: src/routes/tools.js)">
+                        <div class="path-actions">
+                            <button id="open-path-btn" class="btn">Abrir Path</button>
+                            <button id="open-root-btn" class="btn btn-secondary">Root</button>
+                            <button id="refresh-dir-btn" class="btn btn-secondary">Recargar</button>
+                        </div>
+
+                        <ul id="file-list" class="file-list">
+                            <li class="empty-list">Cargando archivos...</li>
+                        </ul>
+                    </aside>
+
+                    <main class="editor-panel">
+                        <div class="editor-main-toolbar">
+                            <div id="current-file" class="current-file">Sin archivo abierto</div>
+                            <div class="toolbar-actions">
+                                <button id="reload-file-btn" class="btn btn-secondary">Reload File</button>
+                                <button id="save-file-btn" class="btn">Guardar (Ctrl+S)</button>
+                            </div>
+                        </div>
+
+                        <div id="editor-status" class="editor-status"></div>
+                        <div id="code-editor-surface"></div>
+                        <div class="editor-footer-note">
+                            Limite por archivo: <strong id="max-size-label"></strong>. No se abren binarios.
+                        </div>
+                    </main>
+                </div>
+            </details>
         </section>
     </div>
 
@@ -231,6 +343,19 @@
     <script>
         (() => {
             const MAX_BYTES = Number('<%= Number(maxBytes || 0) %>') || (2 * 1024 * 1024);
+            const CODE_SERVER_PROXY_PATH = '<%= codeServerProxyPath %>';
+            const CODE_SERVER_STATUS_API = '/tools/code-editor/vscode/status';
+            const CODE_SERVER_START_API = '/tools/code-editor/vscode/start';
+            const CODE_SERVER_RESTART_API = '/tools/code-editor/vscode/restart';
+            const CODE_SERVER_STOP_API = '/tools/code-editor/vscode/stop';
+
+            const vscodeFrameEl = document.getElementById('vscode-frame');
+            const vscodeStatusEl = document.getElementById('vscode-status');
+            const vscodeStartBtn = document.getElementById('vscode-start-btn');
+            const vscodeRestartBtn = document.getElementById('vscode-restart-btn');
+            const vscodeStopBtn = document.getElementById('vscode-stop-btn');
+            const vscodeOpenTabBtn = document.getElementById('vscode-open-tab-btn');
+
             const listEl = document.getElementById('file-list');
             const pathInput = document.getElementById('path-input');
             const openPathBtn = document.getElementById('open-path-btn');
@@ -254,6 +379,8 @@
                 showInvisibles: false
             });
 
+            let codeServerRunning = false;
+            let codeServerFrameLoaded = false;
             let currentDirectory = '';
             let currentFilePath = '';
             let originalContent = '';
@@ -279,6 +406,107 @@
                 statusEl.className = 'editor-status';
                 if (tone) {
                     statusEl.classList.add(tone);
+                }
+            }
+
+            function setVsCodeStatus(message, tone) {
+                vscodeStatusEl.textContent = message || '';
+                vscodeStatusEl.className = 'vscode-status';
+                if (tone) {
+                    vscodeStatusEl.classList.add(tone);
+                }
+            }
+
+            function setVsCodeButtonsDisabled(disabled) {
+                const value = Boolean(disabled);
+                vscodeStartBtn.disabled = value;
+                vscodeRestartBtn.disabled = value;
+                vscodeStopBtn.disabled = value;
+            }
+
+            function getVsCodeFrameUrl() {
+                const separator = CODE_SERVER_PROXY_PATH.includes('?') ? '&' : '?';
+                return `${CODE_SERVER_PROXY_PATH}${separator}folder=/workspace`;
+            }
+
+            function loadVsCodeFrame(forceReload = false) {
+                if (!codeServerRunning) {
+                    vscodeFrameEl.src = 'about:blank';
+                    codeServerFrameLoaded = false;
+                    return;
+                }
+
+                if (codeServerFrameLoaded && !forceReload) {
+                    return;
+                }
+
+                const targetUrl = getVsCodeFrameUrl();
+                const withCacheBust = `${targetUrl}${targetUrl.includes('?') ? '&' : '?'}_ts=${Date.now()}`;
+                vscodeFrameEl.src = withCacheBust;
+                codeServerFrameLoaded = true;
+            }
+
+            async function parseJsonSafe(response) {
+                const raw = await response.text();
+                try {
+                    return JSON.parse(raw);
+                } catch (_) {
+                    return {
+                        success: false,
+                        error: raw || `http_${response.status}`
+                    };
+                }
+            }
+
+            async function refreshCodeServerStatus() {
+                const response = await fetch(CODE_SERVER_STATUS_API, { credentials: 'same-origin' });
+                const payload = await parseJsonSafe(response);
+
+                if (!response.ok || !payload.success) {
+                    codeServerRunning = false;
+                    codeServerFrameLoaded = false;
+                    vscodeFrameEl.src = 'about:blank';
+                    setVsCodeStatus(`No se pudo consultar status: ${payload.error || response.status}`, 'error');
+                    return;
+                }
+
+                codeServerRunning = payload.running === true;
+
+                if (codeServerRunning) {
+                    setVsCodeStatus(`VS Code online (${payload.status || 'running'}).`, 'success');
+                    loadVsCodeFrame(false);
+                } else {
+                    setVsCodeStatus(`VS Code offline (${payload.status || 'stopped'}). Usa Start Container.`, 'warn');
+                    codeServerFrameLoaded = false;
+                    vscodeFrameEl.src = 'about:blank';
+                }
+            }
+
+            async function callCodeServerControlApi(url, bodyPayload, loadingMessage) {
+                setVsCodeButtonsDisabled(true);
+                setVsCodeStatus(loadingMessage, 'warn');
+
+                try {
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(bodyPayload || {})
+                    });
+
+                    const payload = await parseJsonSafe(response);
+                    if (!response.ok || !payload.success) {
+                        setVsCodeStatus(`Operacion fallida: ${payload.error || payload.message || response.status}`, 'error');
+                        await refreshCodeServerStatus();
+                        return;
+                    }
+
+                    setVsCodeStatus(payload.message || 'Operacion completada.', 'success');
+                    await refreshCodeServerStatus();
+                } finally {
+                    setVsCodeButtonsDisabled(false);
                 }
             }
 
@@ -336,18 +564,6 @@
             function setEditorMode(filePath) {
                 const mode = modeFromPath(filePath);
                 editor.session.setMode(`ace/mode/${mode}`);
-            }
-
-            async function parseJsonSafe(response) {
-                const raw = await response.text();
-                try {
-                    return JSON.parse(raw);
-                } catch (_) {
-                    return {
-                        success: false,
-                        error: raw || `http_${response.status}`
-                    };
-                }
             }
 
             function confirmDiscard() {
@@ -572,8 +788,34 @@
                 saveCurrentFile();
             });
 
+            vscodeStartBtn.addEventListener('click', async () => {
+                await callCodeServerControlApi(CODE_SERVER_START_API, { force: false }, 'Iniciando container VS Code...');
+                loadVsCodeFrame(true);
+            });
+
+            vscodeRestartBtn.addEventListener('click', async () => {
+                await callCodeServerControlApi(CODE_SERVER_RESTART_API, {}, 'Reiniciando VS Code...');
+                loadVsCodeFrame(true);
+            });
+
+            vscodeStopBtn.addEventListener('click', async () => {
+                await callCodeServerControlApi(CODE_SERVER_STOP_API, {}, 'Deteniendo VS Code...');
+            });
+
+            vscodeOpenTabBtn.addEventListener('click', () => {
+                window.open(getVsCodeFrameUrl(), '_blank', 'noopener');
+            });
+
             maxSizeLabelEl.textContent = formatBytes(MAX_BYTES);
             setStatus('Cargando explorador de archivos...');
+
+            refreshCodeServerStatus().catch((error) => {
+                setVsCodeStatus(`No se pudo consultar VS Code: ${error.message}`, 'error');
+            });
+            setInterval(() => {
+                refreshCodeServerStatus().catch(() => {});
+            }, 20000);
+
             loadDirectory('');
         })();
     </script>

@@ -33,6 +33,29 @@
             <button id="force-refresh" type="button">Refresh Now</button>
         </section>
 
+        <section class="ops-panel">
+            <div class="ops-controls">
+                <label for="pool-profile">Perfil</label>
+                <select id="pool-profile">
+                    <% for (const preset of (poolPresets || [])) { %>
+                        <option value="<%= preset.key %>" data-default-start="<%= preset.defaultStartIndex %>"><%= preset.label %></option>
+                    <% } %>
+                </select>
+
+                <label for="start-index">Start</label>
+                <input id="start-index" type="number" min="1" max="<%= maxBoxes || 20 %>" value="1">
+
+                <label for="box-count">Boxes</label>
+                <input id="box-count" type="number" min="1" max="<%= maxBoxes || 20 %>" value="1">
+
+                <button id="create-boxes" type="button">Create / Deploy</button>
+                <button id="stop-boxes" type="button" class="danger">Stop</button>
+            </div>
+
+            <p id="ops-note">No hay operaciones activas.</p>
+            <pre id="ops-log"></pre>
+        </section>
+
         <section class="stats-grid">
             <article class="stat-card">
                 <h3>Total Tunnels</h3>
@@ -69,7 +92,9 @@
     <script>
         window.__MISSION_CONTROL__ = {
             selectedPool: '<%= selectedPool %>',
-            pools: <%- JSON.stringify(pools || []) %>
+            pools: <%- JSON.stringify(pools || []) %>,
+            poolPresets: <%- JSON.stringify(poolPresets || []) %>,
+            maxBoxes: <%= Number(maxBoxes || 20) %>
         };
     </script>
     <script src="/js/proxy-mission-control.js"></script>

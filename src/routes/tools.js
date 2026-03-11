@@ -11,7 +11,69 @@ const ytdl = require('youtube-dl-exec');
 const multer = require('multer');
 const execAsync = promisify(exec);
 const proxyGeneratedRoot = path.join(__dirname, '../../scripts/proxy/generated');
+const proxyScriptsRoot = path.join(__dirname, '../../scripts/proxy');
+const proxyMissionInventoryCsv = path.join(proxyScriptsRoot, 'pia-accounts-inventory.csv');
+const proxyDeployStackScript = path.join(proxyScriptsRoot, 'deploy_pia_stack.py');
+const proxyCheckPoolScript = path.join(proxyScriptsRoot, 'check_proxy_pool.py');
+const proxyMissionWorkingDir = path.join(__dirname, '../..');
+const PROXY_MISSION_BASE_PORT = Math.max(1024, Number.parseInt(process.env.PROXY_MISSION_BASE_PORT || '3128', 10) || 3128);
+const PROXY_MISSION_TUNNELS_PER_BOX = Math.max(
+    1,
+    Math.min(20, Number.parseInt(process.env.PROXY_MISSION_TUNNELS_PER_BOX || '15', 10) || 15)
+);
+const PROXY_MISSION_FIXED_PROXY_PASS = String(process.env.PROXY_MISSION_FIXED_PROXY_PASS || 'x0').trim() || 'x0';
+const PROXY_MISSION_PYTHON_BIN = String(process.env.PROXY_MISSION_PYTHON_BIN || 'python3').trim() || 'python3';
+const PROXY_MISSION_COMMAND_TIMEOUT_MS = Math.max(
+    15000,
+    Math.min(30 * 60 * 1000, Number.parseInt(process.env.PROXY_MISSION_COMMAND_TIMEOUT_MS || '900000', 10) || 900000)
+);
+const PROXY_MISSION_MAX_BOXES = 20;
+const PROXY_MISSION_QUEUE_LIMIT = Math.max(1, Math.min(30, Number.parseInt(process.env.PROXY_MISSION_QUEUE_LIMIT || '10', 10) || 10));
+const PROXY_MISSION_JOB_LOG_LIMIT = 400;
+const PROXY_MISSION_JOB_RETENTION_MS = 12 * 60 * 60 * 1000;
+const PROXY_MISSION_POOL_PRESETS = Object.freeze({
+    us: {
+        key: 'us',
+        label: 'US Pool',
+        slug: 'us',
+        defaultStartIndex: 1,
+        proxyUserPrefix: 'vpx',
+        mode: 'country',
+        modeValue: 'United States'
+    },
+    latam: {
+        key: 'latam',
+        label: 'LATAM Pool',
+        slug: 'latam',
+        defaultStartIndex: 2,
+        proxyUserPrefix: 'vpl',
+        mode: 'server_names',
+        modeValue: 'buenosaires410,bolivia401,saopaolo407,chile403,chile402,costarica403,ecuador402,guatemala401,mexico414,panama411,peru401,uruguay402,venezuela406,buenosaires409,mexico408'
+    },
+    eu: {
+        key: 'eu',
+        label: 'EU Pool',
+        slug: 'eu',
+        defaultStartIndex: 3,
+        proxyUserPrefix: 'vpe',
+        mode: 'server_names',
+        modeValue: 'madrid401,madrid403,madrid404,paris415,amsterdam447,zurich408,vienna403,brussels424,paris414,warsaw414,lisbon405,amsterdam428,zurich407,oslo407,vienna401'
+    }
+});
+let proxyMissionJobCounter = 0;
+let proxyMissionActiveJobId = null;
+let proxyMissionQueueDraining = false;
+const proxyMissionJobs = new Map();
+const proxyMissionJobQueue = [];
 const { ensureLandingLeadsTable, saveNFCCode, registerOrUpdateLead } = require('../utils/landingDb');
+const {
+    ensureLandingPagesTables,
+    listLandingPages,
+    getLandingPageById,
+    createLandingPage,
+    setLandingPageActive,
+    setLandingPageSortOrder
+} = require('../utils/landingPagesRegistry');
 const { syncUserToNotion } = require('../utils/notionHelper');
 const { sendMiniDiscShippedEmail, sendMiniDiscDelayEmail, sendMiniDiscConfirmationEmail } = require('../utils/emailHelper');
 const { getOrderStatus, createPayPalCartOrder, capturePayPalOrder, getPayPalConfig } = require('../utils/paypalHelper');
@@ -108,6 +170,632 @@ function listAvailableProxyPools() {
         .sort();
 }
 
+function createHttpError(statusCode, message) {
+    const error = new Error(message);
+    error.statusCode = statusCode;
+    return error;
+}
+
+function parseCsvLine(line) {
+    const values = [];
+    let current = '';
+    let inQuotes = false;
+
+    for (let idx = 0; idx < line.length; idx += 1) {
+        const char = line[idx];
+        if (char === '"') {
+            if (inQuotes && line[idx + 1] === '"') {
+                current += '"';
+                idx += 1;
+            } else {
+                inQuotes = !inQuotes;
+            }
+            continue;
+        }
+
+        if (char === ',' && !inQuotes) {
+            values.push(current);
+            current = '';
+            continue;
+        }
+
+        current += char;
+    }
+
+    values.push(current);
+    return values;
+}
+
+function loadProxyMissionAccounts() {
+    if (!fs.existsSync(proxyMissionInventoryCsv)) {
+        throw createHttpError(500, 'proxy_inventory_csv_missing');
+    }
+
+    const content = fs.readFileSync(proxyMissionInventoryCsv, 'utf8').replace(/^\uFEFF/, '');
+    const lines = content
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean);
+
+    if (lines.length < 2) {
+        throw createHttpError(500, 'proxy_inventory_csv_empty');
+    }
+
+    const headers = parseCsvLine(lines[0]).map((value) => String(value || '').trim().toLowerCase());
+    const boxIdIdx = headers.indexOf('box_id');
+    const piaUserIdx = headers.indexOf('pia_user');
+    const piaPassIdx = headers.indexOf('pia_pass');
+
+    if (piaUserIdx < 0 || piaPassIdx < 0) {
+        throw createHttpError(500, 'proxy_inventory_csv_invalid_headers');
+    }
+
+    const seenUsers = new Set();
+    const accounts = [];
+
+    for (let idx = 1; idx < lines.length; idx += 1) {
+        const columns = parseCsvLine(lines[idx]);
+        const piaUser = String(columns[piaUserIdx] || '').trim();
+        const piaPass = String(columns[piaPassIdx] || '').trim();
+        const boxId = boxIdIdx >= 0 ? String(columns[boxIdIdx] || '').trim() : '';
+
+        if (!piaUser || !piaPass) {
+            continue;
+        }
+
+        if (seenUsers.has(piaUser)) {
+            continue;
+        }
+
+        seenUsers.add(piaUser);
+        accounts.push({
+            boxId,
+            piaUser,
+            piaPass
+        });
+    }
+
+    accounts.sort((a, b) => {
+        const aMatch = String(a.boxId || '').toLowerCase().match(/^box(\d+)$/);
+        const bMatch = String(b.boxId || '').toLowerCase().match(/^box(\d+)$/);
+
+        if (aMatch && bMatch) {
+            return Number(aMatch[1]) - Number(bMatch[1]);
+        }
+        if (aMatch) return -1;
+        if (bMatch) return 1;
+
+        return String(a.boxId || '').localeCompare(String(b.boxId || ''));
+    });
+
+    return accounts;
+}
+
+function getProxyMissionSelectedAccounts(startIndex, boxCount) {
+    const accounts = loadProxyMissionAccounts();
+    const start = Number(startIndex) - 1;
+    const count = Number(boxCount);
+
+    if (!Number.isInteger(start) || start < 0 || start >= accounts.length) {
+        throw createHttpError(400, 'proxy_start_index_out_of_range');
+    }
+
+    if (!Number.isInteger(count) || count < 1 || count > PROXY_MISSION_MAX_BOXES) {
+        throw createHttpError(400, 'proxy_box_count_out_of_range');
+    }
+
+    if ((start + count) > accounts.length) {
+        throw createHttpError(400, `proxy_box_count_exceeds_inventory:${accounts.length - start}`);
+    }
+
+    return accounts.slice(start, start + count).map((account, idx) => ({
+        account,
+        absoluteIndex: start + idx + 1
+    }));
+}
+
+function resolveProxyMissionBoxLabel(account, absoluteIndex) {
+    const candidate = String(account?.boxId || '').trim().toLowerCase();
+    if (/^box\d+$/.test(candidate)) {
+        return candidate;
+    }
+
+    return `box${absoluteIndex}`;
+}
+
+function resolveProxyMissionBoxNumber(boxLabel, fallbackIndex) {
+    const match = String(boxLabel || '').toLowerCase().match(/^box(\d+)$/);
+    if (match) {
+        return Number.parseInt(match[1], 10);
+    }
+
+    return Number(fallbackIndex) || 1;
+}
+
+function getProxyMissionPoolName(account, absoluteIndex, preset) {
+    const boxLabel = resolveProxyMissionBoxLabel(account, absoluteIndex);
+    return `pia15-${boxLabel}-${preset.slug}`;
+}
+
+function getProxyMissionBasePort(account, absoluteIndex) {
+    const boxLabel = resolveProxyMissionBoxLabel(account, absoluteIndex);
+    const boxNumber = Math.max(1, resolveProxyMissionBoxNumber(boxLabel, absoluteIndex));
+    return PROXY_MISSION_BASE_PORT + ((boxNumber - 1) * PROXY_MISSION_TUNNELS_PER_BOX);
+}
+
+function appendProxyMissionLog(job, line) {
+    if (!job || !Array.isArray(job.logs)) {
+        return;
+    }
+
+    const text = String(line || '')
+        .replace(/\u0000/g, '')
+        .replace(/\r/g, '')
+        .trimEnd();
+
+    if (!text) {
+        return;
+    }
+
+    const timestamp = new Date().toISOString();
+    const entry = `[${timestamp}] ${text}`;
+    job.logs.push(entry);
+    if (job.logs.length > PROXY_MISSION_JOB_LOG_LIMIT) {
+        job.logs.splice(0, job.logs.length - PROXY_MISSION_JOB_LOG_LIMIT);
+    }
+}
+
+function runProxyMissionCommand(job, command, args, options = {}) {
+    const commandArgs = Array.isArray(args) ? args.map((value) => String(value)) : [];
+    const commandLabel = String(options.commandLabel || command).trim() || command;
+    appendProxyMissionLog(job, `$ ${commandLabel}`);
+
+    return new Promise((resolve, reject) => {
+        const child = spawn(command, commandArgs, {
+            cwd: options.cwd || proxyMissionWorkingDir,
+            env: {
+                ...process.env,
+                ...(options.env || {})
+            }
+        });
+
+        let settled = false;
+        let timedOut = false;
+        let timeoutHandle = null;
+
+        const attachLogger = (stream, prefix) => {
+            if (!stream) {
+                return () => {};
+            }
+
+            let carry = '';
+            stream.on('data', (chunk) => {
+                carry += String(chunk || '');
+                const lines = carry.split(/\r?\n/);
+                carry = lines.pop() || '';
+                for (const line of lines) {
+                    appendProxyMissionLog(job, `${prefix}${line}`);
+                }
+            });
+
+            stream.on('end', () => {
+                if (carry.trim()) {
+                    appendProxyMissionLog(job, `${prefix}${carry}`);
+                    carry = '';
+                }
+            });
+
+            return () => {
+                if (carry.trim()) {
+                    appendProxyMissionLog(job, `${prefix}${carry}`);
+                }
+            };
+        };
+
+        const flushStdout = attachLogger(child.stdout, '');
+        const flushStderr = attachLogger(child.stderr, '[stderr] ');
+
+        const settle = (callback) => {
+            if (settled) {
+                return;
+            }
+
+            settled = true;
+            if (timeoutHandle) {
+                clearTimeout(timeoutHandle);
+            }
+
+            try {
+                flushStdout();
+                flushStderr();
+            } catch (_error) {
+                // ignore flush issues
+            }
+
+            callback();
+        };
+
+        const timeoutMs = Number(options.timeoutMs || PROXY_MISSION_COMMAND_TIMEOUT_MS);
+        if (timeoutMs > 0) {
+            timeoutHandle = setTimeout(() => {
+                timedOut = true;
+                appendProxyMissionLog(job, `command_timeout_after_${timeoutMs}ms`);
+                child.kill('SIGTERM');
+                setTimeout(() => {
+                    if (!settled) {
+                        child.kill('SIGKILL');
+                    }
+                }, 5000);
+            }, timeoutMs);
+        }
+
+        child.on('error', (error) => {
+            settle(() => reject(error));
+        });
+
+        child.on('close', (code, signal) => {
+            if (timedOut) {
+                settle(() => reject(new Error(`command_timeout_after_${timeoutMs}ms`)));
+                return;
+            }
+
+            if (code !== 0) {
+                const suffix = signal ? `signal_${signal}` : `exit_${code}`;
+                settle(() => reject(new Error(`command_failed_${suffix}`)));
+                return;
+            }
+
+            settle(() => resolve());
+        });
+    });
+}
+
+async function resolveDockerComposeCommandParts() {
+    const composeCommand = await resolveDockerComposeCommand();
+    return String(composeCommand || '').split(/\s+/).filter(Boolean);
+}
+
+function cleanupProxyMissionJobs() {
+    const now = Date.now();
+    const completed = [];
+
+    for (const [jobId, job] of proxyMissionJobs.entries()) {
+        if (!job || job.status === 'queued' || job.status === 'running') {
+            continue;
+        }
+
+        const referenceTime = Date.parse(job.finishedAt || job.createdAt || 0);
+        if (!Number.isFinite(referenceTime)) {
+            continue;
+        }
+
+        if ((now - referenceTime) > PROXY_MISSION_JOB_RETENTION_MS) {
+            proxyMissionJobs.delete(jobId);
+            continue;
+        }
+
+        completed.push({ jobId, timestamp: referenceTime });
+    }
+
+    if (proxyMissionJobs.size <= 120) {
+        return;
+    }
+
+    completed
+        .sort((a, b) => a.timestamp - b.timestamp)
+        .slice(0, Math.max(0, proxyMissionJobs.size - 120))
+        .forEach((entry) => proxyMissionJobs.delete(entry.jobId));
+}
+
+function getProxyMissionQueuePosition(jobId) {
+    if (!jobId) {
+        return null;
+    }
+
+    if (proxyMissionActiveJobId === jobId) {
+        return 0;
+    }
+
+    const idx = proxyMissionJobQueue.indexOf(jobId);
+    if (idx < 0) {
+        return null;
+    }
+
+    return idx + 1;
+}
+
+function serializeProxyMissionJob(job) {
+    if (!job) {
+        return null;
+    }
+
+    return {
+        id: job.id,
+        type: job.type,
+        status: job.status,
+        payload: job.payload,
+        createdAt: job.createdAt,
+        startedAt: job.startedAt,
+        finishedAt: job.finishedAt,
+        error: job.error || '',
+        logs: Array.isArray(job.logs) ? job.logs : [],
+        queuePosition: getProxyMissionQueuePosition(job.id),
+        activeJobId: proxyMissionActiveJobId,
+        queueDepth: proxyMissionJobQueue.length
+    };
+}
+
+function getProxyMissionPresetMetadata() {
+    return Object.values(PROXY_MISSION_POOL_PRESETS).map((preset) => ({
+        key: preset.key,
+        label: preset.label,
+        defaultStartIndex: preset.defaultStartIndex
+    }));
+}
+
+function parseProxyMissionOperationRequest(rawBody) {
+    const body = rawBody && typeof rawBody === 'object' ? rawBody : {};
+    const poolKey = String(body.poolKey || '').trim().toLowerCase();
+    const preset = PROXY_MISSION_POOL_PRESETS[poolKey];
+    if (!preset) {
+        throw createHttpError(400, 'invalid_pool_key');
+    }
+
+    const boxCount = Number.parseInt(body.boxCount, 10);
+    if (!Number.isInteger(boxCount) || boxCount < 1 || boxCount > PROXY_MISSION_MAX_BOXES) {
+        throw createHttpError(400, 'invalid_box_count');
+    }
+
+    const rawStartIndex = body.startIndex;
+    const startIndex = String(rawStartIndex || '').trim()
+        ? Number.parseInt(rawStartIndex, 10)
+        : preset.defaultStartIndex;
+
+    if (!Number.isInteger(startIndex) || startIndex < 1 || startIndex > PROXY_MISSION_MAX_BOXES) {
+        throw createHttpError(400, 'invalid_start_index');
+    }
+
+    const accounts = loadProxyMissionAccounts();
+    if (startIndex > accounts.length) {
+        throw createHttpError(400, 'start_index_out_of_inventory_range');
+    }
+
+    if ((startIndex + boxCount - 1) > accounts.length) {
+        throw createHttpError(400, `requested_boxes_exceed_inventory:${accounts.length - startIndex + 1}`);
+    }
+
+    return {
+        poolKey,
+        boxCount,
+        startIndex
+    };
+}
+
+async function executeProxyMissionCreateJob(job) {
+    const payload = job.payload || {};
+    const preset = PROXY_MISSION_POOL_PRESETS[payload.poolKey];
+    if (!preset) {
+        throw createHttpError(400, 'invalid_pool_key');
+    }
+
+    if (!fs.existsSync(proxyDeployStackScript)) {
+        throw createHttpError(500, 'deploy_script_missing');
+    }
+    if (!fs.existsSync(proxyCheckPoolScript)) {
+        throw createHttpError(500, 'check_script_missing');
+    }
+
+    const selectedAccounts = getProxyMissionSelectedAccounts(payload.startIndex, payload.boxCount);
+    appendProxyMissionLog(
+        job,
+        `create_boxes pool=${preset.key} start=${payload.startIndex} count=${payload.boxCount} tunnels=${PROXY_MISSION_TUNNELS_PER_BOX}`
+    );
+
+    for (const selected of selectedAccounts) {
+        const poolName = getProxyMissionPoolName(selected.account, selected.absoluteIndex, preset);
+        const basePort = getProxyMissionBasePort(selected.account, selected.absoluteIndex);
+
+        appendProxyMissionLog(job, `[create] deploying ${poolName} (base_port=${basePort})`);
+
+        const deployArgs = [
+            proxyDeployStackScript,
+            '--pia-user',
+            selected.account.piaUser,
+            '--pia-pass',
+            selected.account.piaPass,
+            '--count',
+            String(PROXY_MISSION_TUNNELS_PER_BOX),
+            '--base-port',
+            String(basePort),
+            '--project',
+            poolName,
+            '--proxy-user-prefix',
+            preset.proxyUserPrefix,
+            '--proxy-pass-fixed',
+            PROXY_MISSION_FIXED_PROXY_PASS
+        ];
+
+        if (preset.mode === 'country') {
+            deployArgs.push('--country', preset.modeValue);
+        } else if (preset.mode === 'region') {
+            deployArgs.push('--region', preset.modeValue);
+        } else {
+            deployArgs.push('--server-names', preset.modeValue);
+        }
+
+        await runProxyMissionCommand(job, PROXY_MISSION_PYTHON_BIN, deployArgs, {
+            commandLabel: `deploy_pia_stack.py ${poolName}`,
+            timeoutMs: PROXY_MISSION_COMMAND_TIMEOUT_MS,
+            cwd: proxyMissionWorkingDir
+        });
+
+        const credentialsPath = path.join(proxyGeneratedRoot, poolName, 'proxy-credentials.csv');
+        if (!fs.existsSync(credentialsPath)) {
+            appendProxyMissionLog(job, `[warn] missing credentials file after deploy: ${credentialsPath}`);
+            continue;
+        }
+
+        const checkArgs = [
+            proxyCheckPoolScript,
+            '--input',
+            credentialsPath,
+            '--workers',
+            '8',
+            '--timeout',
+            '12',
+            '--heal'
+        ];
+
+        appendProxyMissionLog(job, `[create] health-check ${poolName}`);
+        await runProxyMissionCommand(job, PROXY_MISSION_PYTHON_BIN, checkArgs, {
+            commandLabel: `check_proxy_pool.py ${poolName} --heal`,
+            timeoutMs: PROXY_MISSION_COMMAND_TIMEOUT_MS,
+            cwd: proxyMissionWorkingDir
+        });
+    }
+}
+
+async function executeProxyMissionStopJob(job) {
+    const payload = job.payload || {};
+    const preset = PROXY_MISSION_POOL_PRESETS[payload.poolKey];
+    if (!preset) {
+        throw createHttpError(400, 'invalid_pool_key');
+    }
+
+    const selectedAccounts = getProxyMissionSelectedAccounts(payload.startIndex, payload.boxCount);
+    const composeCommandParts = await resolveDockerComposeCommandParts();
+
+    if (!composeCommandParts.length) {
+        throw createHttpError(500, 'docker_compose_not_available');
+    }
+
+    appendProxyMissionLog(
+        job,
+        `stop_boxes pool=${preset.key} start=${payload.startIndex} count=${payload.boxCount}`
+    );
+
+    for (const selected of selectedAccounts) {
+        const poolName = getProxyMissionPoolName(selected.account, selected.absoluteIndex, preset);
+        const composePath = path.join(proxyGeneratedRoot, poolName, 'docker-compose.yml');
+
+        if (!fs.existsSync(composePath)) {
+            appendProxyMissionLog(job, `[skip] compose file not found for ${poolName}`);
+            continue;
+        }
+
+        appendProxyMissionLog(job, `[stop] docker compose down ${poolName}`);
+        await runProxyMissionCommand(
+            job,
+            composeCommandParts[0],
+            [
+                ...composeCommandParts.slice(1),
+                '-f',
+                composePath,
+                '-p',
+                poolName,
+                'down'
+            ],
+            {
+                commandLabel: `docker-compose down ${poolName}`,
+                timeoutMs: PROXY_MISSION_COMMAND_TIMEOUT_MS,
+                cwd: proxyMissionWorkingDir
+            }
+        );
+
+        const credentialsPath = path.join(proxyGeneratedRoot, poolName, 'proxy-credentials.csv');
+        if (fs.existsSync(credentialsPath)) {
+            appendProxyMissionLog(job, `[stop] writing fresh status snapshot for ${poolName}`);
+            await runProxyMissionCommand(
+                job,
+                PROXY_MISSION_PYTHON_BIN,
+                [
+                    proxyCheckPoolScript,
+                    '--input',
+                    credentialsPath,
+                    '--workers',
+                    '6',
+                    '--timeout',
+                    '10'
+                ],
+                {
+                    commandLabel: `check_proxy_pool.py ${poolName}`,
+                    timeoutMs: PROXY_MISSION_COMMAND_TIMEOUT_MS,
+                    cwd: proxyMissionWorkingDir
+                }
+            );
+        }
+    }
+}
+
+function enqueueProxyMissionJob(type, payload, executor) {
+    cleanupProxyMissionJobs();
+
+    const pending = proxyMissionJobQueue.length + (proxyMissionActiveJobId ? 1 : 0);
+    if (pending >= PROXY_MISSION_QUEUE_LIMIT) {
+        throw createHttpError(429, 'proxy_operation_queue_full');
+    }
+
+    proxyMissionJobCounter += 1;
+    const jobId = `proxy-op-${Date.now()}-${proxyMissionJobCounter}`;
+    const job = {
+        id: jobId,
+        type,
+        status: 'queued',
+        payload,
+        executor,
+        createdAt: new Date().toISOString(),
+        startedAt: null,
+        finishedAt: null,
+        error: '',
+        logs: []
+    };
+
+    appendProxyMissionLog(job, `job_queued type=${type}`);
+    proxyMissionJobs.set(jobId, job);
+    proxyMissionJobQueue.push(jobId);
+    void drainProxyMissionQueue();
+    return job;
+}
+
+async function drainProxyMissionQueue() {
+    if (proxyMissionQueueDraining) {
+        return;
+    }
+
+    proxyMissionQueueDraining = true;
+
+    try {
+        while (proxyMissionJobQueue.length > 0) {
+            const jobId = proxyMissionJobQueue.shift();
+            const job = proxyMissionJobs.get(jobId);
+            if (!job || job.status !== 'queued') {
+                continue;
+            }
+
+            proxyMissionActiveJobId = jobId;
+            job.status = 'running';
+            job.startedAt = new Date().toISOString();
+            appendProxyMissionLog(job, `job_started type=${job.type}`);
+
+            try {
+                await job.executor(job);
+                job.status = 'completed';
+                appendProxyMissionLog(job, 'job_completed');
+            } catch (error) {
+                job.status = 'failed';
+                job.error = error.message || 'unknown_error';
+                appendProxyMissionLog(job, `job_failed: ${job.error}`);
+            } finally {
+                job.finishedAt = new Date().toISOString();
+                proxyMissionActiveJobId = null;
+                cleanupProxyMissionJobs();
+            }
+        }
+    } finally {
+        proxyMissionQueueDraining = false;
+    }
+}
+
 function redirectMiniDiscOrders(res, type, message) {
     const flash = encodeURIComponent(`${type}:${message}`);
     return res.redirect(`/tools/minidisc-orders?flash=${flash}`);
@@ -128,6 +816,19 @@ function parseMiniDiscFlash(raw) {
         type: ['success', 'error', 'warn', 'info'].includes(type) ? type : 'info',
         message: message || value
     };
+}
+
+function redirectLandingPages(res, type, message) {
+    const flash = encodeURIComponent(`${type}:${message}`);
+    return res.redirect(`/tools/landing-pages?flash=${flash}`);
+}
+
+function parseLandingPagesFlash(raw) {
+    const parsed = parseMiniDiscFlash(raw);
+    if (parsed) {
+        return parsed;
+    }
+    return null;
 }
 
 const STICKY_NOTE_DEFAULT_COLOR = '#FDE68A';
@@ -1003,6 +1704,116 @@ router.get('/', (req, res) => {
     res.render('tools/index', {
         title: 'Herramientas - El Inmortal 2 Dashboard'
     });
+});
+
+router.get('/landing-pages', async (req, res) => {
+    try {
+        await ensureLandingPagesTables();
+
+        const pages = await listLandingPages();
+        const activeCount = pages.filter((page) => page.isActive).length;
+        const flash = parseLandingPagesFlash(req.query.flash);
+
+        return res.render('tools/landing-pages', {
+            title: 'Landing Pages - El Inmortal 2 Dashboard',
+            pages,
+            activeCount,
+            flash
+        });
+    } catch (error) {
+        console.error('[Tools Landing Pages] Error loading page:', error);
+        return res.status(500).render('error', {
+            title: 'Error',
+            message: 'No se pudo cargar el manager de Landing Pages.',
+            error: process.env.NODE_ENV === 'development' ? error : {}
+        });
+    }
+});
+
+router.post('/landing-pages', async (req, res) => {
+    try {
+        await ensureLandingPagesTables();
+
+        const mode = String(req.body.mode || 'internal').trim().toLowerCase() === 'redirect'
+            ? 'redirect'
+            : 'internal';
+
+        const created = await createLandingPage({
+            slug: req.body.slug,
+            name: req.body.name,
+            description: req.body.description,
+            mode,
+            renderKey: mode === 'internal' ? req.body.render_key : null,
+            targetUrl: mode === 'redirect' ? req.body.target_url : null,
+            isActive: req.body.is_active === '1' || req.body.is_active === 'on' || req.body.is_active === 'true',
+            sortOrder: req.body.sort_order
+        });
+
+        return redirectLandingPages(res, 'success', `Landing creada: ${created.name}`);
+    } catch (error) {
+        console.error('[Tools Landing Pages] Error creating landing:', error.message);
+
+        const errorMap = {
+            landing_slug_required: 'Debes indicar un slug para la landing.',
+            landing_name_required: 'Debes indicar un nombre para la landing.',
+            landing_target_url_required: 'En modo redirect debes indicar Target URL.',
+            landing_slug_duplicate: 'Ese slug ya existe. Usa uno diferente.'
+        };
+
+        const message = errorMap[error.message] || 'No se pudo crear la landing.';
+        return redirectLandingPages(res, 'error', message);
+    }
+});
+
+router.post('/landing-pages/:id/toggle-active', async (req, res) => {
+    try {
+        await ensureLandingPagesTables();
+
+        const landingId = Number.parseInt(req.params.id, 10);
+        if (!Number.isInteger(landingId) || landingId <= 0) {
+            return redirectLandingPages(res, 'error', 'ID de landing invalido.');
+        }
+
+        const landingPage = await getLandingPageById(landingId);
+        if (!landingPage) {
+            return redirectLandingPages(res, 'error', 'Landing no encontrada.');
+        }
+
+        const updated = await setLandingPageActive(landingId, !landingPage.isActive);
+        const statusLabel = updated && updated.isActive ? 'activada' : 'desactivada';
+
+        return redirectLandingPages(res, 'success', `Landing ${statusLabel}: ${landingPage.name}`);
+    } catch (error) {
+        console.error('[Tools Landing Pages] Error toggling landing active state:', error);
+        return redirectLandingPages(res, 'error', 'No se pudo actualizar el estado de la landing.');
+    }
+});
+
+router.post('/landing-pages/:id/sort-order', async (req, res) => {
+    try {
+        await ensureLandingPagesTables();
+
+        const landingId = Number.parseInt(req.params.id, 10);
+        if (!Number.isInteger(landingId) || landingId <= 0) {
+            return redirectLandingPages(res, 'error', 'ID de landing invalido.');
+        }
+
+        const landingPage = await getLandingPageById(landingId);
+        if (!landingPage) {
+            return redirectLandingPages(res, 'error', 'Landing no encontrada.');
+        }
+
+        const sortOrder = Number.parseInt(String(req.body.sort_order || ''), 10);
+        if (!Number.isInteger(sortOrder)) {
+            return redirectLandingPages(res, 'error', 'Sort order invalido.');
+        }
+
+        await setLandingPageSortOrder(landingId, sortOrder);
+        return redirectLandingPages(res, 'success', `Orden actualizado para ${landingPage.name}.`);
+    } catch (error) {
+        console.error('[Tools Landing Pages] Error updating sort order:', error);
+        return redirectLandingPages(res, 'error', 'No se pudo actualizar el orden de la landing.');
+    }
 });
 
 router.get('/thumbnail-generator', (req, res) => {
@@ -2447,7 +3258,84 @@ router.get('/proxy/mission-control', (req, res) => {
     res.render('tools/proxy-mission-control', {
         title: 'Proxy Mission Control - El Inmortal 2 Dashboard',
         pools,
-        selectedPool: selected
+        selectedPool: selected,
+        poolPresets: getProxyMissionPresetMetadata(),
+        maxBoxes: PROXY_MISSION_MAX_BOXES
+    });
+});
+
+router.post('/proxy/mission-control/api/create-boxes', (req, res) => {
+    try {
+        const payload = parseProxyMissionOperationRequest(req.body);
+        const job = enqueueProxyMissionJob('create-boxes', payload, executeProxyMissionCreateJob);
+        return res.status(202).json({
+            ok: true,
+            job: serializeProxyMissionJob(job)
+        });
+    } catch (error) {
+        const statusCode = Number(error.statusCode) || 500;
+        return res.status(statusCode).json({
+            ok: false,
+            error: error.message || 'proxy_create_failed'
+        });
+    }
+});
+
+router.post('/proxy/mission-control/api/stop-boxes', (req, res) => {
+    try {
+        const payload = parseProxyMissionOperationRequest(req.body);
+        const job = enqueueProxyMissionJob('stop-boxes', payload, executeProxyMissionStopJob);
+        return res.status(202).json({
+            ok: true,
+            job: serializeProxyMissionJob(job)
+        });
+    } catch (error) {
+        const statusCode = Number(error.statusCode) || 500;
+        return res.status(statusCode).json({
+            ok: false,
+            error: error.message || 'proxy_stop_failed'
+        });
+    }
+});
+
+router.get('/proxy/mission-control/api/jobs/active', (req, res) => {
+    cleanupProxyMissionJobs();
+    const activeId = proxyMissionActiveJobId || proxyMissionJobQueue[0] || null;
+    if (!activeId) {
+        return res.json({
+            ok: true,
+            job: null
+        });
+    }
+
+    const job = proxyMissionJobs.get(activeId);
+    return res.json({
+        ok: true,
+        job: serializeProxyMissionJob(job)
+    });
+});
+
+router.get('/proxy/mission-control/api/jobs/:id', (req, res) => {
+    cleanupProxyMissionJobs();
+    const jobId = String(req.params.id || '').trim();
+    if (!jobId) {
+        return res.status(400).json({
+            ok: false,
+            error: 'missing_job_id'
+        });
+    }
+
+    const job = proxyMissionJobs.get(jobId);
+    if (!job) {
+        return res.status(404).json({
+            ok: false,
+            error: 'job_not_found'
+        });
+    }
+
+    return res.json({
+        ok: true,
+        job: serializeProxyMissionJob(job)
     });
 });
 

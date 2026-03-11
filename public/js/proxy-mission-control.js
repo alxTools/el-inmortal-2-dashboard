@@ -1,4 +1,6 @@
 (function () {
+    const missionConfig = window.__MISSION_CONTROL__ || {};
+
     const mapEl = document.getElementById('holo-map');
     const markersEl = document.getElementById('holo-markers');
     const linesEl = document.getElementById('holo-lines');
@@ -12,6 +14,21 @@
     const statCities = document.getElementById('stat-cities');
     const refreshNote = document.getElementById('refresh-note');
     const clock = document.getElementById('clock');
+
+    const profileSelect = document.getElementById('pool-profile');
+    const startIndexInput = document.getElementById('start-index');
+    const boxCountInput = document.getElementById('box-count');
+    const createBoxesBtn = document.getElementById('create-boxes');
+    const stopBoxesBtn = document.getElementById('stop-boxes');
+    const opsNote = document.getElementById('ops-note');
+    const opsLog = document.getElementById('ops-log');
+
+    const maxBoxes = Number.isFinite(Number(missionConfig.maxBoxes))
+        ? Math.max(1, Math.min(20, Number(missionConfig.maxBoxes)))
+        : 20;
+
+    let operationPollTimer = null;
+    let operationRequestInFlight = false;
 
     const coordsByCity = {
         'new jersey': [40.0583, -74.4057],
@@ -35,10 +52,224 @@
         'lima district': [-12.0464, -77.0428],
         'new york': [40.7128, -74.006],
         washington: [38.9072, -77.0369],
-        'coban': [15.4697, -90.3729]
+        coban: [15.4697, -90.3729]
     };
 
     const hub = { lat: 18.2208, lon: -66.5901 }; // Puerto Rico
+
+    function clampInt(value, fallback, min, max) {
+        const parsed = Number.parseInt(value, 10);
+        if (!Number.isFinite(parsed)) {
+            return fallback;
+        }
+        return Math.max(min, Math.min(max, parsed));
+    }
+
+    function getProfileDefaultStart() {
+        if (!profileSelect) {
+            return 1;
+        }
+
+        const option = profileSelect.options[profileSelect.selectedIndex];
+        const defaultStart = Number.parseInt(option?.dataset?.defaultStart || '1', 10);
+        if (Number.isFinite(defaultStart) && defaultStart > 0) {
+            return defaultStart;
+        }
+
+        return 1;
+    }
+
+    function syncStartIndexToProfile() {
+        if (!startIndexInput) {
+            return;
+        }
+
+        startIndexInput.value = String(clampInt(getProfileDefaultStart(), 1, 1, maxBoxes));
+    }
+
+    function getOperationPayload() {
+        const poolKey = String(profileSelect?.value || '').trim().toLowerCase();
+        const startIndex = clampInt(startIndexInput?.value, getProfileDefaultStart(), 1, maxBoxes);
+        const boxCount = clampInt(boxCountInput?.value, 1, 1, maxBoxes);
+
+        if (startIndexInput) {
+            startIndexInput.value = String(startIndex);
+        }
+        if (boxCountInput) {
+            boxCountInput.value = String(boxCount);
+        }
+
+        return {
+            poolKey,
+            startIndex,
+            boxCount
+        };
+    }
+
+    function stopOperationPolling() {
+        if (operationPollTimer) {
+            clearInterval(operationPollTimer);
+            operationPollTimer = null;
+        }
+    }
+
+    function setOperationBusy(isBusy) {
+        const disabled = Boolean(isBusy) || operationRequestInFlight;
+
+        if (profileSelect) profileSelect.disabled = disabled;
+        if (startIndexInput) startIndexInput.disabled = disabled;
+        if (boxCountInput) boxCountInput.disabled = disabled;
+        if (createBoxesBtn) createBoxesBtn.disabled = disabled;
+        if (stopBoxesBtn) stopBoxesBtn.disabled = disabled;
+    }
+
+    function renderOperationJob(job) {
+        if (!opsNote || !opsLog) {
+            return;
+        }
+
+        if (!job) {
+            opsNote.textContent = 'No hay operaciones activas.';
+            opsLog.textContent = '';
+            setOperationBusy(false);
+            return;
+        }
+
+        const status = String(job.status || '').toLowerCase();
+        const isBusy = status === 'queued' || status === 'running';
+        const queueInfo = job.queuePosition === 0
+            ? 'ejecutando ahora'
+            : (job.queuePosition ? `en cola #${job.queuePosition}` : status);
+
+        const headline = `${job.type || 'operation'} - ${queueInfo}`;
+        if (status === 'failed' && job.error) {
+            opsNote.textContent = `${headline} - error: ${job.error}`;
+        } else if (status === 'completed') {
+            opsNote.textContent = `${headline} - completado`;
+        } else {
+            opsNote.textContent = headline;
+        }
+
+        const stickToBottom = (opsLog.scrollTop + opsLog.clientHeight) >= (opsLog.scrollHeight - 30);
+        const logs = Array.isArray(job.logs) ? job.logs : [];
+        opsLog.textContent = logs.join('\n');
+        if (stickToBottom) {
+            opsLog.scrollTop = opsLog.scrollHeight;
+        }
+
+        setOperationBusy(isBusy);
+    }
+
+    async function fetchJson(url, options) {
+        const response = await fetch(url, options);
+        let payload = null;
+
+        try {
+            payload = await response.json();
+        } catch (_error) {
+            payload = null;
+        }
+
+        if (!response.ok || (payload && payload.ok === false)) {
+            const message = payload?.error || `request_failed_${response.status}`;
+            throw new Error(message);
+        }
+
+        return payload || { ok: true };
+    }
+
+    async function pollOperationJob(jobId) {
+        if (!jobId) {
+            return;
+        }
+
+        stopOperationPolling();
+
+        const pollOnce = async () => {
+            try {
+                const payload = await fetchJson(`/tools/proxy/mission-control/api/jobs/${encodeURIComponent(jobId)}`, {
+                    cache: 'no-store'
+                });
+                const job = payload?.job || null;
+                renderOperationJob(job);
+
+                const status = String(job?.status || '').toLowerCase();
+                if (status === 'completed' || status === 'failed') {
+                    stopOperationPolling();
+                    setOperationBusy(false);
+                    refresh();
+                }
+            } catch (error) {
+                if (opsNote) {
+                    opsNote.textContent = `No se pudo actualizar job: ${error.message}`;
+                }
+            }
+        };
+
+        await pollOnce();
+        operationPollTimer = setInterval(pollOnce, 2500);
+    }
+
+    async function submitOperation(endpoint, confirmationText) {
+        if (operationRequestInFlight) {
+            return;
+        }
+
+        const payload = getOperationPayload();
+        if (!payload.poolKey) {
+            if (opsNote) opsNote.textContent = 'Selecciona un perfil antes de ejecutar.';
+            return;
+        }
+
+        if (confirmationText && !window.confirm(confirmationText)) {
+            return;
+        }
+
+        try {
+            operationRequestInFlight = true;
+            setOperationBusy(true);
+
+            const response = await fetchJson(endpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            });
+
+            const job = response?.job || null;
+            renderOperationJob(job);
+            if (job?.id) {
+                await pollOperationJob(job.id);
+            }
+        } catch (error) {
+            if (opsNote) {
+                opsNote.textContent = `Operacion rechazada: ${error.message}`;
+            }
+            setOperationBusy(false);
+        } finally {
+            operationRequestInFlight = false;
+        }
+    }
+
+    async function hydrateActiveJob() {
+        if (!opsNote || !opsLog) {
+            return;
+        }
+
+        try {
+            const payload = await fetchJson('/tools/proxy/mission-control/api/jobs/active', {
+                cache: 'no-store'
+            });
+            const job = payload?.job || null;
+            renderOperationJob(job);
+            if (job?.id) {
+                await pollOperationJob(job.id);
+            }
+        } catch (_error) {
+            renderOperationJob(null);
+        }
+    }
 
     function tickClock() {
         clock.textContent = new Date().toLocaleString('es-PR', { hour12: false });
@@ -151,7 +382,7 @@
             const data = await res.json();
             draw(data);
             refreshNote.textContent = `Last sync: ${new Date().toLocaleTimeString('es-PR', { hour12: false })}`;
-        } catch (err) {
+        } catch (_error) {
             refreshNote.textContent = 'Telemetry error';
         }
     }
@@ -160,8 +391,32 @@
     forceBtn.addEventListener('click', refresh);
     window.addEventListener('resize', refresh);
 
+    if (profileSelect) {
+        profileSelect.addEventListener('change', syncStartIndexToProfile);
+    }
+
+    if (createBoxesBtn) {
+        createBoxesBtn.addEventListener('click', () => {
+            submitOperation(
+                '/tools/proxy/mission-control/api/create-boxes',
+                'Esto desplegara cajas nuevas para el perfil seleccionado. Continuar?'
+            );
+        });
+    }
+
+    if (stopBoxesBtn) {
+        stopBoxesBtn.addEventListener('click', () => {
+            submitOperation(
+                '/tools/proxy/mission-control/api/stop-boxes',
+                'Esto detendra las cajas seleccionadas. Confirmas stop?'
+            );
+        });
+    }
+
+    syncStartIndexToProfile();
     tickClock();
     refresh();
+    hydrateActiveJob();
     setInterval(tickClock, 1000);
     setInterval(refresh, 15000);
 })();

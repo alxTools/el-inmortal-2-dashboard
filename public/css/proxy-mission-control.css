@@ -29,7 +29,7 @@ body {
 .mission-shell {
     font-family: "Rajdhani", "Segoe UI", sans-serif;
     display: grid;
-    grid-template-rows: auto auto auto 1fr;
+    grid-template-rows: auto auto auto auto 1fr;
     gap: 14px;
     min-height: calc(100vh - 70px);
     height: calc(100vh - 70px);
@@ -99,6 +99,77 @@ body {
 
 .controls button {
     cursor: pointer;
+}
+
+.ops-panel {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 10px 12px;
+    display: grid;
+    gap: 8px;
+}
+
+.ops-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+
+.ops-controls label {
+    color: var(--muted);
+    font-size: 0.86rem;
+}
+
+.ops-controls select,
+.ops-controls input,
+.ops-controls button {
+    background: #061429;
+    color: var(--text);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-family: inherit;
+}
+
+.ops-controls input {
+    width: 84px;
+}
+
+.ops-controls button {
+    cursor: pointer;
+}
+
+.ops-controls button.danger {
+    border-color: rgba(255, 91, 108, 0.7);
+    color: #ffc7cd;
+}
+
+.ops-controls button:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+#ops-note {
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.85rem;
+}
+
+#ops-log {
+    margin: 0;
+    min-height: 90px;
+    max-height: 170px;
+    overflow: auto;
+    border: 1px solid rgba(106, 160, 255, 0.28);
+    border-radius: 9px;
+    padding: 8px;
+    background: rgba(3, 10, 22, 0.8);
+    color: #c5dcff;
+    font-size: 0.73rem;
+    line-height: 1.4;
+    white-space: pre-wrap;
 }
 
 .stats-grid {
@@ -265,4 +336,5 @@ body {
     .holo-stage { grid-template-columns: 1fr; }
     .holo-map { min-height: 300px; }
     .feed-panel { min-height: 300px; }
+    .ops-controls input { width: 78px; }
 }

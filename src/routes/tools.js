@@ -11,7 +11,7 @@ const execAsync = promisify(exec);
 const proxyGeneratedRoot = path.join(__dirname, '../../scripts/proxy/generated');
 const { ensureLandingLeadsTable } = require('../utils/landingDb');
 const { syncUserToNotion } = require('../utils/notionHelper');
-const { sendMiniDiscShippedEmail } = require('../utils/emailHelper');
+const { sendMiniDiscShippedEmail, sendMiniDiscDelayEmail } = require('../utils/emailHelper');
 
 const {
     ensureYoutubeMetadataTables,
@@ -218,6 +218,8 @@ router.get('/minidisc-orders', async (req, res) => {
                 paypal_payer_email,
                 nfc_unique_code,
                 nfc_link,
+                minidisc_delay_email_sent,
+                minidisc_delay_email_sent_at,
                 package_shipped,
                 tracking_number
              FROM landing_email_leads
@@ -228,7 +230,9 @@ router.get('/minidisc-orders', async (req, res) => {
         const normalizedOrders = (orders || []).map((order) => ({
             ...order,
             package_shipped: Number(order.package_shipped) === 1,
-            tracking_number: String(order.tracking_number || '').trim()
+            tracking_number: String(order.tracking_number || '').trim(),
+            minidisc_delay_email_sent: Number(order.minidisc_delay_email_sent) === 1,
+            minidisc_delay_email_sent_at: order.minidisc_delay_email_sent_at || null
         }));
 
         const pendingOrders = normalizedOrders.filter((order) => !order.package_shipped);
@@ -266,6 +270,79 @@ router.get('/minidisc-order', (_req, res) => {
 
 router.get('/minidisc-fulfillment', (_req, res) => {
     return res.redirect('/tools/minidisc-orders');
+});
+
+router.post('/minidisc-orders/:id/send-delay-email', async (req, res) => {
+    const orderId = Number(req.params.id || 0);
+    if (!orderId) {
+        return redirectMiniDiscOrders(res, 'error', 'ID de orden invalido.');
+    }
+
+    try {
+        await ensureLandingLeadsTable();
+
+        const order = await getOne(
+            `SELECT
+                id,
+                email,
+                full_name,
+                paypal_order_id,
+                paypal_payment_status,
+                package_shipped,
+                minidisc_delay_email_sent,
+                minidisc_delay_email_sent_at
+             FROM landing_email_leads
+             WHERE id = ?`,
+            [orderId]
+        );
+
+        if (!order) {
+            return redirectMiniDiscOrders(res, 'error', 'Orden no encontrada.');
+        }
+
+        if (order.paypal_payment_status !== 'captured') {
+            return redirectMiniDiscOrders(res, 'error', 'Solo se permite aviso para pagos capturados.');
+        }
+
+        if (Number(order.package_shipped) === 1) {
+            return redirectMiniDiscOrders(res, 'warn', 'La orden ya fue enviada. Usa Reenviar Email de envio.');
+        }
+
+        if (Number(order.minidisc_delay_email_sent) === 1 || order.minidisc_delay_email_sent_at) {
+            return redirectMiniDiscOrders(res, 'warn', 'Ya se envio un aviso de retraso para esta orden.');
+        }
+
+        const emailResult = await sendMiniDiscDelayEmail({
+            to: order.email,
+            name: order.full_name,
+            orderId: order.paypal_order_id
+        });
+
+        if (!emailResult.success) {
+            return redirectMiniDiscOrders(
+                res,
+                'error',
+                `No se pudo enviar aviso de retraso (${emailResult.error || 'error_desconocido'}).`
+            );
+        }
+
+        await run(
+            `UPDATE landing_email_leads
+             SET minidisc_delay_email_sent = 1,
+                 minidisc_delay_email_sent_at = COALESCE(minidisc_delay_email_sent_at, CURRENT_TIMESTAMP)
+             WHERE id = ?`,
+            [orderId]
+        );
+
+        return redirectMiniDiscOrders(
+            res,
+            'success',
+            `Aviso de retraso enviado a ${order.email}.`
+        );
+    } catch (error) {
+        console.error('[MiniDisc Orders] Error enviando aviso de retraso:', error);
+        return redirectMiniDiscOrders(res, 'error', `No se pudo enviar aviso de retraso: ${error.message}`);
+    }
 });
 
 router.post('/minidisc-orders/:id/complete', async (req, res) => {

@@ -166,6 +166,26 @@
             color: #e2e8f0;
         }
 
+        .btn-warning-inline {
+            border-color: rgba(245, 158, 11, 0.5);
+            background: rgba(245, 158, 11, 0.18);
+            color: #fde68a;
+        }
+
+        .btn-inline:disabled,
+        .btn-inline[disabled] {
+            cursor: not-allowed;
+            opacity: 0.55;
+            filter: saturate(0.35);
+            box-shadow: none;
+        }
+
+        .action-note {
+            font-size: 0.68rem;
+            color: #fbbf24;
+            letter-spacing: 0.02em;
+        }
+
         .empty {
             color: #94a3b8;
             padding: 24px 10px;
@@ -264,6 +284,19 @@
                                                 required
                                             >
                                             <button type="submit" class="btn-inline btn-primary-inline">Completar + Notificar</button>
+                                        </form>
+
+                                        <form method="POST" action="/tools/minidisc-orders/<%= order.id %>/send-delay-email" class="inline-form">
+                                            <button
+                                                type="submit"
+                                                class="btn-inline btn-warning-inline"
+                                                <%= order.minidisc_delay_email_sent ? 'disabled title="Ya se envio un aviso de retraso"' : '' %>
+                                            >
+                                                <%= order.minidisc_delay_email_sent ? 'Aviso de retraso enviado' : 'Avisar retraso (3-5 dias)' %>
+                                            </button>
+                                            <% if (order.minidisc_delay_email_sent_at) { %>
+                                                <span class="action-note">Enviado: <%= new Date(order.minidisc_delay_email_sent_at).toLocaleString('es-PR') %></span>
+                                            <% } %>
                                         </form>
                                     </div>
                                 </td>

@@ -36,6 +36,8 @@ async function ensureLandingLeadsTable() {
                     paypal_payer_email TEXT,
                     minidisc_email_sent_at DATETIME,
                     minidisc_email_sent INTEGER DEFAULT 0,
+                    minidisc_delay_email_sent_at DATETIME,
+                    minidisc_delay_email_sent INTEGER DEFAULT 0,
                     nfc_unique_code TEXT UNIQUE,
                     nfc_link TEXT,
                     package_shipped INTEGER DEFAULT 0,
@@ -79,6 +81,12 @@ async function ensureLandingLeadsTable() {
             if (!columnSet.has('minidisc_email_sent')) {
                 await query('ALTER TABLE landing_email_leads ADD COLUMN minidisc_email_sent INTEGER DEFAULT 0');
             }
+            if (!columnSet.has('minidisc_delay_email_sent_at')) {
+                await query('ALTER TABLE landing_email_leads ADD COLUMN minidisc_delay_email_sent_at DATETIME');
+            }
+            if (!columnSet.has('minidisc_delay_email_sent')) {
+                await query('ALTER TABLE landing_email_leads ADD COLUMN minidisc_delay_email_sent INTEGER DEFAULT 0');
+            }
             if (!columnSet.has('nfc_unique_code')) {
                 await query('ALTER TABLE landing_email_leads ADD COLUMN nfc_unique_code TEXT UNIQUE');
             }
@@ -110,6 +118,8 @@ async function ensureLandingLeadsTable() {
                     paypal_payer_email VARCHAR(255) NULL,
                     minidisc_email_sent_at DATETIME NULL,
                     minidisc_email_sent TINYINT DEFAULT 0,
+                    minidisc_delay_email_sent_at DATETIME NULL,
+                    minidisc_delay_email_sent TINYINT DEFAULT 0,
                     nfc_unique_code VARCHAR(20) UNIQUE NULL,
                     nfc_link VARCHAR(255) NULL,
                     package_shipped TINYINT DEFAULT 0,
@@ -157,6 +167,8 @@ async function ensureLandingLeadsTable() {
             await addColumnIfNotExists('paypal_payer_email', 'VARCHAR(255) NULL');
             await addColumnIfNotExists('minidisc_email_sent_at', 'DATETIME NULL');
             await addColumnIfNotExists('minidisc_email_sent', 'TINYINT DEFAULT 0');
+            await addColumnIfNotExists('minidisc_delay_email_sent_at', 'DATETIME NULL');
+            await addColumnIfNotExists('minidisc_delay_email_sent', 'TINYINT DEFAULT 0');
             await addColumnIfNotExists('nfc_unique_code', 'VARCHAR(20) UNIQUE NULL');
             await addColumnIfNotExists('nfc_link', 'VARCHAR(255) NULL');
             await addColumnIfNotExists('package_shipped', 'TINYINT DEFAULT 0');

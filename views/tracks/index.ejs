@@ -240,41 +240,56 @@
         }
     </style>
 </head>
-<body>
+<body class="dashboard-view density-compact mission-control-mode page-tracks">
     <%- include('../partials/navbar') %>
 
-    <div class="container" style="padding-top: 40px;">
+    <div class="container tracks-mission-shell">
+        <%
+            const totalTracksCount = tracks.length;
+            const singlesCount = tracks.filter((t) => t.is_single).length;
+            const primaryCount = tracks.filter((t) => t.is_primary).length;
+            const splitsOkCount = tracks.filter((t) => t.splitsheet_confirmed).length;
+        %>
+
+        <div class="mission-strip tracks-mission-strip" aria-label="Estado temas">
+            <span class="mission-chip mission-chip-live">TRACK OPS ONLINE</span>
+            <span class="mission-chip">TOTAL <%= totalTracksCount %></span>
+            <span class="mission-chip">SINGLES <%= singlesCount %></span>
+            <span class="mission-chip">PRIMARY <%= primaryCount %></span>
+            <span class="mission-chip">SPLITS OK <%= splitsOkCount %></span>
+        </div>
+
         <!-- Server Port Notice -->
-        <div id="portNotice" style="background: rgba(255, 215, 0, 0.1); border: 2px solid #ffd700; border-radius: 10px; padding: 15px; margin-bottom: 20px; text-align: center;">
-            <p style="color: #ffd700; margin: 0; font-weight: bold;">
+        <div id="portNotice" class="tracks-port-notice">
+            <p class="tracks-port-notice-main">
                 🌐 Servidor activo en: <span id="currentPort">db.artistaviral.com:3003</span>
             </p>
-            <p style="color: #888; font-size: 0.85em; margin: 5px 0 0 0;">
+            <p class="tracks-port-notice-sub">
                 Si ves errores, verifica que estés usando esta URL
             </p>
         </div>
 
-        <div class="section-header" style="margin-bottom: 30px;">
+        <div class="section-header tracks-page-header">
             <h1>🎵 El Inmortal 2 - Lista de Temas</h1>
             <a href="/tracks/new" class="btn">+ Nuevo Tema</a>
         </div>
 
         <!-- Stats Overview -->
-        <div class="stats-overview">
-            <div class="stat-mini">
-                <div class="number"><%= tracks.length %></div>
+        <div class="stats-overview" data-layout-container="tracks-stats-overview">
+            <div class="stat-mini" data-layout-item="tracks-stat-total">
+                <div class="number"><%= totalTracksCount %></div>
                 <div class="label">Total Temas</div>
             </div>
-            <div class="stat-mini">
-                <div class="number" style="color: #ff6b6b;"><%= tracks.filter(t => t.is_single).length %></div>
+            <div class="stat-mini" data-layout-item="tracks-stat-singles">
+                <div class="number" style="color: #ff6b6b;"><%= singlesCount %></div>
                 <div class="label">Sencillos</div>
             </div>
-            <div class="stat-mini">
-                <div class="number" style="color: #ffd700;"><%= tracks.filter(t => t.is_primary).length %></div>
+            <div class="stat-mini" data-layout-item="tracks-stat-primary">
+                <div class="number" style="color: #ffd700;"><%= primaryCount %></div>
                 <div class="label">Principales</div>
             </div>
-            <div class="stat-mini">
-                <div class="number" style="color: #28a745;"><%= tracks.filter(t => t.splitsheet_confirmed).length %></div>
+            <div class="stat-mini" data-layout-item="tracks-stat-splits-ok">
+                <div class="number" style="color: #28a745;"><%= splitsOkCount %></div>
                 <div class="label">Splits OK</div>
             </div>
         </div>
@@ -288,8 +303,8 @@
             <a href="/tracks?filter=pending" class="filter-tab <%= currentFilter === 'pending' ? 'active' : '' %>">⚠️ Sin Splitsheet</a>
         </div>
 
-        <div class="section">
-            <table class="tracks-table">
+        <div class="section tracks-mission-table-shell">
+            <table class="tracks-table tracks-mission-table">
                 <thead>
                     <tr>
                         <th style="width: 50px;">#</th>
@@ -304,7 +319,7 @@
                 <tbody>
                     <% tracks.forEach(track => { %>
                     <tr class="track-row <%= track.is_single ? 'single' : '' %> <%= track.is_primary ? 'primary' : '' %>">
-                        <td style="font-weight: bold; color: #ffd700;"><%= track.track_number %></td>
+                        <td class="track-number-cell"><%= track.track_number %></td>
                         <td>
                             <strong><%= track.title || 'Sin título' %></strong>
                             <% if (track.features) { %>
@@ -368,14 +383,14 @@
         </div>
 
         <!-- Quick Legend -->
-        <div style="margin-top: 30px; padding: 20px; background: rgba(255, 255, 255, 0.03); border-radius: 10px;">
-            <h3 style="color: #ffd700; margin-bottom: 15px; font-size: 1.1em;">📋 Leyenda:</h3>
-            <div style="display: flex; gap: 20px; flex-wrap: wrap; font-size: 0.9em;">
+        <div class="tracks-legend-card">
+            <h3>📋 Leyenda:</h3>
+            <div class="tracks-legend-items">
                 <span><span style="color: #ff6b6b;">█</span> Sencillo (Lanzamiento principal)</span>
                 <span><span style="color: #ffd700;">█</span> Principal (Track destacado)</span>
                 <span><span style="color: #666;">█</span> Track de álbum regular</span>
             </div>
-            <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid rgba(255, 255, 255, 0.1); font-size: 0.85em; color: #888;">
+            <div class="tracks-legend-subline">
                 <strong>Indicadores de archivos:</strong> 🎵 Audio | 🖼️ Imagen | 📝 Letra
             </div>
         </div>
@@ -542,5 +557,6 @@
             }
         });
     </script>
+    <script src="/js/layout-editor.js"></script>
 </body>
 </html>

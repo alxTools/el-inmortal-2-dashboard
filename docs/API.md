@@ -144,6 +144,20 @@ Mounted under `/api/v1/uploads`:
 - `POST /track/:id/audio/replace`
 - `DELETE /track/:id/audio`
 - `GET /track/:id/audio`
+- `POST /project-zip` (pre-upload ZIP before creating track)
+- `POST /track/:id/project-zip`
+- `DELETE /track/:id/project-zip`
+
+ZIP uploads are stored in Google Drive. You can dedicate a folder with:
+
+- `GOOGLE_DRIVE_PROJECT_ZIP_FOLDER_ID` (preferred)
+- or `GOOGLE_DRIVE_PROJECT_ZIP_FOLDER_NAME` (auto-create/find)
+
+Default folder name when not set: `EI2_Project_Data_Zips`.
+
+To create/verify this folder and get the final folder ID, run:
+
+- `npm run gdrive:ensure-project-zip-folder`
 - `POST /track/:id/cover`
 - `POST /album/cover`
 - `POST /avatar/:type/:id`

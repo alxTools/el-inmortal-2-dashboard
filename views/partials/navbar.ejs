@@ -5,7 +5,7 @@
     </a>
     
     <!-- Mobile Menu Toggle -->
-    <button class="mobile-menu-toggle" id="mobileMenuToggle" aria-label="Toggle menu">
+    <button class="mobile-menu-toggle" id="mobileMenuToggle" aria-label="Toggle menu" aria-expanded="false" aria-controls="navbarNav">
         <span></span>
         <span></span>
         <span></span>
@@ -23,17 +23,13 @@
                 <li><a href="/artists" data-tooltip="Artistas">👥 Artistas</a></li>
                 <li><a href="/splitsheets" data-tooltip="Splitsheets">📄 Splitsheets</a></li>
                 <li><a href="/calendar" data-tooltip="Calendario">📅 Calendario</a></li>
-                <li><a href="/checklist" data-tooltip="Checklist">✅ Checklist</a></li>
                 <li><a href="/tools" data-tooltip="Herramientas">🧰 Tools</a></li>
-                <li><a href="/ei2" target="_blank" rel="noreferrer" data-tooltip="Ver landing público">🚀 Landing</a></li>
-                <li><a href="/settings" data-tooltip="Configuración">⚙️ Config</a></li>
+                <li><a href="/tools/proxy/mission-control" data-tooltip="Agents">🤖 Agents</a></li>
             <% } else { %>
                 <!-- FAN NAVBAR -->
                 <li><a href="/albums/1" data-tooltip="Ver álbum">🎵 EI2</a></li>
                 <li><a href="/splitsheets" data-tooltip="Splitsheets">📄 Splitsheets</a></li>
-                <li><a href="/checklist" data-tooltip="Checklist">✅ Checklist</a></li>
                 <li><a href="/tools" data-tooltip="Herramientas">🧰 Tools</a></li>
-                <li><a href="/settings" data-tooltip="Mi cuenta">⚙️ Config</a></li>
             <% } %>
             <li><a href="/auth/logout" data-tooltip="Cerrar sesión">🚪 Salir</a></li>
         <% } else { %>
@@ -42,33 +38,149 @@
     </ul>
 </nav>
 
+<div class="global-mission-strip" id="globalMissionStrip" aria-label="Dashboard mission strip">
+    <span class="mission-chip mission-chip-live">MISSION CONTROL</span>
+    <span class="mission-chip" id="globalMissionRoute">ROUTE: DASHBOARD</span>
+    <span class="mission-chip" id="globalMissionStatus">STATUS: STABLE</span>
+    <span class="mission-chip mission-chip-clock">UTC <span id="realtime-clock-global">--:--:--</span></span>
+</div>
+
 <script>
-    // Mobile menu toggle
-    document.addEventListener('DOMContentLoaded', function() {
+    function applyDashboardMissionTheme() {
+        const body = document.body;
+        if (!body) return;
+
+        body.classList.add('dashboard-view', 'density-compact', 'mission-control-mode');
+
+        const normalizedPath = (window.location.pathname || '/').replace(/\/+$/, '') || '/';
+        const firstSegment = normalizedPath === '/'
+            ? 'home'
+            : (normalizedPath.split('/').filter(Boolean)[0] || 'home');
+        const routeClass = `route-${String(firstSegment).toLowerCase().replace(/[^a-z0-9-]/g, '-')}`;
+        body.classList.add(routeClass);
+
+        const routeChip = document.getElementById('globalMissionRoute');
+        const statusChip = document.getElementById('globalMissionStatus');
+        const strip = document.getElementById('globalMissionStrip');
+
+        const routeLabelMap = {
+            '/': 'DASHBOARD',
+            '/tracks': 'TRACKS',
+            '/producers': 'PRODUCERS',
+            '/artists': 'ARTISTS',
+            '/composers': 'COMPOSERS',
+            '/splitsheets': 'SPLITSHEETS',
+            '/calendar': 'CALENDAR',
+            '/checklist': 'CHECKLIST',
+            '/tools': 'TOOLS',
+            '/albums': 'ALBUMS',
+            '/settings': 'SETTINGS'
+        };
+
+        const matchedPrefix = Object.keys(routeLabelMap)
+            .sort((a, b) => b.length - a.length)
+            .find((prefix) => normalizedPath === prefix || normalizedPath.startsWith(`${prefix}/`));
+
+        const routeLabel = routeLabelMap[matchedPrefix || '/'] || 'DASHBOARD';
+        if (routeChip) {
+            routeChip.textContent = `ROUTE: ${routeLabel}`;
+        }
+
+        let statusLabel = 'STATUS: STABLE';
+        if (/\/new($|\/)/.test(normalizedPath)) {
+            statusLabel = 'STATUS: CREATE MODE';
+        } else if (/\/edit($|\/)/.test(normalizedPath)) {
+            statusLabel = 'STATUS: EDIT MODE';
+        } else if (/\/tools($|\/)/.test(normalizedPath)) {
+            statusLabel = 'STATUS: OPS LAB';
+        }
+
+        if (statusChip) {
+            statusChip.textContent = statusLabel;
+        }
+
+        if (strip) {
+            const hasDedicatedStrip = Boolean(
+                document.querySelector('.dashboard-hero') ||
+                document.querySelector('.tracks-mission-strip') ||
+                document.querySelector('.tools-mission-strip')
+            );
+            if (hasDedicatedStrip) {
+                strip.classList.add('is-hidden');
+            }
+        }
+    }
+
+    function initGlobalMissionClock() {
+        const clockEl = document.getElementById('realtime-clock-global');
+        if (!clockEl || clockEl.dataset.clockInit === '1') return;
+        clockEl.dataset.clockInit = '1';
+
+        const tick = () => {
+            const now = new Date();
+            clockEl.textContent = now.toLocaleTimeString('es-ES', {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+        };
+
+        tick();
+        window.setInterval(tick, 1000);
+    }
+
+    function initNavbarMobileMenu() {
+        applyDashboardMissionTheme();
+        initGlobalMissionClock();
+
         const mobileMenuToggle = document.getElementById('mobileMenuToggle');
         const navbarNav = document.getElementById('navbarNav');
-        
+
         if (!mobileMenuToggle || !navbarNav) return;
-        
+        if (mobileMenuToggle.dataset.navInit === '1') return;
+        mobileMenuToggle.dataset.navInit = '1';
+
         mobileMenuToggle.addEventListener('click', function(e) {
             e.preventDefault();
             e.stopPropagation();
             this.classList.toggle('active');
             navbarNav.classList.toggle('active');
+            const expanded = navbarNav.classList.contains('active');
+            this.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+            document.body.classList.toggle('mobile-nav-open', expanded);
         });
-        
+
         navbarNav.querySelectorAll('a').forEach(link => {
             link.addEventListener('click', () => {
                 mobileMenuToggle.classList.remove('active');
                 navbarNav.classList.remove('active');
+                mobileMenuToggle.setAttribute('aria-expanded', 'false');
+                document.body.classList.remove('mobile-nav-open');
             });
         });
-        
+
         document.addEventListener('click', function(e) {
             if (!mobileMenuToggle.contains(e.target) && !navbarNav.contains(e.target)) {
                 mobileMenuToggle.classList.remove('active');
                 navbarNav.classList.remove('active');
+                mobileMenuToggle.setAttribute('aria-expanded', 'false');
+                document.body.classList.remove('mobile-nav-open');
             }
         });
-    });
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                mobileMenuToggle.classList.remove('active');
+                navbarNav.classList.remove('active');
+                mobileMenuToggle.setAttribute('aria-expanded', 'false');
+                document.body.classList.remove('mobile-nav-open');
+            }
+        });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initNavbarMobileMenu);
+    } else {
+        initNavbarMobileMenu();
+    }
 </script>

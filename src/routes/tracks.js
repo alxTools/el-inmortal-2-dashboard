@@ -6,6 +6,7 @@ const fs = require('fs');
 const { body, validationResult } = require('express-validator');
 const { getAll, getOne, run } = require('../config/database');
 const { analyzeAndDescribeAudio } = require('../utils/audioHelper');
+const { ensureTrackProjectZipColumns } = require('../utils/trackProjectZipSchema');
 
 // Configurar multer para subida de audio
 const storage = multer.diskStorage({
@@ -85,6 +86,21 @@ function normalizeDurationText(value) {
     }
 
     return formatSeconds(parsed);
+}
+
+function normalizeOptionalText(value, maxLength = 1000) {
+    if (value === undefined || value === null) return null;
+    const text = String(value).trim();
+    if (!text) return null;
+    return text.slice(0, maxLength);
+}
+
+function normalizeOptionalFileSize(value) {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed) || parsed < 0) {
+        return null;
+    }
+    return Math.round(parsed);
 }
 
 async function ensureTrackCreditsTables() {
@@ -223,6 +239,7 @@ router.get('/', async (req, res) => {
 // GET new track form
 router.get('/new', async (req, res) => {
     try {
+        await ensureTrackProjectZipColumns();
         const producers = await getAll('SELECT * FROM producers ORDER BY name');
 
         res.render('tracks/new', {
@@ -245,6 +262,8 @@ router.post('/', upload.single('audio_file'), [
     body('title').trim().notEmpty(),
     body('producer_id').optional().isInt()
 ], async (req, res) => {
+    await ensureTrackProjectZipColumns();
+
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
         const producers = await getAll('SELECT * FROM producers ORDER BY name');
@@ -257,8 +276,42 @@ router.post('/', upload.single('audio_file'), [
     }
 
     try {
-        const { track_number, title, producer_id, recording_date, duration, lyrics } = req.body;
+        const {
+            track_number,
+            title,
+            producer_id,
+            recording_date,
+            duration,
+            lyrics,
+            project_zip_drive_file_id,
+            project_zip_drive_download_url,
+            project_zip_drive_view_url,
+            project_zip_original_name,
+            project_zip_file_size
+        } = req.body;
         const normalizedFormDuration = normalizeDurationText(duration);
+
+        const projectZipDriveFileId = normalizeOptionalText(project_zip_drive_file_id, 255);
+        const hasProjectZip = Boolean(projectZipDriveFileId);
+        const projectZipDownloadUrl = hasProjectZip
+            ? (
+                normalizeOptionalText(project_zip_drive_download_url, 2000) ||
+                `https://drive.google.com/uc?export=download&id=${projectZipDriveFileId}`
+            )
+            : null;
+        const projectZipViewUrl = hasProjectZip
+            ? (
+                normalizeOptionalText(project_zip_drive_view_url, 2000) ||
+                `https://drive.google.com/file/d/${projectZipDriveFileId}/view`
+            )
+            : null;
+        const projectZipOriginalName = hasProjectZip
+            ? (normalizeOptionalText(project_zip_original_name, 500) || 'project-data.zip')
+            : null;
+        const projectZipFileSize = hasProjectZip
+            ? normalizeOptionalFileSize(project_zip_file_size)
+            : null;
+        const projectZipUploadedAt = hasProjectZip ? new Date() : null;
         
         // Si se subió audio, procesarlo
         let audioFilePath = null;
@@ -291,8 +344,24 @@ router.post('/', upload.single('audio_file'), [
         const durationToSave = detectedDuration ?? normalizedFormDuration;
 
         await run(
-            `INSERT INTO tracks (track_number, title, producer_id, recording_date, duration, lyrics, audio_file_path, audio_file_type, audio_description)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            `INSERT INTO tracks (
+                track_number,
+                title,
+                producer_id,
+                recording_date,
+                duration,
+                lyrics,
+                audio_file_path,
+                audio_file_type,
+                audio_description,
+                project_zip_drive_file_id,
+                project_zip_drive_download_url,
+                project_zip_drive_view_url,
+                project_zip_original_name,
+                project_zip_file_size,
+                project_zip_uploaded_at
+            )
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
                 track_number,
                 title,
@@ -302,7 +371,13 @@ router.post('/', upload.single('audio_file'), [
                 lyrics,
                 audioFilePath,
                 audioFilePath ? 'master' : null,
-                audioDescription
+                audioDescription,
+                projectZipDriveFileId,
+                projectZipDownloadUrl,
+                projectZipViewUrl,
+                projectZipOriginalName,
+                projectZipFileSize,
+                projectZipUploadedAt
             ]
         );
 
@@ -352,6 +427,7 @@ router.get('/:id/edit', async (req, res) => {
         const trackId = req.params.id;
 
         await ensureTrackCreditsTables();
+        await ensureTrackProjectZipColumns();
 
         const track = await getOne('SELECT * FROM tracks WHERE id = ?', [trackId]);
 

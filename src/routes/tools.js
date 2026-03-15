@@ -954,6 +954,20 @@ const CODE_SERVER_STARTUP_TIMEOUT_MS = Math.max(
     Math.min(180000, Number.parseInt(process.env.CODE_EDITOR_STARTUP_TIMEOUT_MS || '90000', 10) || 90000)
 );
 const CODE_SERVER_AUTO_START = String(process.env.CODE_EDITOR_AUTO_START || 'true').trim().toLowerCase() !== 'false';
+const VIDEO_EDITOR_REPO_URL = 'https://github.com/trykimu/videoeditor/tree/main';
+const VIDEO_EDITOR_PROXY_PREFIX = '/tools/remotion-studio/ide';
+const VIDEO_EDITOR_MANAGE_SCRIPT = path.join(__dirname, '../../scripts/video-editor/manage-video-editor.sh');
+const VIDEO_EDITOR_HOST = String(process.env.VIDEO_EDITOR_HOST || '127.0.0.1').trim() || '127.0.0.1';
+const VIDEO_EDITOR_FRONTEND_PORT = Math.max(1024, Math.min(65535, Number.parseInt(process.env.VIDEO_EDITOR_FRONTEND_PORT || '15173', 10) || 15173));
+const VIDEO_EDITOR_RENDER_PORT = Math.max(1024, Math.min(65535, Number.parseInt(process.env.VIDEO_EDITOR_RENDER_PORT || '18000', 10) || 18000));
+const VIDEO_EDITOR_FASTAPI_PORT = Math.max(1024, Math.min(65535, Number.parseInt(process.env.VIDEO_EDITOR_FASTAPI_PORT || '13000', 10) || 13000));
+const VIDEO_EDITOR_FRONTEND_CONTAINER = String(process.env.VIDEO_EDITOR_FRONTEND_CONTAINER || 'ei2-video-editor-frontend').trim() || 'ei2-video-editor-frontend';
+const VIDEO_EDITOR_RENDER_CONTAINER = String(process.env.VIDEO_EDITOR_RENDER_CONTAINER || 'ei2-video-editor-render').trim() || 'ei2-video-editor-render';
+const VIDEO_EDITOR_FASTAPI_CONTAINER = String(process.env.VIDEO_EDITOR_FASTAPI_CONTAINER || 'ei2-video-editor-fastapi').trim() || 'ei2-video-editor-fastapi';
+const VIDEO_EDITOR_COMMAND_TIMEOUT_MS = Math.max(
+    15000,
+    Math.min(45 * 60 * 1000, Number.parseInt(process.env.VIDEO_EDITOR_COMMAND_TIMEOUT_MS || '1500000', 10) || 1500000)
+);
 let dockerComposeCommandCache = null;
 
 function toCodeEditorPosixPath(value) {
@@ -1273,6 +1287,232 @@ function proxyCodeServerHttp(req, res) {
     }
 
     req.pipe(upstreamRequest);
+}
+
+function buildVideoEditorExecOptions(timeoutMs = VIDEO_EDITOR_COMMAND_TIMEOUT_MS) {
+    return {
+        cwd: path.join(__dirname, '../..'),
+        timeout: timeoutMs,
+        maxBuffer: 4 * 1024 * 1024,
+        env: {
+            ...process.env,
+            VIDEO_EDITOR_FRONTEND_PORT: String(VIDEO_EDITOR_FRONTEND_PORT),
+            VIDEO_EDITOR_RENDER_PORT: String(VIDEO_EDITOR_RENDER_PORT),
+            VIDEO_EDITOR_FASTAPI_PORT: String(VIDEO_EDITOR_FASTAPI_PORT),
+            VIDEO_EDITOR_BASENAME: VIDEO_EDITOR_PROXY_PREFIX
+        }
+    };
+}
+
+async function runVideoEditorManager(action, timeoutMs = VIDEO_EDITOR_COMMAND_TIMEOUT_MS) {
+    if (!fs.existsSync(VIDEO_EDITOR_MANAGE_SCRIPT)) {
+        throw new Error('missing_video_editor_manage_script');
+    }
+
+    const safeAction = String(action || '').trim().toLowerCase();
+    if (!['start', 'stop', 'restart', 'status', 'logs', 'update'].includes(safeAction)) {
+        throw new Error('invalid_video_editor_action');
+    }
+
+    return await execAsync(`"${VIDEO_EDITOR_MANAGE_SCRIPT}" ${safeAction}`, buildVideoEditorExecOptions(timeoutMs));
+}
+
+async function getVideoEditorContainerState(containerName) {
+    try {
+        const { stdout } = await execAsync(
+            `docker ps -a --filter "name=^/${containerName}$" --format "{{.Names}}|{{.State}}|{{.Status}}"`,
+            buildVideoEditorExecOptions(20000)
+        );
+
+        const line = String(stdout || '').trim();
+        if (!line) {
+            return {
+                exists: false,
+                running: false,
+                state: 'missing',
+                status: 'container_not_created',
+                container: containerName
+            };
+        }
+
+        const [name, state, status] = line.split('|');
+        return {
+            exists: true,
+            running: String(state || '').trim() === 'running',
+            state: String(state || '').trim() || 'unknown',
+            status: String(status || '').trim() || 'unknown',
+            container: String(name || containerName).trim() || containerName
+        };
+    } catch (error) {
+        return {
+            exists: false,
+            running: false,
+            state: 'error',
+            status: error.message,
+            container: containerName
+        };
+    }
+}
+
+async function getVideoEditorStatus() {
+    const [frontend, render, fastapi] = await Promise.all([
+        getVideoEditorContainerState(VIDEO_EDITOR_FRONTEND_CONTAINER),
+        getVideoEditorContainerState(VIDEO_EDITOR_RENDER_CONTAINER),
+        getVideoEditorContainerState(VIDEO_EDITOR_FASTAPI_CONTAINER)
+    ]);
+
+    return {
+        running: frontend.running,
+        frontend,
+        render,
+        fastapi,
+        frontendPort: VIDEO_EDITOR_FRONTEND_PORT,
+        renderPort: VIDEO_EDITOR_RENDER_PORT,
+        fastapiPort: VIDEO_EDITOR_FASTAPI_PORT,
+        proxyPath: `${VIDEO_EDITOR_PROXY_PREFIX}/`
+    };
+}
+
+function rewriteVideoEditorProxyPath(rawPath, options = {}) {
+    const pathValue = String(rawPath || '/');
+    const stripPrefix = String(options.stripPrefix || '');
+    const prependPrefix = String(options.prependPrefix || '');
+
+    let rewritten = pathValue || '/';
+    if (stripPrefix && rewritten.startsWith(stripPrefix)) {
+        rewritten = rewritten.slice(stripPrefix.length) || '/';
+    }
+
+    if (prependPrefix) {
+        const normalizedPrefix = prependPrefix.endsWith('/')
+            ? prependPrefix.slice(0, -1)
+            : prependPrefix;
+        const normalizedPath = rewritten.startsWith('/') ? rewritten : `/${rewritten}`;
+        rewritten = `${normalizedPrefix}${normalizedPath}`;
+    }
+
+    if (!rewritten.startsWith('/')) {
+        rewritten = `/${rewritten}`;
+    }
+
+    return rewritten;
+}
+
+function proxyVideoEditorHttpToPort(req, res, options = {}) {
+    const targetPort = Number(options.port || VIDEO_EDITOR_FRONTEND_PORT);
+    const requestSourcePath = req.originalUrl || req.url || '/';
+    const targetPath = rewriteVideoEditorProxyPath(requestSourcePath, {
+        stripPrefix: options.stripPrefix || '',
+        prependPrefix: options.prependPrefix || ''
+    });
+
+    let bufferedBody = null;
+    if (req.readableEnded || req.complete) {
+        if (typeof req.body === 'string' && req.body.length > 0) {
+            bufferedBody = Buffer.from(req.body);
+        } else if (Buffer.isBuffer(req.body) && req.body.length > 0) {
+            bufferedBody = req.body;
+        } else if (req.body && typeof req.body === 'object' && Object.keys(req.body).length > 0) {
+            bufferedBody = Buffer.from(JSON.stringify(req.body));
+        }
+    }
+
+    const proxyHeaders = {
+        ...req.headers,
+        host: `${VIDEO_EDITOR_HOST}:${targetPort}`,
+        'x-forwarded-host': req.headers.host || '',
+        'x-forwarded-proto': req.headers['x-forwarded-proto'] || 'https'
+    };
+
+    if (bufferedBody) {
+        proxyHeaders['content-length'] = String(bufferedBody.length);
+        if (!proxyHeaders['content-type']) {
+            proxyHeaders['content-type'] = 'application/json';
+        }
+    } else {
+        delete proxyHeaders['content-length'];
+    }
+
+    const upstreamRequest = http.request(
+        {
+            hostname: VIDEO_EDITOR_HOST,
+            port: targetPort,
+            method: req.method,
+            path: targetPath,
+            headers: proxyHeaders
+        },
+        (upstreamResponse) => {
+            res.status(upstreamResponse.statusCode || 502);
+            for (const [headerKey, headerValue] of Object.entries(upstreamResponse.headers || {})) {
+                if (headerValue === undefined) {
+                    continue;
+                }
+                res.setHeader(headerKey, headerValue);
+            }
+            upstreamResponse.pipe(res);
+        }
+    );
+
+    upstreamRequest.on('error', (error) => {
+        if (!res.headersSent) {
+            res.status(502).send(`Video Editor proxy error: ${error.message}`);
+            return;
+        }
+        res.end();
+    });
+
+    if (req.readableEnded || req.complete) {
+        if (bufferedBody) {
+            upstreamRequest.write(bufferedBody);
+        }
+        upstreamRequest.end();
+        return;
+    }
+
+    req.pipe(upstreamRequest);
+}
+
+function proxyVideoEditorFrontendRootApi(req, res) {
+    return proxyVideoEditorHttpToPort(req, res, {
+        port: VIDEO_EDITOR_FRONTEND_PORT,
+        prependPrefix: VIDEO_EDITOR_PROXY_PREFIX
+    });
+}
+
+function proxyVideoEditorRenderApi(req, res) {
+    return proxyVideoEditorHttpToPort(req, res, {
+        port: VIDEO_EDITOR_RENDER_PORT,
+        stripPrefix: '/render'
+    });
+}
+
+function proxyVideoEditorFastApi(req, res) {
+    return proxyVideoEditorHttpToPort(req, res, {
+        port: VIDEO_EDITOR_FASTAPI_PORT,
+        stripPrefix: '/ai/api'
+    });
+}
+
+function proxyVideoEditorPrefixed(req, res) {
+    const sourcePath = String(req.originalUrl || req.url || '/');
+
+    if (sourcePath.startsWith(`${VIDEO_EDITOR_PROXY_PREFIX}/render`)) {
+        return proxyVideoEditorHttpToPort(req, res, {
+            port: VIDEO_EDITOR_RENDER_PORT,
+            stripPrefix: `${VIDEO_EDITOR_PROXY_PREFIX}/render`
+        });
+    }
+
+    if (sourcePath.startsWith(`${VIDEO_EDITOR_PROXY_PREFIX}/ai/api`)) {
+        return proxyVideoEditorHttpToPort(req, res, {
+            port: VIDEO_EDITOR_FASTAPI_PORT,
+            stripPrefix: `${VIDEO_EDITOR_PROXY_PREFIX}/ai/api`
+        });
+    }
+
+    return proxyVideoEditorHttpToPort(req, res, {
+        port: VIDEO_EDITOR_FRONTEND_PORT
+    });
 }
 
 async function syncMiniDiscOrderToNotion(orderId) {
@@ -1706,6 +1946,14 @@ router.get('/', (req, res) => {
     });
 });
 
+router.get('/landing-page', (_req, res) => {
+    return res.redirect('/tools/landing-pages');
+});
+
+router.get('/landingpages', (_req, res) => {
+    return res.redirect('/tools/landing-pages');
+});
+
 router.get('/landing-pages', async (req, res) => {
     try {
         await ensureLandingPagesTables();
@@ -1737,6 +1985,20 @@ router.post('/landing-pages', async (req, res) => {
         const mode = String(req.body.mode || 'internal').trim().toLowerCase() === 'redirect'
             ? 'redirect'
             : 'internal';
+        const rawTargetUrl = String(req.body.target_url || '').trim();
+
+        if (mode === 'redirect' && rawTargetUrl) {
+            const isExternalTarget = /^https?:\/\//i.test(rawTargetUrl);
+            const isSupportedInternalTarget = /^\/ei2(\/|$)/.test(rawTargetUrl) || /^\/landing(\/|$)/.test(rawTargetUrl);
+
+            if (!isExternalTarget && !isSupportedInternalTarget) {
+                return redirectLandingPages(
+                    res,
+                    'error',
+                    'Target URL interno no soportado. Usa URL externa o /ei2.'
+                );
+            }
+        }
 
         const created = await createLandingPage({
             slug: req.body.slug,
@@ -1744,7 +2006,7 @@ router.post('/landing-pages', async (req, res) => {
             description: req.body.description,
             mode,
             renderKey: mode === 'internal' ? req.body.render_key : null,
-            targetUrl: mode === 'redirect' ? req.body.target_url : null,
+            targetUrl: mode === 'redirect' ? rawTargetUrl : null,
             isActive: req.body.is_active === '1' || req.body.is_active === 'on' || req.body.is_active === 'true',
             sortOrder: req.body.sort_order
         });
@@ -3757,147 +4019,108 @@ function cleanupFiles(outputPath, videoPath) {
     }
 }
 
-// Remotion Studio Routes
-let remotionProcess = null;
-let remotionPort = 3003;
+router.get('/video-editor', (_req, res) => {
+    return res.redirect('/tools/remotion-studio');
+});
 
-// Helper to find an available port
-async function findAvailablePort(startPort) {
-    const net = require('net');
-    return new Promise((resolve, reject) => {
-        const server = net.createServer();
-        server.listen(startPort, () => {
-            const port = server.address().port;
-            server.close(() => resolve(port));
-        });
-        server.on('error', () => {
-            findAvailablePort(startPort + 1).then(resolve).catch(reject);
-        });
-    });
-}
+router.get('/remotion-studio', (_req, res) => {
+    return res.redirect('/tools/remotion-studio/ide/');
+});
 
-router.get('/remotion-studio', async (req, res) => {
-    const projectPath = path.join(__dirname, '../../remotion');
-    const packageJsonPath = path.join(__dirname, '../../package.json');
-    
-    // Check if remotion directory exists
-    if (!fs.existsSync(projectPath)) {
-        return res.status(404).render('error', {
-            title: 'Remotion No Encontrado',
-            message: 'El proyecto Remotion no existe. Ejecuta "npx remotion init" primero.'
-        });
-    }
-    
-    // Start Remotion Studio if not already running
-    if (!remotionProcess) {
-        try {
-            remotionPort = await findAvailablePort(3003);
-            
-    // Use server hostname from environment or default to database host
-    const serverHost = process.env.REMOTION_HOST || 'db.artistaviral.com';
-    
-    remotionProcess = spawn('npx', ['remotion', 'studio', '--port', remotionPort.toString(), '--host', '0.0.0.0'], {
-                cwd: path.join(__dirname, '../..'),
-                detached: false,
-                stdio: ['ignore', 'pipe', 'pipe']
-            });
-            
-            remotionProcess.stdout.on('data', (data) => {
-                console.log(`[Remotion Studio] ${data}`);
-            });
-            
-            remotionProcess.stderr.on('data', (data) => {
-                console.error(`[Remotion Studio Error] ${data}`);
-            });
-            
-            remotionProcess.on('close', (code) => {
-                console.log(`[Remotion Studio] Process exited with code ${code}`);
-                remotionProcess = null;
-            });
-            
-            // Wait a bit for the server to start
-            await new Promise(resolve => setTimeout(resolve, 3000));
-            
-        } catch (error) {
-            console.error('Error starting Remotion Studio:', error);
-            return res.status(500).render('error', {
-                title: 'Error al Iniciar Remotion',
-                message: 'No se pudo iniciar Remotion Studio: ' + error.message
-            });
-        }
-    }
-    
-    // Use server hostname from environment or default to database host
-    const serverHost = process.env.REMOTION_HOST || 'db.artistaviral.com';
-    const studioUrl = `http://${serverHost}:${remotionPort}`;
-    
+router.get('/remotion-studio/control', async (req, res) => {
+    const status = await getVideoEditorStatus();
     res.render('tools/remotion-studio', {
-        title: 'Remotion Studio - El Inmortal 2 Dashboard',
-        studioUrl,
-        serverHost,
-        remotionPort,
-        projectPath: 'remotion/',
-        flash: String(req.query.flash || '')
+        title: 'Kimu Video Editor - El Inmortal 2 Dashboard',
+        repoUrl: VIDEO_EDITOR_REPO_URL,
+        proxyPath: `${VIDEO_EDITOR_PROXY_PREFIX}/`,
+        status
     });
 });
 
-router.post('/remotion-studio/render', async (req, res) => {
-    const { composition, output, props } = req.body;
-    
-    if (!composition) {
-        return res.status(400).json({ error: 'Composition name is required' });
-    }
-    
-    const outputDir = path.join(__dirname, '../../exports');
-    if (!fs.existsSync(outputDir)) {
-        fs.mkdirSync(outputDir, { recursive: true });
-    }
-    
-    const outputPath = output || `exports/${composition}_${Date.now()}.mp4`;
-    const fullOutputPath = path.join(__dirname, '../..', outputPath);
-    
+router.get('/remotion-studio/status', async (_req, res) => {
     try {
-        const args = ['remotion', 'render', composition, fullOutputPath];
-        
-        if (props) {
-            args.push('--props', JSON.stringify(props));
-        }
-        
-        const { stdout, stderr } = await execAsync(`npx ${args.join(' ')}`, {
-            cwd: path.join(__dirname, '../..'),
-            timeout: 300000 // 5 minutes timeout
+        const status = await getVideoEditorStatus();
+        return res.json({
+            ok: true,
+            status
         });
-        
-        if (fs.existsSync(fullOutputPath)) {
-            res.json({
-                success: true,
-                outputPath: outputPath,
-                message: 'Video rendered successfully'
-            });
-        } else {
-            throw new Error('Output file was not created');
-        }
-        
     } catch (error) {
-        console.error('Render error:', error);
-        res.status(500).json({
-            error: 'Render failed: ' + error.message,
-            details: error.stderr || ''
+        return res.status(500).json({
+            ok: false,
+            error: error.message || 'video_editor_status_failed'
         });
     }
 });
 
-router.post('/remotion-studio/stop', (req, res) => {
-    if (remotionProcess) {
-        remotionProcess.kill();
-        remotionProcess = null;
-        res.json({ success: true, message: 'Remotion Studio stopped' });
-    } else {
-        res.json({ success: true, message: 'Remotion Studio was not running' });
+router.post('/remotion-studio/start', async (_req, res) => {
+    try {
+        await runVideoEditorManager('start', VIDEO_EDITOR_COMMAND_TIMEOUT_MS);
+        const status = await getVideoEditorStatus();
+        return res.json({
+            ok: true,
+            status
+        });
+    } catch (error) {
+        return res.status(500).json({
+            ok: false,
+            error: error.message || 'video_editor_start_failed'
+        });
+    }
+});
+
+router.post('/remotion-studio/restart', async (_req, res) => {
+    try {
+        await runVideoEditorManager('restart', VIDEO_EDITOR_COMMAND_TIMEOUT_MS);
+        const status = await getVideoEditorStatus();
+        return res.json({
+            ok: true,
+            status
+        });
+    } catch (error) {
+        return res.status(500).json({
+            ok: false,
+            error: error.message || 'video_editor_restart_failed'
+        });
+    }
+});
+
+router.post('/remotion-studio/stop', async (_req, res) => {
+    try {
+        await runVideoEditorManager('stop', 180000);
+        const status = await getVideoEditorStatus();
+        return res.json({
+            ok: true,
+            status
+        });
+    } catch (error) {
+        return res.status(500).json({
+            ok: false,
+            error: error.message || 'video_editor_stop_failed'
+        });
+    }
+});
+
+router.use('/remotion-studio/ide', async (req, res) => {
+    try {
+        const status = await getVideoEditorStatus();
+        if (!status.running) {
+            try {
+                await runVideoEditorManager('start', VIDEO_EDITOR_COMMAND_TIMEOUT_MS);
+            } catch (startError) {
+                return res.status(502).send(`Video Editor is offline: ${startError.message}`);
+            }
+        }
+
+        return proxyVideoEditorPrefixed(req, res);
+    } catch (error) {
+        return res.status(502).send(`Video Editor proxy failed: ${error.message}`);
     }
 });
 
 router.isCodeEditorUpgradeRequest = isCodeEditorUpgradeRequest;
 router.handleCodeEditorUpgrade = handleCodeEditorUpgrade;
+router.proxyVideoEditorFrontendRootApi = proxyVideoEditorFrontendRootApi;
+router.proxyVideoEditorRenderApi = proxyVideoEditorRenderApi;
+router.proxyVideoEditorFastApi = proxyVideoEditorFastApi;
 
 module.exports = router;

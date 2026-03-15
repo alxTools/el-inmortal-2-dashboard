@@ -1,2 +1,4 @@
 workers.json
+hosts.json
+.env.worker
 *.log

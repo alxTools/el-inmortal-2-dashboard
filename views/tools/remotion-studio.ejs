@@ -6,257 +6,343 @@
     <title><%= title %></title>
     <link rel="stylesheet" href="/css/dashboard.css">
     <style>
-        .studio-container {
-            display: flex;
-            flex-direction: column;
-            height: calc(100vh - 120px);
-            background: #1a1a2e;
-            border-radius: 12px;
-            overflow: hidden;
-            margin-top: 20px;
+        .ve-shell {
+            padding-top: 24px;
+            padding-bottom: 20px;
         }
-        .studio-header {
-            background: #16213e;
-            padding: 15px 20px;
+
+        .ve-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 12px;
+        }
+
+        .ve-header h2 {
+            margin: 0;
+        }
+
+        .ve-subtitle {
+            margin: 8px 0 0;
+            color: #8ea9d0;
+            max-width: 820px;
+        }
+
+        .ve-back {
+            text-decoration: none;
+            color: #e2e8f0;
+            border: 1px solid rgba(130, 170, 240, 0.35);
+            border-radius: 8px;
+            padding: 8px 12px;
+            background: rgba(8, 20, 42, 0.75);
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .ve-panel {
+            border: 1px solid rgba(130, 170, 240, 0.35);
+            border-radius: 14px;
+            overflow: hidden;
+            background: linear-gradient(180deg, #09182f 0%, #071121 100%);
+            box-shadow: 0 20px 50px rgba(7, 18, 38, 0.45);
+        }
+
+        .ve-toolbar {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            border-bottom: 1px solid #0f3460;
+            gap: 12px;
+            padding: 12px;
+            border-bottom: 1px solid rgba(130, 170, 240, 0.24);
+            flex-wrap: wrap;
         }
-        .studio-header h3 {
-            margin: 0;
-            color: #fff;
+
+        .ve-status-line {
             display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        .studio-actions {
-            display: flex;
-            gap: 10px;
-        }
-        .studio-iframe {
-            flex: 1;
-            border: none;
-            width: 100%;
-            background: #0f0f23;
-        }
-        .studio-info {
-            background: #16213e;
-            padding: 15px 20px;
-            border-top: 1px solid #0f3460;
-        }
-        .studio-info p {
-            margin: 5px 0;
-            color: #9ca3af;
-            font-size: 14px;
-        }
-        .studio-info code {
-            background: #1a1a2e;
-            padding: 2px 6px;
-            border-radius: 4px;
-            color: #4fc3f7;
-        }
-        .btn-launch {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 600;
-            transition: all 0.2s;
-            display: inline-flex;
             align-items: center;
             gap: 8px;
+            color: #c9dbfb;
+            font-weight: 600;
         }
-        .btn-launch:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+
+        .ve-chip {
+            border-radius: 999px;
+            padding: 4px 10px;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 0.02em;
         }
-        .btn-secondary {
-            background: #2d3748;
+
+        .ve-chip.running {
+            color: #0f2f27;
+            background: #67f1be;
+        }
+
+        .ve-chip.offline {
+            color: #450f14;
+            background: #fda4af;
+        }
+
+        .ve-actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .ve-btn {
+            border: 1px solid rgba(130, 170, 240, 0.35);
+            border-radius: 8px;
+            background: rgba(11, 28, 56, 0.9);
             color: #e2e8f0;
-            border: 1px solid #4a5568;
-            padding: 10px 20px;
-            border-radius: 8px;
+            padding: 8px 12px;
             cursor: pointer;
-            font-size: 14px;
-            transition: all 0.2s;
-        }
-        .btn-secondary:hover {
-            background: #4a5568;
-        }
-        .btn-back {
-            background: transparent;
-            color: #9ca3af;
-            border: 1px solid #4a5568;
-            padding: 8px 16px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 14px;
             text-decoration: none;
             display: inline-flex;
             align-items: center;
             gap: 6px;
-        }
-        .btn-back:hover {
-            background: #2d3748;
-            color: #e2e8f0;
-        }
-        .status-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 12px;
             font-weight: 600;
         }
-        .status-badge.ready {
-            background: rgba(72, 187, 120, 0.2);
-            color: #48bb78;
+
+        .ve-btn:hover {
+            background: rgba(18, 42, 78, 0.95);
         }
-        .status-badge.info {
-            background: rgba(66, 153, 225, 0.2);
-            color: #4299e1;
+
+        .ve-btn.primary {
+            color: #ffffff;
+            border-color: transparent;
+            background: linear-gradient(135deg, #2f76ff, #16bfd8);
         }
-        .help-section {
-            margin-top: 20px;
-            padding: 20px;
-            background: #1a1a2e;
-            border-radius: 12px;
+
+        .ve-btn.warn {
+            border-color: rgba(255, 190, 92, 0.6);
+            color: #ffe2b4;
         }
-        .help-section h4 {
-            margin: 0 0 15px 0;
-            color: #fff;
+
+        .ve-btn.danger {
+            border-color: rgba(255, 111, 135, 0.7);
+            color: #ffd0d8;
         }
-        .help-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 15px;
+
+        .ve-btn:disabled {
+            opacity: 0.55;
+            cursor: not-allowed;
         }
-        .help-item {
-            background: #16213e;
-            padding: 15px;
-            border-radius: 8px;
-            border-left: 3px solid #667eea;
-        }
-        .help-item h5 {
-            margin: 0 0 8px 0;
-            color: #fff;
-            font-size: 14px;
-        }
-        .help-item p {
+
+        .ve-status-note {
             margin: 0;
-            color: #9ca3af;
+            padding: 10px 12px;
+            color: #9fb8da;
+            border-bottom: 1px solid rgba(130, 170, 240, 0.2);
+            font-size: 0.86rem;
+        }
+
+        .ve-health-row {
+            margin: 0;
+            padding: 8px 12px;
+            border-bottom: 1px solid rgba(130, 170, 240, 0.15);
+            color: #a8bfdd;
+            font-size: 0.78rem;
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .ve-health-item {
+            border: 1px solid rgba(130, 170, 240, 0.22);
+            border-radius: 999px;
+            padding: 3px 10px;
+            background: rgba(6, 18, 36, 0.65);
+        }
+
+        .ve-frame {
+            width: 100%;
+            height: min(78vh, 900px);
+            border: 0;
+            display: block;
+            background: #050b15;
+        }
+
+        .ve-foot {
+            margin: 12px 0 0;
+            color: #8ea6c8;
             font-size: 13px;
+            line-height: 1.5;
+        }
+
+        .ve-foot code {
+            color: #c3ddff;
+            background: rgba(8, 20, 40, 0.7);
+            border: 1px solid rgba(130, 170, 240, 0.3);
+            border-radius: 6px;
+            padding: 2px 6px;
         }
     </style>
 </head>
 <body>
+    <% const veStatus = (typeof status !== 'undefined' && status) ? status : {}; %>
     <%- include('../partials/navbar') %>
 
-    <div class="container" style="padding-top: 30px;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-            <h2 style="margin: 0;"><span class="section-icon">🎬</span> Remotion Studio</h2>
-            <a href="/tools" class="btn-back">← Volver a Tools</a>
-        </div>
-
-        <div class="studio-container">
-            <div class="studio-header">
-                <div style="display: flex; align-items: center; gap: 15px;">
-                    <h3>
-                        🎬 Remotion Studio
-                        <span class="status-badge ready">● Listo</span>
-                    </h3>
-                </div>
-                <div class="studio-actions">
-                    <button class="btn-secondary" onclick="refreshStudio()">🔄 Recargar</button>
-                    <button class="btn-launch" onclick="openStudio()">
-                        🚀 Abrir Studio
-                    </button>
-                    <button class="btn-launch" onclick="renderVideo()" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
-                        📹 Render Video
-                    </button>
-                </div>
-            </div>
-            
-            <iframe 
-                id="studioFrame"
-                class="studio-iframe"
-                src="<%= studioUrl %>"
-                sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
-            ></iframe>
-            
-            <div class="studio-info">
-                <p><strong>📁 Proyecto:</strong> <code><%= projectPath %></code></p>
-                <p><strong>🔌 URL Studio:</strong> <code><%= studioUrl %></code></p>
-                <p style="margin-top: 10px; font-size: 12px; color: #6b7280;">
-                    💡 Si el iframe no carga, usa el botón "Abrir Studio" para abrirlo en una nueva pestaña.
+    <div class="container ve-shell">
+        <div class="ve-header">
+            <div>
+                <h2><span class="section-icon">🎬</span> Kimu Video Editor (Docker)</h2>
+                <p class="ve-subtitle">
+                    Stack local del repo <strong>trykimu/videoeditor</strong> corriendo en Docker y expuesto por proxy interno.
                 </p>
             </div>
+            <a href="/tools" class="ve-back">← Volver a Tools</a>
         </div>
 
-        <div class="help-section">
-            <h4>🎯 Comandos Útiles</h4>
-            <div class="help-grid">
-                <div class="help-item">
-                    <h5>Iniciar Studio</h5>
-                    <p><code>npx remotion studio</code></p>
+        <section class="ve-panel">
+            <div class="ve-toolbar">
+                <div class="ve-status-line">
+                    <span id="ve-label">Estado del stack</span>
+                    <span id="ve-chip" class="ve-chip <%= veStatus.running ? 'running' : 'offline' %>"><%= veStatus.running ? 'RUNNING' : 'OFFLINE' %></span>
                 </div>
-                <div class="help-item">
-                    <h5>Render Video</h5>
-                    <p><code>npx remotion render MyComp out/video.mp4</code></p>
-                </div>
-                <div class="help-item">
-                    <h5>Preview Composición</h5>
-                    <p><code>npx remotion preview MyComp</code></p>
-                </div>
-                <div class="help-item">
-                    <h5>Still (Imagen)</h5>
-                    <p><code>npx remotion still MyComp out/frame.png</code></p>
+
+                <div class="ve-actions">
+                    <button type="button" id="ve-start" class="ve-btn primary">▶ Start</button>
+                    <button type="button" id="ve-restart" class="ve-btn warn">↻ Restart</button>
+                    <button type="button" id="ve-stop" class="ve-btn danger">■ Stop</button>
+                    <button type="button" id="ve-refresh" class="ve-btn">🔄 Recargar</button>
+                    <a href="<%= repoUrl %>" target="_blank" rel="noreferrer" class="ve-btn">📚 Ver Repo</a>
+                    <a id="ve-open-new" href="<%= proxyPath %>/" target="_blank" rel="noreferrer" class="ve-btn">↗ Abrir en nueva pestana</a>
                 </div>
             </div>
-        </div>
+
+            <p id="ve-note" class="ve-status-note">Preparando estado...</p>
+            <p class="ve-health-row">
+                <span id="ve-frontend" class="ve-health-item">frontend: --</span>
+                <span id="ve-render" class="ve-health-item">render: --</span>
+                <span id="ve-fastapi" class="ve-health-item">fastapi: --</span>
+            </p>
+
+            <iframe id="ve-frame" class="ve-frame" src="<%= veStatus.running ? proxyPath + '/' : 'about:blank' %>" loading="lazy"></iframe>
+        </section>
+
+        <p class="ve-foot">
+            Proxy interno: <code><%= proxyPath %>/</code>.
+            El start usa <code>scripts/video-editor/manage-video-editor.sh</code> y Docker Compose del repo.
+        </p>
     </div>
 
     <%- include('../partials/footer') %>
 
     <script>
-        function openStudio() {
-            window.open('<%= studioUrl %>', '_blank', 'width=1400,height=900');
-        }
-        
-        function refreshStudio() {
-            document.getElementById('studioFrame').src = document.getElementById('studioFrame').src;
-        }
-        
-        function renderVideo() {
-            if (confirm('¿Renderizar el video? Esto puede tomar varios minutos.')) {
-                fetch('/tools/remotion-studio/render', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        composition: 'MyComp',
-                        output: 'exports/remotion-output.mp4'
-                    })
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        alert('✅ Video renderizado: ' + data.outputPath);
-                    } else {
-                        alert('❌ Error: ' + data.error);
-                    }
-                })
-                .catch(err => {
-                    alert('❌ Error: ' + err.message);
-                });
+        (function () {
+            const proxyPath = <%- JSON.stringify(proxyPath) %>;
+
+            const frame = document.getElementById('ve-frame');
+            const chip = document.getElementById('ve-chip');
+            const note = document.getElementById('ve-note');
+            const openNew = document.getElementById('ve-open-new');
+
+            const startBtn = document.getElementById('ve-start');
+            const restartBtn = document.getElementById('ve-restart');
+            const stopBtn = document.getElementById('ve-stop');
+            const refreshBtn = document.getElementById('ve-refresh');
+
+            const frontendEl = document.getElementById('ve-frontend');
+            const renderEl = document.getElementById('ve-render');
+            const fastapiEl = document.getElementById('ve-fastapi');
+
+            let pendingAction = false;
+
+            function setBusy(busy) {
+                pendingAction = Boolean(busy);
+                startBtn.disabled = pendingAction;
+                restartBtn.disabled = pendingAction;
+                stopBtn.disabled = pendingAction;
             }
-        }
+
+            function shortState(node) {
+                if (!node) return 'missing';
+                return `${node.state || 'unknown'} | ${node.status || 'unknown'}`;
+            }
+
+            function applyStatus(status) {
+                const running = Boolean(status && status.running);
+                chip.textContent = running ? 'RUNNING' : 'OFFLINE';
+                chip.classList.toggle('running', running);
+                chip.classList.toggle('offline', !running);
+
+                frontendEl.textContent = `frontend: ${shortState(status && status.frontend)}`;
+                renderEl.textContent = `render: ${shortState(status && status.render)}`;
+                fastapiEl.textContent = `fastapi: ${shortState(status && status.fastapi)}`;
+
+                if (running) {
+                    note.textContent = 'Stack activo. Editor disponible en iframe y nueva pestana.';
+                    if (frame.src === 'about:blank' || frame.src.endsWith('/blank')) {
+                        frame.src = `${proxyPath}/`;
+                    }
+                } else {
+                    note.textContent = 'Stack detenido. Usa Start para levantar contenedores.';
+                    frame.src = 'about:blank';
+                }
+
+                openNew.href = `${proxyPath}/`;
+            }
+
+            async function requestJson(url, options) {
+                const response = await fetch(url, options);
+                const payload = await response.json().catch(() => ({}));
+                if (!response.ok || payload.ok === false) {
+                    throw new Error(payload.error || `request_failed_${response.status}`);
+                }
+                return payload;
+            }
+
+            async function refreshStatus() {
+                try {
+                    const payload = await requestJson('/tools/remotion-studio/status', { cache: 'no-store' });
+                    applyStatus(payload.status || {});
+                } catch (error) {
+                    note.textContent = `No se pudo leer estado: ${error.message}`;
+                }
+            }
+
+            async function runAction(endpoint, runningMessage) {
+                if (pendingAction) return;
+
+                try {
+                    setBusy(true);
+                    note.textContent = runningMessage;
+                    const payload = await requestJson(endpoint, { method: 'POST' });
+                    applyStatus(payload.status || {});
+                } catch (error) {
+                    note.textContent = `Operacion fallida: ${error.message}`;
+                } finally {
+                    setBusy(false);
+                }
+            }
+
+            startBtn.addEventListener('click', function () {
+                runAction('/tools/remotion-studio/start', 'Levantando Docker stack...');
+            });
+
+            restartBtn.addEventListener('click', function () {
+                runAction('/tools/remotion-studio/restart', 'Reiniciando Docker stack...');
+            });
+
+            stopBtn.addEventListener('click', function () {
+                if (!window.confirm('Detener Kimu Video Editor?')) return;
+                runAction('/tools/remotion-studio/stop', 'Deteniendo Docker stack...');
+            });
+
+            refreshBtn.addEventListener('click', function () {
+                if (frame.src !== 'about:blank') {
+                    frame.src = frame.src;
+                }
+                refreshStatus();
+            });
+
+            applyStatus(<%- JSON.stringify(veStatus || {}) %>);
+            refreshStatus();
+            setInterval(refreshStatus, 12000);
+        })();
     </script>
 </body>
 </html>

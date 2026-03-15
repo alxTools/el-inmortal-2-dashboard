@@ -13,6 +13,9 @@
             <a href="/tracks" class="footer-link">Temas</a>
             <a href="/calendar" class="footer-link">Calendario</a>
             <a href="/checklist" class="footer-link">Checklist</a>
+            <% if (typeof user !== 'undefined' && user) { %>
+                <a href="/settings" class="footer-link">Config</a>
+            <% } %>
         </div>
         
         <div class="footer-meta">

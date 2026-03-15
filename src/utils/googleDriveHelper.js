@@ -6,6 +6,49 @@ const os = require('os');
 // Google Drive Configuration
 const SCOPES = ['https://www.googleapis.com/auth/drive.file'];
 
+function sanitizeDriveQueryText(value) {
+    return String(value || '')
+        .replace(/\\/g, '\\\\')
+        .replace(/'/g, "\\'");
+}
+
+async function ensureDriveFolder(drive, folderName, parentFolderId = 'root') {
+    const trimmedName = String(folderName || '').trim();
+    const targetParent = String(parentFolderId || 'root').trim() || 'root';
+    if (!trimmedName) {
+        return targetParent;
+    }
+
+    const safeName = sanitizeDriveQueryText(trimmedName);
+    const safeParent = sanitizeDriveQueryText(targetParent);
+
+    const existingResponse = await drive.files.list({
+        q: `mimeType = 'application/vnd.google-apps.folder' and trashed = false and name = '${safeName}' and '${safeParent}' in parents`,
+        fields: 'files(id, name)',
+        spaces: 'drive',
+        pageSize: 1,
+        includeItemsFromAllDrives: true,
+        supportsAllDrives: true
+    });
+
+    const existingFolder = existingResponse.data.files && existingResponse.data.files[0];
+    if (existingFolder && existingFolder.id) {
+        return existingFolder.id;
+    }
+
+    const createResponse = await drive.files.create({
+        resource: {
+            name: trimmedName,
+            mimeType: 'application/vnd.google-apps.folder',
+            parents: [targetParent]
+        },
+        fields: 'id',
+        supportsAllDrives: true
+    });
+
+    return createResponse.data.id;
+}
+
 // Initialize Google Drive API
 function getDriveClient() {
     // Check for service account credentials
@@ -57,20 +100,37 @@ function getDriveClient() {
  * @param {string} localFilePath - Path to local file
  * @param {string} fileName - Name to give the file in Drive
  * @param {string} mimeType - MIME type of the file
- * @returns {Promise<string>} - Google Drive file ID
+ * @param {{folderId?: string, folderName?: string, parentFolderId?: string}} options - Destination options
+ * @returns {Promise<{fileId: string, downloadUrl: string, viewUrl: string}>}
  */
-async function uploadToDrive(localFilePath, fileName, mimeType = 'audio/wav') {
+async function uploadToDrive(localFilePath, fileName, mimeType = 'audio/wav', options = {}) {
     const drive = getDriveClient();
     if (!drive) {
         throw new Error('Google Drive client not initialized');
     }
 
     try {
+        const baseParentFolderId = String(
+            options.parentFolderId || process.env.GOOGLE_DRIVE_FOLDER_ID || 'root'
+        ).trim() || 'root';
+        const preferredFolderId = String(options.folderId || '').trim();
+        const preferredFolderName = String(options.folderName || '').trim();
+
+        let targetFolderId = preferredFolderId || baseParentFolderId;
+        if (!preferredFolderId && preferredFolderName) {
+            try {
+                targetFolderId = await ensureDriveFolder(drive, preferredFolderName, baseParentFolderId);
+            } catch (folderError) {
+                console.warn('[GoogleDrive] Could not ensure dedicated folder, using parent folder instead:', folderError.message);
+                targetFolderId = baseParentFolderId;
+            }
+        }
+
         console.log(`📤 Uploading to Google Drive: ${fileName}`);
 
         const fileMetadata = {
             name: fileName,
-            parents: [process.env.GOOGLE_DRIVE_FOLDER_ID || 'root'] // Optional: specific folder
+            parents: [targetFolderId]
         };
 
         const media = {
@@ -78,11 +138,22 @@ async function uploadToDrive(localFilePath, fileName, mimeType = 'audio/wav') {
             body: fs.createReadStream(localFilePath)
         };
 
-        const response = await drive.files.create({
-            resource: fileMetadata,
-            media: media,
-            fields: 'id, webViewLink, webContentLink'
-        });
+        const uploadTimeoutMs = Number(process.env.GDRIVE_UPLOAD_TIMEOUT_MS || (2 * 60 * 60 * 1000));
+
+        const response = await drive.files.create(
+            {
+                resource: fileMetadata,
+                media: media,
+                fields: 'id, webViewLink, webContentLink',
+                uploadType: 'resumable',
+                supportsAllDrives: true
+            },
+            {
+                timeout: Number.isFinite(uploadTimeoutMs) && uploadTimeoutMs > 0
+                    ? uploadTimeoutMs
+                    : undefined
+            }
+        );
 
         const fileId = response.data.id;
         console.log(`✅ Uploaded to Google Drive: ${fileId}`);
@@ -90,6 +161,7 @@ async function uploadToDrive(localFilePath, fileName, mimeType = 'audio/wav') {
         // Make the file publicly readable (optional - for direct download)
         await drive.permissions.create({
             fileId: fileId,
+            supportsAllDrives: true,
             resource: {
                 role: 'reader',
                 type: 'anyone'

@@ -46,6 +46,28 @@ docker run -d --name opencode-worker \
 
 If your workers must use outbound proxies, pass `HTTP_PROXY` / `HTTPS_PROXY` env vars.
 
+### 2b) Keep worker always on (systemd + compose)
+
+If you want one local node (for example Puerto Rico) to stay online after reboots, use the included service installer:
+
+```bash
+cp scripts/proxy/opencode_cluster/.env.worker.example scripts/proxy/opencode_cluster/.env.worker
+# edit credentials and model in .env.worker
+
+bash scripts/proxy/opencode_cluster/install_worker_service.sh \
+  scripts/proxy/opencode_cluster/.env.worker
+
+curl -u opencode:YOUR_PASSWORD http://127.0.0.1:4096/global/health
+```
+
+Service management:
+
+```bash
+sudo systemctl status opencode-worker.service --no-pager
+sudo systemctl restart opencode-worker.service
+bash scripts/proxy/opencode_cluster/uninstall_worker_service.sh
+```
+
 ## 3) Create workers inventory for master controller
 
 Copy `scripts/proxy/opencode_cluster/workers.example.json` to `workers.json` and set real hosts/passwords.
@@ -97,4 +119,4 @@ docker run --rm -it \
 
 - OpenCode server auth is enforced with basic auth.
 - Tavily MCP is injected dynamically by the controller on each worker before prompting.
-- Keep `workers.json` out of Git (it contains credentials).
+- Keep `workers.json`, `hosts.json`, and `.env.worker` out of Git (they contain credentials).

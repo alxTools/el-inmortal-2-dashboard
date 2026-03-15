@@ -1,10 +1,17 @@
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 const { getAll, getOne, query, run } = require('../config/database');
 const { sendWelcomeEmail, sendMiniDiscConfirmationEmail, sendWebhookToN8N } = require('../utils/emailHelper');
 const { syncLeadToEmailOctopus } = require('../utils/emailOctopusHelper');
 const { ensureLandingLeadsTable, saveNFCCode, syncToWordPress, getUnifiedStats, registerOrUpdateLead, verifyMagicToken, markEmailAsVerified } = require('../utils/landingDb');
+const {
+    ensureLandingPagesTables,
+    getActiveLandingPages,
+    getSeenLandingSlugs,
+    markLandingAsSeen
+} = require('../utils/landingPagesRegistry');
 const { createPayPalOrder, capturePayPalOrder, getPayPalConfig } = require('../utils/paypalHelper');
 const { scheduleMiniDiscEmail } = require('../utils/scheduledEmails');
 const { syncUserToNotion, isNotionConfigured, syncAllUsersToNotion, getNotionStats } = require('../utils/notionHelper');
@@ -182,6 +189,105 @@ function toPublicMediaPath(rawPath, trackNumber = null) {
     return '';
 }
 
+function getLandingVisitorKey(req, res) {
+    const sessionUserId = Number(req.session?.user?.id || 0);
+    if (Number.isInteger(sessionUserId) && sessionUserId > 0) {
+        return `user:${sessionUserId}`;
+    }
+
+    const existing = String(req.cookies?.landing_visitor_key || '').trim();
+    if (existing) {
+        return existing;
+    }
+
+    const generated = `anon:${crypto.randomBytes(12).toString('hex')}`;
+    res.cookie('landing_visitor_key', generated, {
+        maxAge: 365 * 24 * 60 * 60 * 1000,
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax'
+    });
+    return generated;
+}
+
+function normalizeLandingTargetUrl(rawUrl) {
+    const value = String(rawUrl || '').trim();
+    if (!value) return '';
+    if (/^https?:\/\//i.test(value)) return value;
+    if (value.startsWith('/')) return value;
+    return `/${value}`;
+}
+
+function isSupportedInternalLandingTarget(targetUrl) {
+    const value = String(targetUrl || '').trim();
+    if (!value.startsWith('/')) return false;
+    return /^\/ei2(\/|$)/.test(value) || /^\/landing(\/|$)/.test(value);
+}
+
+async function renderLandingByRegistry(req, res) {
+    // Keep /ei2 route behavior stable in production.
+    if (req.baseUrl === '/ei2') {
+        return renderLandingPage(res);
+    }
+
+    try {
+        await ensureLandingPagesTables();
+
+        const activePages = await getActiveLandingPages();
+        if (!activePages.length) {
+            return renderLandingPage(res);
+        }
+
+        const visitorKey = getLandingVisitorKey(req, res);
+        const activeSlugs = activePages.map((page) => page.slug);
+        const seenSlugs = await getSeenLandingSlugs(visitorKey, activeSlugs);
+        const seenSet = new Set(seenSlugs);
+
+        const selectedPage = activePages.find((page) => !seenSet.has(page.slug)) || activePages[0];
+        await markLandingAsSeen(visitorKey, selectedPage.slug);
+
+        const pageMode = String(selectedPage.mode || 'internal').trim().toLowerCase();
+        const pageRenderKey = String(selectedPage.renderKey || '').trim().toLowerCase();
+
+        if (pageMode === 'redirect') {
+            const targetUrl = normalizeLandingTargetUrl(selectedPage.targetUrl);
+            const currentPath = String(req.originalUrl || '').split('?')[0];
+            const isExternalTarget = /^https?:\/\//i.test(targetUrl);
+
+            if (targetUrl && isExternalTarget && targetUrl !== currentPath) {
+                return res.redirect(targetUrl);
+            }
+
+            if (
+                targetUrl &&
+                targetUrl.startsWith('/') &&
+                !isSupportedInternalLandingTarget(targetUrl)
+            ) {
+                console.warn('[Landing Registry] Unsupported internal redirect target, fallback EI2:', targetUrl);
+                return renderLandingPage(res);
+            }
+
+            if (
+                targetUrl &&
+                !['/landing', '/landing/'].includes(targetUrl) &&
+                targetUrl !== currentPath
+            ) {
+                return res.redirect(targetUrl);
+            }
+        }
+
+        // For now, all internal pages render the existing EI2 landing (production-safe).
+        if (!pageRenderKey || pageRenderKey === 'ei2' || selectedPage.slug === 'ei2') {
+            return renderLandingPage(res);
+        }
+
+        return renderLandingPage(res);
+    } catch (error) {
+        console.error('[Landing Registry] Error resolving active landing, fallback EI2:', error.message);
+        return renderLandingPage(res);
+    }
+}
+
 // Función reutilizable para renderizar la landing
 async function renderLandingPage(res) {
     let album = null;
@@ -281,8 +387,8 @@ async function renderLandingPage(res) {
 }
 
 // Ruta principal - renderiza la landing page
-router.get('/', async (_req, res) => {
-    return renderLandingPage(res);
+router.get('/', async (req, res) => {
+    return renderLandingByRegistry(req, res);
 });
 
 router.post('/subscribe', async (req, res) => {
@@ -507,7 +613,7 @@ router.get('/unlock', async (req, res) => {
             const name = user.full_name || user.email.split('@')[0];
             const username = user.email.split('@')[0] + '_' + Math.floor(Math.random() * 10000);
             // Generar un password temporal aleatorio (los usuarios fans no necesitan password, usan magic link)
-            const tempPassword = require('crypto').randomBytes(32).toString('hex');
+            const tempPassword = crypto.randomBytes(32).toString('hex');
             const result = await run(
                 'INSERT INTO users (email, username, name, role, password, created_at) VALUES (?, ?, ?, ?, ?, NOW())',
                 [user.email, username, name, 'fan', tempPassword]

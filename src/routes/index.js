@@ -111,4 +111,12 @@ router.post('/send-daily-report-email', async (req, res) => {
     }
 });
 
+router.get('/landing-pages', (_req, res) => {
+    return res.redirect('/tools/landing-pages');
+});
+
+router.get('/agents', (_req, res) => {
+    return res.redirect('/tools/proxy/mission-control');
+});
+
 module.exports = router;

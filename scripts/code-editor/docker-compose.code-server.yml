@@ -9,6 +9,7 @@ services:
     working_dir: /workspace
     environment:
       TZ: ${TZ:-UTC}
+      PATH: /root/.opencode/bin:/root/.local/share/opencode/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
     command:
       - code-server
       - --bind-addr
@@ -22,6 +23,12 @@ services:
       - "127.0.0.1:${CODE_EDITOR_PORT:-13337}:13337"
     volumes:
       - ${DASHBOARD_CODE_EDITOR_ROOT:-/home/gtalx/el-inmortal-2-dashboard}:/workspace
+      - ${OPENCODE_BIN_PATH:-/root/.opencode/bin/opencode}:/usr/local/bin/opencode:ro
+      - ${OPENCODE_HOME_DIR:-/root/.opencode}:/root/.opencode:ro
+      - ${OPENCODE_CONFIG_DIR:-/root/.config/opencode}:/root/.config/opencode
+      - ${OPENCODE_DATA_DIR:-/root/.local/share/opencode}:/root/.local/share/opencode
+      - ${OPENCODE_CACHE_DIR:-/root/.cache/opencode}:/root/.cache/opencode
+      - ${OPENCODE_STATE_DIR:-/root/.local/state/opencode}:/root/.local/state/opencode
       - code_server_data:/root/.local/share/code-server
       - code_server_config:/root/.config/code-server
 

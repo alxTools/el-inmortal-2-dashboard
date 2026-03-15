@@ -1,6 +1,8 @@
 // Dashboard JavaScript - Enhanced Edition
 
 document.addEventListener('DOMContentLoaded', function() {
+    initializeDashboardDensityToggle();
+
     // Initialize all features
     initializeRevealAnimations();
     initializeParallaxEffect();
@@ -8,11 +10,11 @@ document.addEventListener('DOMContentLoaded', function() {
     initializeQuickLinkAnimations();
     initializeTableRowEffects();
     
-    // Auto-update stats every 30 seconds
-    setInterval(updateStats, 30000);
-    
-    // Initial load
-    updateStats();
+    // Auto-update stats every 30 seconds (silent refresh)
+    setInterval(() => updateStats({ silent: true }), 30000);
+
+    // Initial load (silent)
+    updateStats({ silent: true });
     
     // Setup hourly reminder alert
     setupHourlyAlert();
@@ -23,6 +25,39 @@ document.addEventListener('DOMContentLoaded', function() {
     // Initialize tooltip system
     initializeTooltips();
 });
+
+function initializeDashboardDensityToggle() {
+    const body = document.body;
+    if (!body || !body.classList.contains('dashboard-view')) return;
+
+    const toggleButton = document.getElementById('densityToggleBtn');
+    const densityStorageKey = 'ei2-dashboard-density';
+    const storedMode = localStorage.getItem(densityStorageKey);
+    const mode = storedMode === 'cinematic' ? 'cinematic' : 'compact';
+
+    applyDashboardDensityMode(mode, toggleButton);
+
+    if (!toggleButton) return;
+
+    toggleButton.addEventListener('click', () => {
+        const nextMode = body.classList.contains('density-compact') ? 'cinematic' : 'compact';
+        applyDashboardDensityMode(nextMode, toggleButton);
+        localStorage.setItem(densityStorageKey, nextMode);
+    });
+}
+
+function applyDashboardDensityMode(mode, toggleButton) {
+    const body = document.body;
+    const isCompact = mode !== 'cinematic';
+
+    body.classList.toggle('density-compact', isCompact);
+    body.classList.toggle('density-cinematic', !isCompact);
+
+    if (!toggleButton) return;
+
+    toggleButton.textContent = isCompact ? '🗜 Vista Compacta' : '🎛 Vista Cinematica';
+    toggleButton.setAttribute('aria-pressed', isCompact ? 'true' : 'false');
+}
 
 // Reveal animations on scroll
 function initializeRevealAnimations() {
@@ -51,6 +86,10 @@ function initializeRevealAnimations() {
 function initializeParallaxEffect() {
     const header = document.querySelector('.header');
     if (!header) return;
+
+    if (document.body.classList.contains('dashboard-view')) {
+        return;
+    }
     
     window.addEventListener('scroll', () => {
         const scrolled = window.pageYOffset;
@@ -351,7 +390,9 @@ if ('speechSynthesis' in window) {
     };
 }
 
-async function updateStats() {
+async function updateStats(options = {}) {
+    const { silent = false } = options;
+
     try {
         const response = await fetch('/api/stats');
         const data = await response.json();
@@ -373,8 +414,9 @@ async function updateStats() {
             progressBars[2].style.width = `${(data.content.total / data.content.target * 100)}%`;
         }
         
-        // Show toast notification
-        showToast('Stats actualizados', 'success');
+        if (!silent) {
+            showToast('Stats actualizados', 'success');
+        }
     } catch (error) {
         console.error('Error updating stats:', error);
     }
@@ -479,10 +521,15 @@ function updateClock() {
         minute: '2-digit',
         second: '2-digit'
     });
-    
-    const clockEl = document.getElementById('realtime-clock');
-    if (clockEl) {
-        clockEl.textContent = timeString;
+
+    const footerClock = document.getElementById('realtime-clock');
+    if (footerClock) {
+        footerClock.textContent = timeString;
+    }
+
+    const missionClock = document.getElementById('realtime-clock-mission');
+    if (missionClock) {
+        missionClock.textContent = timeString;
     }
 }
 

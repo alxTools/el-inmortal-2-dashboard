@@ -37,6 +37,7 @@ app.use(helmet({
                 "'self'",
                 "'unsafe-inline'",
                 "https://www.googletagmanager.com",
+                "https://connect.facebook.net",
                 "https://static.cloudflareinsights.com",
                 "https://www.paypal.com",
                 "https://www.sandbox.paypal.com",
@@ -66,7 +67,9 @@ app.use(helmet({
                 "https://www.sandbox.paypal.com",
                 "https://www.paypalobjects.com",
                 "https://*.paypal.com",
-                "https://*.paypalobjects.com"
+                "https://*.paypalobjects.com",
+                "https://trykimu.com",
+                "https://*.trykimu.com"
             ],
         },
     },
@@ -317,6 +320,48 @@ app.get('/notes', (req, res) => {
 
 app.get('/sticky-notes', (req, res) => {
     return res.redirect('/tools/notes');
+});
+
+app.use('/api/auth', requireAdmin, (req, res, next) => {
+    if (typeof toolsRouter.proxyVideoEditorFrontendRootApi !== 'function') {
+        return next();
+    }
+    return toolsRouter.proxyVideoEditorFrontendRootApi(req, res);
+});
+
+app.use('/api/projects', requireAdmin, (req, res, next) => {
+    if (typeof toolsRouter.proxyVideoEditorFrontendRootApi !== 'function') {
+        return next();
+    }
+    return toolsRouter.proxyVideoEditorFrontendRootApi(req, res);
+});
+
+app.use('/api/assets', requireAdmin, (req, res, next) => {
+    if (typeof toolsRouter.proxyVideoEditorFrontendRootApi !== 'function') {
+        return next();
+    }
+    return toolsRouter.proxyVideoEditorFrontendRootApi(req, res);
+});
+
+app.use('/api/storage', requireAdmin, (req, res, next) => {
+    if (typeof toolsRouter.proxyVideoEditorFrontendRootApi !== 'function') {
+        return next();
+    }
+    return toolsRouter.proxyVideoEditorFrontendRootApi(req, res);
+});
+
+app.use('/render', requireAdmin, (req, res, next) => {
+    if (typeof toolsRouter.proxyVideoEditorRenderApi !== 'function') {
+        return next();
+    }
+    return toolsRouter.proxyVideoEditorRenderApi(req, res);
+});
+
+app.use('/ai/api', requireAdmin, (req, res, next) => {
+    if (typeof toolsRouter.proxyVideoEditorFastApi !== 'function') {
+        return next();
+    }
+    return toolsRouter.proxyVideoEditorFastApi(req, res);
 });
 
 // Protected routes with role-based access

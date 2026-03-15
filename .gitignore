@@ -72,3 +72,7 @@ t*corriendo*
 # Python cache
 __pycache__/
 *.pyc
+
+# Local clone/runtime for Kimu video editor stack
+scripts/video-editor/videoeditor/
+scripts/video-editor/postgres-data/

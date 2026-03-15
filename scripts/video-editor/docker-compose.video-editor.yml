@@ -1,0 +1,79 @@
+version: "3.3"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: ei2-video-editor-postgres
+    environment:
+      POSTGRES_DB: ${VIDEO_EDITOR_POSTGRES_DB}
+      POSTGRES_USER: ${VIDEO_EDITOR_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${VIDEO_EDITOR_POSTGRES_PASSWORD}
+    volumes:
+      - ./postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${VIDEO_EDITOR_POSTGRES_USER} -d ${VIDEO_EDITOR_POSTGRES_DB}"]
+      interval: 8s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./videoeditor
+      dockerfile: Dockerfile.frontend
+      args:
+        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL}
+        VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY}
+    container_name: ei2-video-editor-frontend
+    env_file:
+      - ./videoeditor/.env.ei2
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: 5173
+      PROD_DOMAIN: ${VIDEO_EDITOR_PUBLIC_HOST}
+      AUTH_BASE_URL: ${VIDEO_EDITOR_PUBLIC_BASE_URL}
+      AUTH_TRUSTED_ORIGINS: ${VIDEO_EDITOR_AUTH_TRUSTED_ORIGINS}
+      AUTH_COOKIE_DOMAIN: ${VIDEO_EDITOR_AUTH_COOKIE_DOMAIN}
+      VIDEO_EDITOR_BASENAME: ${VIDEO_EDITOR_BASENAME}
+      DATABASE_URL: ${DATABASE_URL}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+    depends_on:
+      - postgres
+      - backend
+      - fastapi
+    ports:
+      - "${VIDEO_EDITOR_FRONTEND_PORT}:5173"
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./videoeditor
+      dockerfile: Dockerfile.backend
+    container_name: ei2-video-editor-render
+    env_file:
+      - ./videoeditor/.env.ei2
+    environment:
+      NODE_ENV: production
+      PORT: 8000
+      DATABASE_URL: ${DATABASE_URL}
+      VIDEO_EDITOR_BASENAME: ${VIDEO_EDITOR_BASENAME}
+    volumes:
+      - ./videoeditor/out:/app/out
+    depends_on:
+      - postgres
+    ports:
+      - "${VIDEO_EDITOR_RENDER_PORT}:8000"
+    restart: unless-stopped
+
+  fastapi:
+    build:
+      context: ./videoeditor/backend
+      dockerfile: Dockerfile
+    container_name: ei2-video-editor-fastapi
+    env_file:
+      - ./videoeditor/.env.ei2
+    ports:
+      - "${VIDEO_EDITOR_FASTAPI_PORT}:3000"
+    restart: unless-stopped

@@ -155,6 +155,12 @@ async function initializeTables() {
                     audio_file_path VARCHAR(500),
                     audio_file_type VARCHAR(50),
                     cover_image_path VARCHAR(500),
+                    project_zip_drive_file_id VARCHAR(255),
+                    project_zip_drive_download_url TEXT,
+                    project_zip_drive_view_url TEXT,
+                    project_zip_original_name VARCHAR(500),
+                    project_zip_file_size BIGINT,
+                    project_zip_uploaded_at DATETIME,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                     UNIQUE KEY unique_track_number (album_id, track_number)

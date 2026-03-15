@@ -61,6 +61,41 @@
                     </small>
                 </div>
 
+                <div class="form-group" style="background: rgba(34,197,94,0.07); padding: 20px; border-radius: 10px; border: 2px dashed rgba(34,197,94,0.35);">
+                    <label style="color: #86efac; font-weight: bold; display: flex; align-items: center; gap: 8px; margin-bottom: 10px;">
+                        ☁️ Proyecto/Data ZIP en Google Drive (hasta 10GB)
+                    </label>
+
+                    <div id="projectZipDropZone" style="border: 2px dashed rgba(34,197,94,0.55); border-radius: 10px; padding: 18px; text-align: center; background: rgba(0,0,0,0.15); cursor: pointer; transition: all 0.2s ease;">
+                        <p style="margin: 0; color: #cbd5e1; font-size: 0.95em;">
+                            Arrastra tu ZIP aquí o haz clic para seleccionarlo
+                        </p>
+                        <button type="button" id="projectZipSelectBtn" class="btn" style="margin-top: 10px; padding: 8px 14px; font-size: 0.85em; background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); border: none;">
+                            📦 Seleccionar ZIP
+                        </button>
+                        <input type="file" id="projectZipInput" accept=".zip,application/zip" style="display: none;">
+                    </div>
+
+                    <div id="projectZipCurrent" style="display: none; margin-top: 12px; background: rgba(34,197,94,0.08); border: 1px solid rgba(34,197,94,0.35); border-radius: 8px; padding: 12px;">
+                        <div style="color: #dcfce7; font-weight: 600; font-size: 0.92em;" id="projectZipName"></div>
+                        <div style="color: #9ca3af; font-size: 0.8em; margin-top: 4px;" id="projectZipMeta"></div>
+                        <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px;">
+                            <a id="projectZipViewLink" href="#" target="_blank" class="btn btn-secondary" style="padding: 6px 10px; font-size: 0.78em; text-decoration: none;">🔗 Abrir en Drive</a>
+                            <button type="button" id="projectZipClearBtn" class="btn btn-secondary" style="padding: 6px 10px; font-size: 0.78em;">🧹 Limpiar</button>
+                        </div>
+                    </div>
+
+                    <small id="projectZipStatus" style="color: #94a3b8; display: block; margin-top: 10px;">
+                        Opcional: sube 1 ZIP de proyecto/data y quedará vinculado al crear el tema.
+                    </small>
+
+                    <input type="hidden" name="project_zip_drive_file_id" id="projectZipDriveFileId">
+                    <input type="hidden" name="project_zip_drive_download_url" id="projectZipDriveDownloadUrl">
+                    <input type="hidden" name="project_zip_drive_view_url" id="projectZipDriveViewUrl">
+                    <input type="hidden" name="project_zip_original_name" id="projectZipOriginalName">
+                    <input type="hidden" name="project_zip_file_size" id="projectZipFileSize">
+                </div>
+
                 <div class="form-group">
                     <label>Letras/Notas</label>
                     <textarea name="lyrics" rows="4" placeholder="Letras o notas del tema..."></textarea>
@@ -114,29 +149,225 @@
             const durationInput = document.getElementById('durationInput');
             const status = document.getElementById('durationAutoStatus');
 
-            if (!audioInput || !durationInput || !status) return;
+            if (audioInput && durationInput && status) {
+                audioInput.addEventListener('change', async () => {
+                    const file = audioInput.files && audioInput.files[0];
+                    if (!file) {
+                        status.textContent = 'Se llenará automáticamente al seleccionar un archivo de audio.';
+                        status.style.color = '#888';
+                        return;
+                    }
 
-            audioInput.addEventListener('change', async () => {
-                const file = audioInput.files && audioInput.files[0];
-                if (!file) {
-                    status.textContent = 'Se llenará automáticamente al seleccionar un archivo de audio.';
-                    status.style.color = '#888';
+                    status.textContent = 'Detectando duración del audio...';
+                    status.style.color = '#ffd700';
+
+                    try {
+                        const durationSeconds = await extractAudioDurationSeconds(file);
+                        durationInput.value = formatDurationPreview(durationSeconds);
+                        status.textContent = `Duración detectada: ${formatDurationPreview(durationSeconds)}`;
+                        status.style.color = '#22c55e';
+                    } catch (error) {
+                        status.textContent = `No se pudo detectar duración automática: ${error.message}`;
+                        status.style.color = '#ff6b6b';
+                    }
+                });
+            }
+
+            const projectZipMaxBytes = 10 * 1024 * 1024 * 1024;
+            const projectZipDropZone = document.getElementById('projectZipDropZone');
+            const projectZipSelectBtn = document.getElementById('projectZipSelectBtn');
+            const projectZipInput = document.getElementById('projectZipInput');
+            const projectZipCurrent = document.getElementById('projectZipCurrent');
+            const projectZipName = document.getElementById('projectZipName');
+            const projectZipMeta = document.getElementById('projectZipMeta');
+            const projectZipStatus = document.getElementById('projectZipStatus');
+            const projectZipViewLink = document.getElementById('projectZipViewLink');
+            const projectZipClearBtn = document.getElementById('projectZipClearBtn');
+
+            const projectZipDriveFileIdInput = document.getElementById('projectZipDriveFileId');
+            const projectZipDriveDownloadUrlInput = document.getElementById('projectZipDriveDownloadUrl');
+            const projectZipDriveViewUrlInput = document.getElementById('projectZipDriveViewUrl');
+            const projectZipOriginalNameInput = document.getElementById('projectZipOriginalName');
+            const projectZipFileSizeInput = document.getElementById('projectZipFileSize');
+
+            const createTrackForm = document.querySelector('form[action="/tracks"]');
+            let projectZipUploading = false;
+
+            const setProjectZipStatus = (message, color) => {
+                if (!projectZipStatus) return;
+                projectZipStatus.textContent = message;
+                projectZipStatus.style.color = color;
+            };
+
+            const formatFileSize = (bytes) => {
+                if (!Number.isFinite(bytes) || bytes <= 0) return '0 B';
+                const units = ['B', 'KB', 'MB', 'GB'];
+                let value = bytes;
+                let unit = 0;
+                while (value >= 1024 && unit < units.length - 1) {
+                    value /= 1024;
+                    unit += 1;
+                }
+                const decimals = unit < 2 ? 0 : 2;
+                return `${value.toFixed(decimals)} ${units[unit]}`;
+            };
+
+            const clearProjectZipMetadata = () => {
+                if (projectZipDriveFileIdInput) projectZipDriveFileIdInput.value = '';
+                if (projectZipDriveDownloadUrlInput) projectZipDriveDownloadUrlInput.value = '';
+                if (projectZipDriveViewUrlInput) projectZipDriveViewUrlInput.value = '';
+                if (projectZipOriginalNameInput) projectZipOriginalNameInput.value = '';
+                if (projectZipFileSizeInput) projectZipFileSizeInput.value = '';
+
+                if (projectZipCurrent) projectZipCurrent.style.display = 'none';
+                if (projectZipName) projectZipName.textContent = '';
+                if (projectZipMeta) projectZipMeta.textContent = '';
+                if (projectZipViewLink) projectZipViewLink.href = '#';
+            };
+
+            const fillProjectZipMetadata = (payload) => {
+                if (!payload) return;
+
+                if (projectZipDriveFileIdInput) projectZipDriveFileIdInput.value = payload.driveFileId || '';
+                if (projectZipDriveDownloadUrlInput) projectZipDriveDownloadUrlInput.value = payload.downloadUrl || '';
+                if (projectZipDriveViewUrlInput) projectZipDriveViewUrlInput.value = payload.viewUrl || '';
+                if (projectZipOriginalNameInput) projectZipOriginalNameInput.value = payload.originalName || '';
+                if (projectZipFileSizeInput) projectZipFileSizeInput.value = String(payload.fileSize || '');
+
+                if (projectZipName) projectZipName.textContent = payload.originalName || 'project-data.zip';
+
+                const uploadedLabel = payload.uploadedAt
+                    ? new Date(payload.uploadedAt).toLocaleString('es-ES')
+                    : 'ahora';
+                if (projectZipMeta) {
+                    projectZipMeta.textContent = `${formatFileSize(Number(payload.fileSize))} • Subido ${uploadedLabel}`;
+                }
+
+                if (projectZipViewLink) {
+                    projectZipViewLink.href = payload.viewUrl || '#';
+                }
+
+                if (projectZipCurrent) {
+                    projectZipCurrent.style.display = 'block';
+                }
+            };
+
+            const setDropZoneState = (isDragging) => {
+                if (!projectZipDropZone) return;
+                projectZipDropZone.style.borderColor = isDragging ? '#22c55e' : 'rgba(34,197,94,0.55)';
+                projectZipDropZone.style.background = isDragging ? 'rgba(34,197,94,0.12)' : 'rgba(0,0,0,0.15)';
+            };
+
+            const uploadProjectZip = async (file) => {
+                if (!file || projectZipUploading) return;
+
+                const looksLikeZip = String(file.name || '').toLowerCase().endsWith('.zip');
+                if (!looksLikeZip) {
+                    setProjectZipStatus('Solo se permite archivo .zip', '#ff6b6b');
                     return;
                 }
 
-                status.textContent = 'Detectando duración del audio...';
-                status.style.color = '#ffd700';
+                if (file.size > projectZipMaxBytes) {
+                    setProjectZipStatus('El archivo supera el limite de 10GB por upload.', '#ff6b6b');
+                    return;
+                }
+
+                const formData = new FormData();
+                formData.append('project_zip', file);
+
+                projectZipUploading = true;
+                if (projectZipSelectBtn) projectZipSelectBtn.disabled = true;
+                if (projectZipInput) projectZipInput.disabled = true;
+                clearProjectZipMetadata();
+                setProjectZipStatus(`Subiendo ${file.name} a Google Drive...`, '#86efac');
 
                 try {
-                    const durationSeconds = await extractAudioDurationSeconds(file);
-                    durationInput.value = formatDurationPreview(durationSeconds);
-                    status.textContent = `Duración detectada: ${formatDurationPreview(durationSeconds)}`;
-                    status.style.color = '#22c55e';
+                    const response = await fetch('/uploads/project-zip', {
+                        method: 'POST',
+                        body: formData,
+                        headers: {
+                            'Accept': 'application/json'
+                        }
+                    });
+
+                    const contentType = response.headers.get('content-type') || '';
+                    const result = contentType.includes('application/json')
+                        ? await response.json()
+                        : { success: false, error: 'Respuesta invalida del servidor' };
+
+                    if (!response.ok || !result.success) {
+                        throw new Error(result.error || result.details || 'No se pudo subir el ZIP');
+                    }
+
+                    fillProjectZipMetadata(result.projectZip);
+                    setProjectZipStatus('ZIP subido y listo para guardar con el tema.', '#22c55e');
                 } catch (error) {
-                    status.textContent = `No se pudo detectar duración automática: ${error.message}`;
-                    status.style.color = '#ff6b6b';
+                    clearProjectZipMetadata();
+                    setProjectZipStatus(`Error subiendo ZIP: ${error.message}`, '#ff6b6b');
+                } finally {
+                    projectZipUploading = false;
+                    if (projectZipSelectBtn) projectZipSelectBtn.disabled = false;
+                    if (projectZipInput) {
+                        projectZipInput.disabled = false;
+                        projectZipInput.value = '';
+                    }
                 }
-            });
+            };
+
+            if (projectZipSelectBtn && projectZipInput) {
+                projectZipSelectBtn.addEventListener('click', (event) => {
+                    event.stopPropagation();
+                    projectZipInput.click();
+                });
+            }
+
+            if (projectZipDropZone && projectZipInput) {
+                projectZipDropZone.addEventListener('click', () => {
+                    projectZipInput.click();
+                });
+
+                projectZipDropZone.addEventListener('dragover', (event) => {
+                    event.preventDefault();
+                    setDropZoneState(true);
+                });
+
+                projectZipDropZone.addEventListener('dragleave', (event) => {
+                    event.preventDefault();
+                    setDropZoneState(false);
+                });
+
+                projectZipDropZone.addEventListener('drop', (event) => {
+                    event.preventDefault();
+                    setDropZoneState(false);
+                    const file = event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files[0];
+                    if (file) {
+                        uploadProjectZip(file);
+                    }
+                });
+
+                projectZipInput.addEventListener('change', () => {
+                    const file = projectZipInput.files && projectZipInput.files[0];
+                    if (file) {
+                        uploadProjectZip(file);
+                    }
+                });
+            }
+
+            if (projectZipClearBtn) {
+                projectZipClearBtn.addEventListener('click', () => {
+                    clearProjectZipMetadata();
+                    setProjectZipStatus('ZIP limpiado del formulario. Puedes subir otro antes de guardar.', '#94a3b8');
+                });
+            }
+
+            if (createTrackForm) {
+                createTrackForm.addEventListener('submit', (event) => {
+                    if (projectZipUploading) {
+                        event.preventDefault();
+                        alert('Espera a que termine la subida del ZIP antes de guardar el tema.');
+                    }
+                });
+            }
         });
     </script>
 </body>

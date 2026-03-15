@@ -6,64 +6,88 @@
     <title><%= title %></title>
     <link rel="stylesheet" href="/css/dashboard.css">
 </head>
-<body>
+<body class="dashboard-view density-compact mission-control-mode page-tools">
     <%- include('../partials/navbar') %>
 
-    <div class="container" style="padding-top: 30px;">
-        <section class="section">
+    <div class="container tools-mission-shell">
+        <div class="mission-strip tools-mission-strip" aria-label="Estado tools">
+            <span class="mission-chip mission-chip-live">TOOLS CORE ACTIVE</span>
+            <span class="mission-chip">MEDIA OPS</span>
+            <span class="mission-chip">EXPORT HUB</span>
+            <span class="mission-chip">AUTOMATION READY</span>
+        </div>
+
+        <section class="section tools-mission-hero">
             <div class="section-header">
-                <h2><span class="section-icon">🧰</span> Tools & Features</h2>
+                <h2><span class="section-icon">🧰</span> Tools Mission Control</h2>
+                <a href="/" class="btn btn-ghost">Volver a Dashboard</a>
             </div>
 
-            <p style="color: #9ca3af; margin-bottom: 20px;">
+            <p class="tools-mission-copy">
                 Herramientas de productividad para contenido, assets y automatizaciones del release.
             </p>
 
-            <div class="quick-links">
-                <a href="/tools/thumbnail-generator" class="quick-link">
-                    <div class="quick-link-icon">🖼️</div>
-                    <div>Thumbnail Generator</div>
+            <div class="tools-command-grid" data-layout-container="tools-command-grid">
+                <a href="/tools/landing-pages" class="tools-command-card tone-cobalt" data-layout-item="tools-landing-pages">
+                    <span class="tools-command-emoji">🌐</span>
+                    <span class="tools-command-title">Landing Pages</span>
+                    <span class="tools-command-meta">Activation + Sequencing</span>
                 </a>
-                <a href="/tools/youtube-metadata-audit" class="quick-link">
-                    <div class="quick-link-icon">📺</div>
-                    <div>YouTube Metadata Audit</div>
+                <a href="/tools/thumbnail-generator" class="tools-command-card tone-plasma" data-layout-item="tools-thumbnail-generator">
+                    <span class="tools-command-emoji">🖼️</span>
+                    <span class="tools-command-title">Thumbnail Generator</span>
+                    <span class="tools-command-meta">Visual Ops</span>
                 </a>
-                <a href="/tools/minidisc-orders" class="quick-link">
-                    <div class="quick-link-icon">💿</div>
-                    <div>Mini-Disc Fulfillment</div>
+                <a href="/tools/youtube-metadata-audit" class="tools-command-card tone-red" data-layout-item="tools-youtube-audit">
+                    <span class="tools-command-emoji">📺</span>
+                    <span class="tools-command-title">YouTube Metadata Audit</span>
+                    <span class="tools-command-meta">SEO + Metadata</span>
                 </a>
-                <a href="/tools/minidisc-generator" class="quick-link">
-                    <div class="quick-link-icon">🔎</div>
-                    <div>Mini-Disc Generator</div>
+                <a href="/tools/minidisc-orders" class="tools-command-card tone-neon" data-layout-item="tools-minidisc-orders">
+                    <span class="tools-command-emoji">💿</span>
+                    <span class="tools-command-title">Mini-Disc Fulfillment</span>
+                    <span class="tools-command-meta">Physical Orders</span>
                 </a>
-                <a href="/tools/notes" class="quick-link">
-                    <div class="quick-link-icon">📝</div>
-                    <div>Notes Sticky Board</div>
+                <a href="/tools/minidisc-generator" class="tools-command-card tone-amber" data-layout-item="tools-minidisc-generator">
+                    <span class="tools-command-emoji">🔎</span>
+                    <span class="tools-command-title">Mini-Disc Generator</span>
+                    <span class="tools-command-meta">Discovery Flow</span>
                 </a>
-                <a href="/tools/code-editor" class="quick-link">
-                    <div class="quick-link-icon">🧑‍💻</div>
-                    <div>Code Editor</div>
+                <a href="/tools/notes" class="tools-command-card tone-lime" data-layout-item="tools-notes">
+                    <span class="tools-command-emoji">📝</span>
+                    <span class="tools-command-title">Notes Sticky Board</span>
+                    <span class="tools-command-meta">Quick Capture</span>
                 </a>
-                <a href="/tools/remotion-studio" class="quick-link">
-                    <div class="quick-link-icon">🎬</div>
-                    <div>Remotion Studio</div>
+                <a href="/tools/code-editor" class="tools-command-card tone-cobalt" data-layout-item="tools-code-editor">
+                    <span class="tools-command-emoji">🧑‍💻</span>
+                    <span class="tools-command-title">Code Editor</span>
+                    <span class="tools-command-meta">Internal Build</span>
                 </a>
-                <a href="/tools/exports" class="quick-link">
-                    <div class="quick-link-icon">📦</div>
-                    <div>Exports</div>
+                <a href="/tools/remotion-studio" class="tools-command-card tone-violet" data-layout-item="tools-remotion-studio">
+                    <span class="tools-command-emoji">🎬</span>
+                    <span class="tools-command-title">Kimu Video Editor</span>
+                    <span class="tools-command-meta">trykimu/videoeditor</span>
                 </a>
-                <a href="/tools/proxy/mission-control" class="quick-link">
-                    <div class="quick-link-icon">🛰️</div>
-                    <div>Proxy Mission Control</div>
+                <a href="/tools/exports" class="tools-command-card tone-indigo" data-layout-item="tools-exports">
+                    <span class="tools-command-emoji">📦</span>
+                    <span class="tools-command-title">Exports</span>
+                    <span class="tools-command-meta">Delivery Hub</span>
                 </a>
-                <a href="/ei2" target="_blank" rel="noreferrer" class="quick-link">
-                    <div class="quick-link-icon">🚀</div>
-                    <div>Landing Publico del Album</div>
+                <a href="/tools/proxy/mission-control" class="tools-command-card tone-cyan" data-layout-item="tools-proxy-mission-control">
+                    <span class="tools-command-emoji">🛰️</span>
+                    <span class="tools-command-title">Proxy Mission Control</span>
+                    <span class="tools-command-meta">Network Ops</span>
+                </a>
+                <a href="/ei2" target="_blank" rel="noreferrer" class="tools-command-card tone-gold" data-layout-item="tools-public-landing">
+                    <span class="tools-command-emoji">🚀</span>
+                    <span class="tools-command-title">Landing Publico del Album</span>
+                    <span class="tools-command-meta">Public Surface</span>
                 </a>
             </div>
         </section>
     </div>
 
     <%- include('../partials/footer') %>
+    <script src="/js/layout-editor.js"></script>
 </body>
 </html>

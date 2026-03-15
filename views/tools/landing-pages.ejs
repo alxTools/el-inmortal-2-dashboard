@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %></title>
+    <link rel="stylesheet" href="/css/dashboard.css">
+</head>
+<body class="dashboard-view density-compact mission-control-mode page-tools-landing">
+    <%- include('../partials/navbar') %>
+
+    <div class="container tools-landing-shell">
+        <div class="mission-strip tools-mission-strip" aria-label="Landing pages status">
+            <span class="mission-chip mission-chip-live">LANDING ORCHESTRATOR</span>
+            <span class="mission-chip">TOTAL: <%= pages.length %></span>
+            <span class="mission-chip">ACTIVE: <%= activeCount %></span>
+            <span class="mission-chip">MODE: SEQUENTIAL DELIVERY</span>
+        </div>
+
+        <% if (flash && flash.message) { %>
+        <section class="tools-landing-flash tools-landing-flash-<%= flash.type || 'info' %>">
+            <%= flash.message %>
+        </section>
+        <% } %>
+
+        <section class="section tools-landing-create-panel">
+            <div class="section-header">
+                <h2><span class="section-icon">🧬</span> Crear Landing</h2>
+            </div>
+
+            <form method="POST" action="/tools/landing-pages" class="landing-pages-form" id="landingPagesCreateForm">
+                <div class="landing-form-grid">
+                    <label class="landing-form-field">
+                        <span>Nombre</span>
+                        <input type="text" name="name" placeholder="Ej: EI2 Launch v2" required maxlength="255">
+                    </label>
+
+                    <label class="landing-form-field">
+                        <span>Slug</span>
+                        <input type="text" name="slug" placeholder="ej: ei2-v2" required maxlength="80">
+                    </label>
+
+                    <label class="landing-form-field">
+                        <span>Modo</span>
+                        <select name="mode" id="landingModeSelect">
+                            <option value="internal" selected>Internal (render app)</option>
+                            <option value="redirect">Redirect (URL externa o ruta)</option>
+                        </select>
+                    </label>
+
+                    <label class="landing-form-field" id="landingRenderKeyField">
+                        <span>Render Key</span>
+                        <input type="text" name="render_key" placeholder="ei2" value="ei2" maxlength="80">
+                    </label>
+
+                    <label class="landing-form-field landing-form-field-full" id="landingTargetUrlField" style="display: none;">
+                        <span>Target URL</span>
+                        <input type="text" name="target_url" placeholder="https://tu-landing.com o /ei2" maxlength="2000">
+                    </label>
+
+                    <label class="landing-form-field">
+                        <span>Sort Order</span>
+                        <input type="number" name="sort_order" value="100" step="1">
+                    </label>
+
+                    <label class="landing-form-checkbox">
+                        <input type="checkbox" name="is_active" value="1">
+                        <span>Activar al crear</span>
+                    </label>
+
+                    <label class="landing-form-field landing-form-field-full">
+                        <span>Descripcion</span>
+                        <textarea name="description" rows="3" placeholder="Notas de esta landing para el equipo..."></textarea>
+                    </label>
+                </div>
+
+                <div class="landing-form-actions">
+                    <button type="submit" class="btn">➕ Crear Landing</button>
+                </div>
+            </form>
+
+            <div class="landing-rule-note">
+                Regla de entrega en <code>/landing</code>: se recorren landings activas por <code>sort_order</code>.
+                Si un visitante ya vio la primera activa, la siguiente visita recibe la siguiente activa.
+                La ruta <code>/ei2</code> permanece fija al landing actual para no romper producción.
+                En modo redirect usa URL externa o <code>/ei2</code>.
+            </div>
+        </section>
+
+        <section class="section tools-landing-list-panel">
+            <div class="section-header">
+                <h2><span class="section-icon">🛰️</span> Landing Inventory</h2>
+            </div>
+
+            <% if (!pages || pages.length === 0) { %>
+            <div class="landing-empty-state">No hay landings registradas.</div>
+            <% } else { %>
+            <div class="landing-pages-grid">
+                <% pages.forEach((page) => { %>
+                <article class="landing-page-card <%= page.isActive ? 'is-active' : 'is-inactive' %>">
+                    <div class="landing-card-top">
+                        <div class="landing-card-title-wrap">
+                            <h3><%= page.name %></h3>
+                            <div class="landing-card-slug">/<%= page.slug %></div>
+                        </div>
+                        <span class="landing-status-badge <%= page.isActive ? 'status-active' : 'status-inactive' %>">
+                            <%= page.isActive ? 'ACTIVE' : 'OFF' %>
+                        </span>
+                    </div>
+
+                    <div class="landing-card-meta-grid">
+                        <div><strong>Modo:</strong> <%= page.mode %></div>
+                        <div><strong>Orden:</strong> <%= page.sortOrder %></div>
+                        <div><strong>Render Key:</strong> <%= page.renderKey || '-' %></div>
+                        <div><strong>Target:</strong> <%= page.targetUrl || '-' %></div>
+                    </div>
+
+                    <% if (page.description) { %>
+                    <p class="landing-card-description"><%= page.description %></p>
+                    <% } %>
+
+                    <div class="landing-card-actions">
+                        <form method="POST" action="/tools/landing-pages/<%= page.id %>/toggle-active">
+                            <button type="submit" class="btn-small <%= page.isActive ? 'landing-btn-danger' : '' %>">
+                                <%= page.isActive ? '⏸️ Desactivar' : '▶️ Activar' %>
+                            </button>
+                        </form>
+
+                        <form method="POST" action="/tools/landing-pages/<%= page.id %>/sort-order" class="landing-sort-form">
+                            <input type="number" name="sort_order" value="<%= page.sortOrder %>" step="1">
+                            <button type="submit" class="btn-small">Guardar orden</button>
+                        </form>
+                    </div>
+                </article>
+                <% }) %>
+            </div>
+            <% } %>
+        </section>
+    </div>
+
+    <%- include('../partials/footer') %>
+
+    <script>
+        (function () {
+            const modeSelect = document.getElementById('landingModeSelect');
+            const renderKeyField = document.getElementById('landingRenderKeyField');
+            const targetUrlField = document.getElementById('landingTargetUrlField');
+            if (!modeSelect || !renderKeyField || !targetUrlField) return;
+
+            const toggleFields = () => {
+                const mode = String(modeSelect.value || 'internal').trim().toLowerCase();
+                const isRedirect = mode === 'redirect';
+                renderKeyField.style.display = isRedirect ? 'none' : '';
+                targetUrlField.style.display = isRedirect ? '' : 'none';
+            };
+
+            modeSelect.addEventListener('change', toggleFields);
+            toggleFields();
+        })();
+    </script>
+</body>
+</html>

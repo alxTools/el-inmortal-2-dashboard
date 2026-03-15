@@ -146,7 +146,7 @@ server {
         proxy_cache_bypass $http_upgrade;
     }
 
-    client_max_body_size 100M;
+    client_max_body_size 10G;
 }
 ```
 

@@ -6,10 +6,10 @@
     <title><%= title %></title>
     <link rel="stylesheet" href="/css/dashboard.css">
 </head>
-<body>
+<body class="dashboard-view density-compact mission-control-mode">
     <%- include('partials/navbar') %>
 
-    <header class="header">
+    <header class="header dashboard-hero">
         <div class="dashboard-brand-logo-wrap">
             <img
                 src="/images/galante_signature.png"
@@ -19,201 +19,344 @@
             >
         </div>
         <div class="subtitle">Panel de Administracion</div>
+        <div class="dashboard-hero-controls">
+            <span class="dashboard-mode-pill">Mission Control</span>
+            <button type="button" id="densityToggleBtn" class="density-toggle-btn" aria-pressed="true">
+                🗜 Vista Compacta
+            </button>
+        </div>
+        <div class="mission-strip" aria-label="Estado del sistema">
+            <span class="mission-chip mission-chip-live">OPS ONLINE</span>
+            <span class="mission-chip">TRACK GRID: <%= stats.totalTracks %>/<%= stats.totalTracksTarget %></span>
+            <span class="mission-chip">SPLIT READY: <%= stats.splitsheetsConfirmed %></span>
+            <span class="mission-chip mission-chip-clock">UTC <span id="realtime-clock-mission">--:--:--</span></span>
+        </div>
     </header>
 
-    <% if (flash) { %>
-    <section class="section" style="max-width: 1200px; margin: 16px auto 0;">
-        <div style="background:#111827; border:1px solid #334155; color:#e5e7eb; border-radius:10px; padding:10px 12px; font-size:0.9rem;">
+    <div class="container dashboard-shell">
+        <% if (flash) { %>
+        <section class="dashboard-flash reveal">
             <strong>Estado:</strong> <%= flash %>
-        </div>
-    </section>
-    <% } %>
+        </section>
+        <% } %>
 
-    <div class="container">
-        <!-- Stats Overview -->
-        <div class="stats-grid">
-            <div class="stat-card reveal shine-effect">
-                <h3>🎵 Total de Temas</h3>
+        <div class="stats-grid dashboard-stats-grid" data-layout-container="home-stats-grid">
+            <div class="stat-card reveal shine-effect" data-layout-item="stats-tracks">
+                <h3>🎵 Temas</h3>
                 <div class="number"><%= stats.totalTracks %>/<%= stats.totalTracksTarget %></div>
-                <div class="label">Canciones en el álbum</div>
+                <div class="label">Catalogo del album</div>
+                <div class="stat-meta">TRACK MATRIX</div>
                 <div class="progress-bar">
-                    <div class="progress-fill" style="width: <%= (stats.totalTracks / stats.totalTracksTarget * 100) %>"></div>
+                    <div class="progress-fill" style="width: <%= stats.totalTracksTarget > 0 ? (stats.totalTracks / stats.totalTracksTarget * 100) : 0 %>%"></div>
                 </div>
             </div>
-            <div class="stat-card reveal shine-effect">
+            <div class="stat-card reveal shine-effect" data-layout-item="stats-producers">
                 <h3>🎧 Productores</h3>
                 <div class="number"><%= stats.producerCount %></div>
-                <div class="label">Colaboradores</div>
+                <div class="label">Colaboradores activos</div>
+                <div class="stat-meta">CREW INDEX</div>
             </div>
-            <div class="stat-card reveal shine-effect">
-                <h3>📄 Splitsheets</h3>
+            <div class="stat-card reveal shine-effect" data-layout-item="stats-splits">
+                <h3>📄 Splits</h3>
                 <div class="number"><%= stats.splitsheetsConfirmed %>/<%= stats.totalTracks %></div>
                 <div class="label">Confirmados</div>
+                <div class="stat-meta">RIGHTS LOCK</div>
                 <div class="progress-bar">
-                    <div class="progress-fill" style="width: <%= stats.totalTracks > 0 ? (stats.splitsheetsConfirmed / stats.totalTracks * 100) : 0 %>"></div>
+                    <div class="progress-fill" style="width: <%= stats.totalTracks > 0 ? (stats.splitsheetsConfirmed / stats.totalTracks * 100) : 0 %>%"></div>
                 </div>
             </div>
-            <div class="stat-card reveal shine-effect">
+            <div class="stat-card reveal shine-effect" data-layout-item="stats-content">
                 <h3>📱 Contenido</h3>
                 <div class="number"><%= stats.totalContent %>/<%= stats.totalContentTarget %></div>
                 <div class="label">Posts planeados</div>
+                <div class="stat-meta">CONTENT FLUX</div>
                 <div class="progress-bar">
-                    <div class="progress-fill" style="width: <%= (stats.totalContent / stats.totalContentTarget * 100) %>"></div>
+                    <div class="progress-fill" style="width: <%= stats.totalContentTarget > 0 ? (stats.totalContent / stats.totalContentTarget * 100) : 0 %>%"></div>
                 </div>
+            </div>
+            <div class="stat-card reveal shine-effect" data-layout-item="stats-pending">
+                <h3>🕓 Pendientes</h3>
+                <div class="number"><%= stats.splitsheetsPending %></div>
+                <div class="label">Splits por confirmar</div>
+                <div class="stat-meta">QUEUE WATCH</div>
+            </div>
+            <div class="stat-card reveal shine-effect" data-layout-item="stats-urgent">
+                <h3>🔥 Urgentes</h3>
+                <div class="number"><%= stats.urgentTasks %></div>
+                <div class="label">Checklist critico</div>
+                <div class="stat-meta">ALERT GRID</div>
             </div>
         </div>
 
-        <!-- Recent Tracks -->
-        <section class="section">
-            <div class="section-header">
-                <h2><span class="section-icon">🎵</span> Temas Recientes</h2>
-                <a href="/tracks" class="btn">Ver Todos</a>
-            </div>
-            <table class="tracks-table">
-                <thead>
-                    <tr>
-                        <th>#</th>
-                        <th>Título</th>
-                        <th>Productor</th>
-                        <th>Splitsheet</th>
-                        <th>Acciones</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <% recentTracks.forEach(track => { %>
-                    <tr>
-                        <td><%= track.track_number %></td>
-                        <td><strong><%= track.title || 'Sin título' %></strong></td>
-                        <td><%= track.producer_name || 'Sin asignar' %></td>
-                        <td>
-                            <% if (track.splitsheet_confirmed) { %>
-                                <span class="status-badge status-done">Confirmado</span>
-                            <% } else if (track.splitsheet_sent) { %>
-                                <span class="status-badge status-pending">Enviado</span>
-                            <% } else { %>
-                                <span class="status-badge status-urgent">Pendiente</span>
-                            <% } %>
-                        </td>
-                        <td>
-                            <a href="/tracks/<%= track.id %>/edit" class="btn-small">Editar</a>
-                        </td>
-                    </tr>
-                    <% }) %>
-                </tbody>
-            </table>
-        </section>
-
-        <!-- Quick Links -->
-        <section class="section">
-            <div class="section-header">
-                <h2><span class="section-icon">⚡</span> Acceso Rápido</h2>
-            </div>
-            <div class="quick-links">
-                <a href="/tracks/new" class="quick-link">
-                    <div class="quick-link-icon">🎵</div>
-                    <div>+ Nuevo Tema</div>
-                </a>
-                <a href="/producers/new" class="quick-link">
-                    <div class="quick-link-icon">🎧</div>
-                    <div>+ Nuevo Productor</div>
-                </a>
-                <a href="/splitsheets" class="quick-link">
-                    <div class="quick-link-icon">📄</div>
-                    <div>Splitsheets</div>
-                </a>
-                <a href="/calendar" class="quick-link">
-                    <div class="quick-link-icon">📅</div>
-                    <div>Calendario</div>
-                </a>
-                <a href="/checklist" class="quick-link">
-                    <div class="quick-link-icon">✅</div>
-                    <div>Checklist</div>
-                </a>
-                <a href="/api/stats" target="_blank" class="quick-link">
-                    <div class="quick-link-icon">📊</div>
-                    <div>API Stats</div>
-                </a>
-                <a href="/tools" class="quick-link">
-                    <div class="quick-link-icon">🧰</div>
-                    <div>Tools</div>
-                </a>
-                <a href="/tools/thumbnail-generator" class="quick-link">
-                    <div class="quick-link-icon">🖼️</div>
-                    <div>Thumbnail Generator</div>
-                </a>
-                <a href="/tools/youtube-metadata-audit" class="quick-link">
-                    <div class="quick-link-icon">📺</div>
-                    <div>YouTube Metadata Audit</div>
-                </a>
-                <a href="/tools/minidisc-orders" class="quick-link">
-                    <div class="quick-link-icon">💿</div>
-                    <div>Mini-Disc Fulfillment</div>
-                </a>
-                <a href="/tools/minidisc-generator" class="quick-link">
-                    <div class="quick-link-icon">🔎</div>
-                    <div>Mini-Disc Generator</div>
-                </a>
-                <a href="/tools/notes" class="quick-link">
-                    <div class="quick-link-icon">📝</div>
-                    <div>Sticky Notes</div>
-                </a>
-                <a href="/tools/exports" class="quick-link">
-                    <div class="quick-link-icon">📦</div>
-                    <div>Exports</div>
-                </a>
-                <a href="/ei2" target="_blank" rel="noreferrer" class="quick-link">
-                    <div class="quick-link-icon">🚀</div>
-                    <div>Landing Publico</div>
-                </a>
-            </div>
-
-            <div style="margin-top: 16px; padding: 12px; border: 1px solid #334155; border-radius: 10px; background: #0f172a;">
-                <div style="font-weight: 700; margin-bottom: 8px; color: #e5e7eb;">Enviar Reporte Diario YouTube (PDF)</div>
-                <form method="POST" action="/send-daily-report-email">
-                    <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
-                        <input type="email" name="email_to" value="<%= defaultReportEmailTo || '' %>" placeholder="destino@dominio.com" style="padding:8px 10px; border-radius:8px; border:1px solid #334155; background:#111827; color:#e5e7eb; min-width:260px;">
-                        <input type="date" name="from" style="padding:8px 10px; border-radius:8px; border:1px solid #334155; background:#111827; color:#e5e7eb;">
-                        <input type="date" name="to" style="padding:8px 10px; border-radius:8px; border:1px solid #334155; background:#111827; color:#e5e7eb;">
-                        <button type="submit" class="btn">Enviar PDF por Email</button>
+        <div class="dashboard-main-grid">
+            <section class="section dashboard-section-tracks reveal">
+                <div class="section-header">
+                    <h2><span class="section-icon">🎛️</span> Vista Rapida de Temas</h2>
+                    <div class="section-actions">
+                        <a href="/tracks/new" class="btn btn-ghost">+ Nuevo Tema</a>
+                        <a href="/tracks" class="btn">Ver Todos</a>
                     </div>
-                </form>
-            </div>
-        </section>
+                </div>
+                <table class="tracks-table dashboard-tracks-table">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>ID</th>
+                            <th>Titulo</th>
+                            <th>Productor</th>
+                            <th>Splitsheet</th>
+                            <th>Accion</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% if (!recentTracks || recentTracks.length === 0) { %>
+                        <tr>
+                            <td colspan="6" class="table-empty">No hay temas recientes todavia.</td>
+                        </tr>
+                        <% } %>
+                        <% recentTracks.forEach(track => { %>
+                        <tr>
+                            <td><%= track.track_number %></td>
+                            <td>T-<%= track.id %></td>
+                            <td><strong><%= track.title || 'Sin titulo' %></strong></td>
+                            <td><%= track.producer_name || 'Sin asignar' %></td>
+                            <td>
+                                <% if (track.splitsheet_confirmed) { %>
+                                    <span class="status-badge status-done">Confirmado</span>
+                                <% } else if (track.splitsheet_sent) { %>
+                                    <span class="status-badge status-pending">Enviado</span>
+                                <% } else { %>
+                                    <span class="status-badge status-urgent">Pendiente</span>
+                                <% } %>
+                            </td>
+                            <td>
+                                <a href="/tracks/<%= track.id %>/edit" class="btn-small">Editar</a>
+                            </td>
+                        </tr>
+                        <% }) %>
+                    </tbody>
+                </table>
+            </section>
 
-        <section class="section">
+            <aside class="dashboard-sidebar" data-layout-container="home-sidebar-panels">
+                <section class="section dashboard-command-center reveal" data-layout-item="panel-command-center">
+                    <div class="section-header compact-section-header">
+                        <h2><span class="section-icon">⚡</span> Centro de Comandos</h2>
+                    </div>
+                    <div class="emoji-command-grid" aria-label="Centro de comandos">
+                        <a href="/tracks/new" class="emoji-command-link tone-gold" data-tooltip="Nuevo Tema" aria-label="Nuevo Tema">🎵</a>
+                        <a href="/producers/new" class="emoji-command-link tone-cyan" data-tooltip="Nuevo Productor" aria-label="Nuevo Productor">🎧</a>
+                        <a href="/splitsheets" class="emoji-command-link tone-violet" data-tooltip="Splitsheets" aria-label="Splitsheets">📄</a>
+                        <a href="/calendar" class="emoji-command-link tone-mint" data-tooltip="Calendario" aria-label="Calendario">📅</a>
+                        <a href="/checklist" class="emoji-command-link tone-sunset" data-tooltip="Checklist" aria-label="Checklist">✅</a>
+                        <a href="/tools" class="emoji-command-link tone-steel" data-tooltip="Tools" aria-label="Tools">🧰</a>
+                        <a href="/tools/landing-pages" class="emoji-command-link tone-cobalt" data-tooltip="Landing Pages" aria-label="Landing Pages">🌐</a>
+
+                        <a href="/tools/thumbnail-generator" class="emoji-command-link tone-plasma" data-tooltip="Thumbnail Generator" aria-label="Thumbnail Generator">🖼️</a>
+                        <a href="/tools/youtube-metadata-audit" class="emoji-command-link tone-red" data-tooltip="YouTube Metadata Audit" aria-label="YouTube Metadata Audit">📺</a>
+                        <a href="/tools/minidisc-orders" class="emoji-command-link tone-neon" data-tooltip="Mini-Disc Fulfillment" aria-label="Mini-Disc Fulfillment">💿</a>
+                        <a href="/tools/minidisc-generator" class="emoji-command-link tone-amber" data-tooltip="Mini-Disc Generator" aria-label="Mini-Disc Generator">🔎</a>
+                        <a href="/tools/notes" class="emoji-command-link tone-lime" data-tooltip="Sticky Notes" aria-label="Sticky Notes">📝</a>
+                        <a href="/tools/exports" class="emoji-command-link tone-indigo" data-tooltip="Exports" aria-label="Exports">📦</a>
+
+                        <a href="/api/stats" target="_blank" class="emoji-command-link tone-cobalt" data-tooltip="API Stats" aria-label="API Stats">📊</a>
+                        <a href="/ei2" target="_blank" rel="noreferrer" class="emoji-command-link tone-gold" data-tooltip="Landing Publico" aria-label="Landing Publico">🚀</a>
+                    </div>
+                    <div class="emoji-command-legend">
+                        <span><i class="legend-dot tone-gold"></i>Core</span>
+                        <span><i class="legend-dot tone-cyan"></i>Creativo</span>
+                        <span><i class="legend-dot tone-violet"></i>Operaciones</span>
+                    </div>
+                    <p class="emoji-command-hint">Hover para ver nombre de cada acceso.</p>
+                </section>
+
+                <section class="section dashboard-mission-panel reveal" data-layout-item="panel-mission-feed">
+                    <div class="section-header compact-section-header">
+                        <h2><span class="section-icon">🛰️</span> Mission Feed</h2>
+                    </div>
+                    <div class="mission-feed-list">
+                        <div class="mission-feed-item">
+                            <span class="mission-feed-label">Track Completion</span>
+                            <span class="mission-feed-value"><%= stats.totalTracksTarget > 0 ? Math.round((stats.totalTracks / stats.totalTracksTarget) * 100) : 0 %>%</span>
+                        </div>
+                        <div class="mission-feed-item">
+                            <span class="mission-feed-label">Splits Confirmed</span>
+                            <span class="mission-feed-value"><%= stats.totalTracks > 0 ? Math.round((stats.splitsheetsConfirmed / stats.totalTracks) * 100) : 0 %>%</span>
+                        </div>
+                        <div class="mission-feed-item">
+                            <span class="mission-feed-label">Content Progress</span>
+                            <span class="mission-feed-value"><%= stats.totalContentTarget > 0 ? Math.round((stats.totalContent / stats.totalContentTarget) * 100) : 0 %>%</span>
+                        </div>
+                        <div class="mission-feed-item">
+                            <span class="mission-feed-label">Urgency Signal</span>
+                            <span class="mission-feed-value"><%= stats.urgentTasks > 0 ? 'ACTIVE' : 'STABLE' %></span>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="section dashboard-report-panel reveal" data-layout-item="panel-report">
+                    <div class="section-header compact-section-header">
+                        <h2><span class="section-icon">📬</span> Reporte Diario YouTube</h2>
+                    </div>
+                    <form method="POST" action="/send-daily-report-email" class="report-form">
+                        <input
+                            type="email"
+                            name="email_to"
+                            value="<%= defaultReportEmailTo || '' %>"
+                            placeholder="destino@dominio.com"
+                            required
+                        >
+                        <div class="report-date-grid">
+                            <input type="date" name="from">
+                            <input type="date" name="to">
+                        </div>
+                        <button type="submit" class="btn">Enviar PDF por Email</button>
+                    </form>
+                </section>
+
+                <section class="section dashboard-activity-panel reveal" data-layout-item="panel-activity">
+                    <div class="section-header compact-section-header">
+                        <h2><span class="section-icon">🧾</span> Actividad Reciente</h2>
+                    </div>
+
+                    <% if (!recentActivity || recentActivity.length === 0) { %>
+                    <div class="activity-empty">Sin actividad reciente.</div>
+                    <% } else { %>
+                    <ul class="activity-list">
+                        <% recentActivity.forEach(activity => {
+                            const createdAt = activity.created_at ? new Date(activity.created_at) : null;
+                            const createdAtLabel = createdAt && !Number.isNaN(createdAt.getTime())
+                                ? createdAt.toLocaleString('es-ES', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+                                : 'Sin fecha';
+                            const actionName = String(activity.action || 'UPDATE').replace(/_/g, ' ');
+                        %>
+                        <li class="activity-item">
+                            <div class="activity-topline">
+                                <span class="activity-action"><%= actionName %></span>
+                                <span class="activity-time"><%= createdAtLabel %></span>
+                            </div>
+                            <div class="activity-details"><%= activity.details || 'Sin detalles' %></div>
+                        </li>
+                        <% }) %>
+                    </ul>
+                    <% } %>
+                </section>
+            </aside>
+        </div>
+
+        <section class="section dashboard-news-section reveal">
             <div class="section-header">
-                <h2><span class="section-icon">✨</span> Features & Tools</h2>
-                <a href="/tools" class="btn">Ver Todo</a>
+                <h2><span class="section-icon">📰</span> Noticias + Algorithm Lab</h2>
+                <span class="news-control-pill">10 Algoritmos Salvajes</span>
             </div>
-            <div class="quick-links">
-                <a href="/tools/thumbnail-generator" class="quick-link">
-                    <div class="quick-link-icon">🎬</div>
-                    <div>Generar Thumbnail desde Video</div>
-                </a>
-                <a href="/tools/youtube-metadata-audit" class="quick-link">
-                    <div class="quick-link-icon">📺</div>
-                    <div>Auditar y Corregir Metadata YouTube</div>
-                </a>
-                <a href="/tools/minidisc-orders" class="quick-link">
-                    <div class="quick-link-icon">💿</div>
-                    <div>Gestionar Ordenes Mini-Disc</div>
-                </a>
-                <a href="/tools/minidisc-generator" class="quick-link">
-                    <div class="quick-link-icon">🔎</div>
-                    <div>Generador Mini-Disc Spotify</div>
-                </a>
-                <a href="/tools/notes" class="quick-link">
-                    <div class="quick-link-icon">📝</div>
-                    <div>Notas Sticky del Dashboard</div>
-                </a>
-                <a href="/tools/exports" class="quick-link">
-                    <div class="quick-link-icon">📦</div>
-                    <div>Descargar Exports</div>
-                </a>
-                <a href="/ei2" target="_blank" rel="noreferrer" class="quick-link">
-                    <div class="quick-link-icon">🚀</div>
-                    <div>Abrir Landing del Album</div>
-                </a>
+
+            <div class="dashboard-news-grid">
+                <div class="news-wire-panel">
+                    <div class="news-wire-header">Mission Newswire</div>
+                    <ul class="news-wire-list">
+                        <li class="news-wire-item">
+                            <span class="news-wire-tag tag-hot">HOT</span>
+                            <div class="news-wire-text">Modelo detecta hooks con alta retencion en demos no finalizados.</div>
+                        </li>
+                        <li class="news-wire-item">
+                            <span class="news-wire-tag tag-drop">DROP</span>
+                            <div class="news-wire-text">Simulador sugiere mejor ventana de release para tracks melancolicos.</div>
+                        </li>
+                        <li class="news-wire-item">
+                            <span class="news-wire-tag tag-social">SOCIAL</span>
+                            <div class="news-wire-text">Posts con narrativa confesional + snippet suben guardados en 3x.</div>
+                        </li>
+                        <li class="news-wire-item">
+                            <span class="news-wire-tag tag-ai">AI</span>
+                            <div class="news-wire-text">Nuevo pipeline combina sentimiento, visual y copy para feeds multiplataforma.</div>
+                        </li>
+                    </ul>
+                </div>
+
+                <%
+                    const wildAlgorithms = [
+                        {
+                            id: 'ALGO-01',
+                            name: 'Track Story Reactor',
+                            level: 'EXTREMO',
+                            steps: ['track', 'lyrics', 'analyze sentiment', 'gen-story']
+                        },
+                        {
+                            id: 'ALGO-02',
+                            name: 'Visual Post Forge',
+                            level: 'ALTO',
+                            steps: ['photo', 'description', 'track', 'analyze sentiment', 'gen-post']
+                        },
+                        {
+                            id: 'ALGO-03',
+                            name: 'Mood Trailer Core',
+                            level: 'ALTO',
+                            steps: ['track stem', 'bpm detect', 'emotion map', 'clip select', 'gen-trailer']
+                        },
+                        {
+                            id: 'ALGO-04',
+                            name: 'Hook Hunter X',
+                            level: 'SALVAJE',
+                            steps: ['track', 'detect hook', 'crowd heatmap', 'caption DNA', 'gen-reel-script']
+                        },
+                        {
+                            id: 'ALGO-05',
+                            name: 'Conflict Narrative',
+                            level: 'SALVAJE',
+                            steps: ['lyrics', 'keyword clash', 'sentiment shift', 'story arc', 'gen-carousel']
+                        },
+                        {
+                            id: 'ALGO-06',
+                            name: 'Fan Pulse Engine',
+                            level: 'EXTREMO',
+                            steps: ['comments', 'voice notes', 'topic graph', 'emotion score', 'gen-community-post']
+                        },
+                        {
+                            id: 'ALGO-07',
+                            name: 'Midnight Drop Oracle',
+                            level: 'ALTO',
+                            steps: ['timezone mix', 'engagement history', 'sleep curve', 'drop window', 'gen-launch-plan']
+                        },
+                        {
+                            id: 'ALGO-08',
+                            name: 'Aesthetic DNA Mapper',
+                            level: 'SALVAJE',
+                            steps: ['cover art', 'palette scan', 'lyric mood', 'style blend', 'gen-creative-brief']
+                        },
+                        {
+                            id: 'ALGO-09',
+                            name: 'Chaos-to-Copy AI',
+                            level: 'EXTREMO',
+                            steps: ['studio notes', 'voice memo', 'theme extract', 'tone lock', 'gen-master-copy']
+                        },
+                        {
+                            id: 'ALGO-10',
+                            name: 'Viral Sequence Builder',
+                            level: 'SALVAJE',
+                            steps: ['track', 'visual pack', 'sentiment pulse', 'cta optimizer', 'gen-7day-sequence']
+                        }
+                    ];
+                %>
+
+                <div class="algorithm-lab-grid" data-layout-container="home-algorithm-lab">
+                    <% wildAlgorithms.forEach((algo, index) => { %>
+                    <article class="algorithm-card" data-layout-item="home-algo-<%= index + 1 %>">
+                        <div class="algorithm-card-top">
+                            <span class="algorithm-id"><%= algo.id %></span>
+                            <span class="algorithm-level"><%= algo.level %></span>
+                        </div>
+                        <h3 class="algorithm-title"><%= algo.name %></h3>
+                        <div class="algorithm-flow" aria-label="Flujo de <%= algo.name %>">
+                            <% algo.steps.forEach((step, stepIndex) => { %>
+                                <span class="algorithm-step"><%= step %></span>
+                                <% if (stepIndex < algo.steps.length - 1) { %>
+                                    <span class="algorithm-arrow">→</span>
+                                <% } %>
+                            <% }) %>
+                        </div>
+                    </article>
+                    <% }) %>
+                </div>
             </div>
         </section>
     </div>
@@ -221,5 +364,6 @@
     <%- include('partials/footer') %>
 
     <script src="/js/dashboard.js"></script>
+    <script src="/js/layout-editor.js"></script>
 </body>
 </html>

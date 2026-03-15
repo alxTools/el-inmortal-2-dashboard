@@ -4,8 +4,11 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const { getAll, getOne, run } = require('../config/database');
-const { uploadToDrive, isGoogleDrivePath } = require('../utils/googleDriveHelper');
+const { uploadToDrive } = require('../utils/googleDriveHelper');
 const { analyzeAndDescribeAudio } = require('../utils/audioHelper');
+const { ensureTrackProjectZipColumns } = require('../utils/trackProjectZipSchema');
+
+const PROJECT_ZIP_MAX_BYTES = 10 * 1024 * 1024 * 1024;
 
 function normalizeDurationText(value) {
     if (value === undefined || value === null || value === '') return null;
@@ -35,6 +38,37 @@ function normalizeDurationText(value) {
     }
 
     return formatSeconds(numeric);
+}
+
+function formatFileSize(bytes) {
+    if (!Number.isFinite(bytes) || bytes <= 0) return '0 B';
+    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    let size = bytes;
+    let index = 0;
+    while (size >= 1024 && index < units.length - 1) {
+        size /= 1024;
+        index += 1;
+    }
+    const precision = index <= 1 ? 0 : 2;
+    return `${size.toFixed(precision)} ${units[index]}`;
+}
+
+function sanitizeZipName(value) {
+    return String(value || '')
+        .replace(/[^a-zA-Z0-9._-]/g, '_')
+        .slice(0, 180);
+}
+
+function getProjectZipDriveUploadOptions() {
+    const folderId = String(process.env.GOOGLE_DRIVE_PROJECT_ZIP_FOLDER_ID || '').trim();
+    const folderName = String(process.env.GOOGLE_DRIVE_PROJECT_ZIP_FOLDER_NAME || 'EI2_Project_Data_Zips').trim();
+    const parentFolderId = String(process.env.GOOGLE_DRIVE_FOLDER_ID || 'root').trim() || 'root';
+
+    return {
+        folderId: folderId || undefined,
+        folderName: folderName || undefined,
+        parentFolderId
+    };
 }
 
 // Helper function to log activity
@@ -120,6 +154,247 @@ const upload = multer({
     limits: {
         fileSize: 100 * 1024 * 1024, // 100MB max for audio
         files: 2 // max 2 files per request
+    }
+});
+
+const projectZipStorage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        const uploadDir = path.join(process.cwd(), 'temp', 'project-zips');
+        if (!fs.existsSync(uploadDir)) {
+            fs.mkdirSync(uploadDir, { recursive: true });
+        }
+        cb(null, uploadDir);
+    },
+    filename: function (req, file, cb) {
+        const timestamp = Date.now();
+        const sanitized = sanitizeZipName(file.originalname || 'project-data.zip');
+        cb(null, `${timestamp}_${sanitized}`);
+    }
+});
+
+const projectZipUpload = multer({
+    storage: projectZipStorage,
+    limits: {
+        fileSize: PROJECT_ZIP_MAX_BYTES,
+        files: 1
+    },
+    fileFilter: (req, file, cb) => {
+        const isZipExtension = /\.zip$/i.test(file.originalname || '');
+        if (!isZipExtension) {
+            cb(new Error('Solo se permite archivo ZIP (.zip)'), false);
+            return;
+        }
+        cb(null, true);
+    }
+});
+
+const projectZipSingleUpload = projectZipUpload.single('project_zip');
+
+function handleProjectZipUpload(req, res, next) {
+    projectZipSingleUpload(req, res, (error) => {
+        if (!error) {
+            next();
+            return;
+        }
+
+        if (error instanceof multer.MulterError && error.code === 'LIMIT_FILE_SIZE') {
+            return res.status(400).json({
+                error: `Archivo ZIP demasiado grande. Limite maximo: ${formatFileSize(PROJECT_ZIP_MAX_BYTES)}.`
+            });
+        }
+
+        if (error instanceof multer.MulterError) {
+            return res.status(400).json({ error: `Error de upload: ${error.message}` });
+        }
+
+        return res.status(400).json({ error: error.message || 'Error subiendo ZIP' });
+    });
+}
+
+// POST upload project/data ZIP before creating a track
+router.post('/project-zip', handleProjectZipUpload, async (req, res) => {
+    let localFilePath = null;
+
+    try {
+        if (!req.file) {
+            return res.status(400).json({ error: 'No se subio ningun ZIP' });
+        }
+
+        localFilePath = req.file.path;
+        const originalName = req.file.originalname;
+        const driveFileName = `track_project_data_${Date.now()}_${sanitizeZipName(originalName || 'project-data.zip')}`;
+
+        const driveUpload = await uploadToDrive(
+            localFilePath,
+            driveFileName,
+            req.file.mimetype || 'application/zip',
+            getProjectZipDriveUploadOptions()
+        );
+
+        return res.json({
+            success: true,
+            message: 'ZIP subido a Google Drive',
+            projectZip: {
+                driveFileId: driveUpload.fileId,
+                downloadUrl: driveUpload.downloadUrl,
+                viewUrl: driveUpload.viewUrl,
+                originalName,
+                fileSize: req.file.size,
+                uploadedAt: new Date().toISOString()
+            }
+        });
+    } catch (error) {
+        console.error('[UPLOADS] Error uploading project ZIP:', error);
+        return res.status(500).json({
+            error: 'Error subiendo ZIP a Google Drive',
+            details: error.message
+        });
+    } finally {
+        if (localFilePath && fs.existsSync(localFilePath)) {
+            try {
+                fs.unlinkSync(localFilePath);
+            } catch (cleanupError) {
+                console.warn('[UPLOADS] Could not cleanup temp ZIP file:', cleanupError.message);
+            }
+        }
+    }
+});
+
+// POST upload project/data ZIP for an existing track
+router.post('/track/:id/project-zip', handleProjectZipUpload, async (req, res) => {
+    let localFilePath = null;
+
+    try {
+        const trackId = req.params.id;
+        if (!req.file) {
+            return res.status(400).json({ error: 'No se subio ningun ZIP' });
+        }
+
+        await ensureTrackProjectZipColumns();
+
+        const track = await getOne('SELECT id, title FROM tracks WHERE id = ?', [trackId]);
+        if (!track) {
+            return res.status(404).json({ error: 'Tema no encontrado' });
+        }
+
+        localFilePath = req.file.path;
+        const originalName = req.file.originalname;
+        const driveFileName = `track_${trackId}_project_data_${Date.now()}_${sanitizeZipName(originalName || 'project-data.zip')}`;
+
+        const driveUpload = await uploadToDrive(
+            localFilePath,
+            driveFileName,
+            req.file.mimetype || 'application/zip',
+            getProjectZipDriveUploadOptions()
+        );
+        const uploadedAt = new Date();
+
+        await run(
+            `UPDATE tracks
+             SET project_zip_drive_file_id = ?,
+                 project_zip_drive_download_url = ?,
+                 project_zip_drive_view_url = ?,
+                 project_zip_original_name = ?,
+                 project_zip_file_size = ?,
+                 project_zip_uploaded_at = ?
+             WHERE id = ?`,
+            [
+                driveUpload.fileId,
+                driveUpload.downloadUrl,
+                driveUpload.viewUrl,
+                originalName,
+                req.file.size,
+                uploadedAt,
+                trackId
+            ]
+        );
+
+        await logActivity(
+            'PROJECT_ZIP_UPLOAD',
+            'track',
+            trackId,
+            `Proyecto/Data ZIP subido a Drive: ${originalName} (${formatFileSize(req.file.size)})`
+        );
+
+        return res.json({
+            success: true,
+            message: 'ZIP del proyecto subido y vinculado al tema',
+            projectZip: {
+                driveFileId: driveUpload.fileId,
+                downloadUrl: driveUpload.downloadUrl,
+                viewUrl: driveUpload.viewUrl,
+                originalName,
+                fileSize: req.file.size,
+                uploadedAt: uploadedAt.toISOString()
+            }
+        });
+    } catch (error) {
+        console.error('[UPLOADS] Error uploading track project ZIP:', error);
+        return res.status(500).json({
+            error: 'Error subiendo ZIP del tema a Google Drive',
+            details: error.message
+        });
+    } finally {
+        if (localFilePath && fs.existsSync(localFilePath)) {
+            try {
+                fs.unlinkSync(localFilePath);
+            } catch (cleanupError) {
+                console.warn('[UPLOADS] Could not cleanup temp ZIP file:', cleanupError.message);
+            }
+        }
+    }
+});
+
+// DELETE remove project/data ZIP association from a track
+router.delete('/track/:id/project-zip', async (req, res) => {
+    try {
+        const trackId = req.params.id;
+        await ensureTrackProjectZipColumns();
+
+        const track = await getOne(
+            `SELECT id, project_zip_drive_file_id, project_zip_original_name
+             FROM tracks
+             WHERE id = ?`,
+            [trackId]
+        );
+
+        if (!track) {
+            return res.status(404).json({ error: 'Tema no encontrado' });
+        }
+
+        if (!track.project_zip_drive_file_id) {
+            return res.status(404).json({ error: 'Este tema no tiene ZIP vinculado' });
+        }
+
+        await run(
+            `UPDATE tracks
+             SET project_zip_drive_file_id = NULL,
+                 project_zip_drive_download_url = NULL,
+                 project_zip_drive_view_url = NULL,
+                 project_zip_original_name = NULL,
+                 project_zip_file_size = NULL,
+                 project_zip_uploaded_at = NULL
+             WHERE id = ?`,
+            [trackId]
+        );
+
+        await logActivity(
+            'PROJECT_ZIP_DELETE',
+            'track',
+            trackId,
+            `Proyecto/Data ZIP desvinculado: ${track.project_zip_original_name || track.project_zip_drive_file_id}`
+        );
+
+        return res.json({
+            success: true,
+            message: 'ZIP desvinculado del tema'
+        });
+    } catch (error) {
+        console.error('[UPLOADS] Error deleting track project ZIP link:', error);
+        return res.status(500).json({
+            error: 'Error desvinculando ZIP del tema',
+            details: error.message
+        });
     }
 });
 

@@ -66,31 +66,28 @@ function requireSuperAdmin(req, res, next) {
 
 function requireFanOrAdmin(req, res, next) {
     if (!req.session || !req.session.user) {
-        // Check for landing unlock cookie as fallback
-        if (req.cookies && req.cookies.landing_el_inmortal_unlock === '1') {
-            // Allow access but mark as fan in request
-            req.isFan = true;
-            req.userRole = 'fan';
-            return next();
-        }
-        
         const wantsJson = req.xhr || req.headers.accept?.includes('application/json');
         if (wantsJson) {
             return res.status(401).json({ error: 'Unauthorized' });
         }
         return res.redirect('/auth/login');
     }
-    
-    const role = req.session.user.role;
-    
-    if (['super_admin', 'admin', 'fan'].includes(role)) {
+
+    const role = String(req.session.user.role || '').trim().toLowerCase();
+
+    if (role === 'super_admin' || role === 'admin') {
         req.userRole = role;
-        req.isAdmin = (role === 'super_admin' || role === 'admin');
-        req.isFan = (role === 'fan');
+        req.isAdmin = true;
+        req.isFan = false;
         return next();
     }
-    
-    return res.status(403).json({ error: 'Forbidden' });
+
+    const wantsJson = req.xhr || req.headers.accept?.includes('application/json');
+    if (wantsJson) {
+        return res.status(403).json({ error: 'Forbidden', message: 'Admin access required' });
+    }
+
+    return res.redirect('/landing');
 }
 
 // Middleware to inject user info into res.locals for views

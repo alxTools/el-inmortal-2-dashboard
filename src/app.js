@@ -197,7 +197,7 @@ app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, '../views'));
 
 // Import role middleware
-const { injectUser, requireAuth, requireAdmin, requireFanOrAdmin } = require('./middleware/roles');
+const { injectUser, requireAdmin, requireFanOrAdmin } = require('./middleware/roles');
 
 function isAdminSessionUser(user) {
     const role = String(user?.role || '').trim().toLowerCase();
@@ -291,10 +291,13 @@ app.get('/', (req, res, next) => {
 
 // Ruta /admin - shortcut para el dashboard
 app.get('/admin', (req, res) => {
-    if (req.session.user) {
+    if (isAdminSessionUser(req.session?.user)) {
         return res.redirect('/');
     }
-    res.redirect('/auth/login');
+    if (req.session?.user) {
+        return res.redirect('/landing');
+    }
+    return res.redirect('/auth/login');
 });
 
 // Alias de acceso rapido para el tool de Mini-Disc
@@ -400,7 +403,7 @@ app.use('/api', requireAdmin, apiRouter);
 app.use('/splitsheets', requireFanOrAdmin, splitsheetsRouter);
 app.use('/checklist', requireFanOrAdmin, checklistRouter);
 app.use('/albums', requireFanOrAdmin, albumsRouter);
-app.use('/', requireAuth, indexRouter);
+app.use('/', requireAdmin, indexRouter);
 
 // Fan Generator routes
 app.use('/fan-generator', requireFanOrAdmin, fanGeneratorRouter);

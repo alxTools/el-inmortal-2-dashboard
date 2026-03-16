@@ -8,7 +8,14 @@
 
 set -euo pipefail
 
-PROJECT_DIR="/home/gtalx/el-inmortal-2-dashboard"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DEFAULT_PROJECT_DIR="/home/gtalx/el-inmortal-2-dashboard"
+
+if [[ -d "$DEFAULT_PROJECT_DIR" ]]; then
+    PROJECT_DIR="${PROJECT_DIR:-$DEFAULT_PROJECT_DIR}"
+else
+    PROJECT_DIR="${PROJECT_DIR:-$SCRIPT_DIR}"
+fi
 MODE="update"
 COMMIT_MESSAGE=""
 
@@ -78,6 +85,12 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
+
+if [[ ! -d "$PROJECT_DIR" ]]; then
+    echo "❌ PROJECT_DIR no existe: $PROJECT_DIR"
+    echo "   Define ruta manual con: PROJECT_DIR=/ruta/repo ./update-server.sh --push"
+    exit 1
+fi
 
 cd "$PROJECT_DIR" || exit 1
 

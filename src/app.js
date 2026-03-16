@@ -322,6 +322,14 @@ app.get('/sticky-notes', (req, res) => {
     return res.redirect('/tools/notes');
 });
 
+app.get('/stream-control', (req, res) => {
+    return res.redirect('/tools/stream-control');
+});
+
+app.get('/streams', (req, res) => {
+    return res.redirect('/tools/stream-control');
+});
+
 app.use('/api/auth', requireAdmin, (req, res, next) => {
     if (typeof toolsRouter.proxyVideoEditorFrontendRootApi !== 'function') {
         return next();

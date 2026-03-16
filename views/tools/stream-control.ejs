@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %></title>
+    <link rel="stylesheet" href="/css/dashboard.css">
+    <style>
+        .streamctl-shell {
+            padding-top: 22px;
+        }
+
+        .streamctl-panel {
+            padding: 16px;
+        }
+
+        .streamctl-copy {
+            color: rgba(148, 163, 184, 0.96);
+            margin-bottom: 12px;
+            font-size: 0.86em;
+            line-height: 1.45;
+            max-width: 980px;
+        }
+
+        .streamctl-flash {
+            margin-bottom: 10px;
+            border-radius: 10px;
+            padding: 9px 11px;
+            font-size: 0.8em;
+            border: 1px solid rgba(148, 163, 184, 0.38);
+            background: rgba(15, 23, 42, 0.8);
+            color: #e2e8f0;
+        }
+
+        .streamctl-flash.error {
+            border-color: rgba(248, 113, 113, 0.55);
+            color: #fecaca;
+        }
+
+        .streamctl-summary {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .streamctl-chip {
+            display: inline-flex;
+            align-items: center;
+            border-radius: 999px;
+            padding: 4px 9px;
+            font-size: 0.66em;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            border: 1px solid rgba(148, 163, 184, 0.32);
+            color: #cbd5e1;
+            background: rgba(2, 6, 23, 0.72);
+            font-weight: 700;
+        }
+
+        .streamctl-chip.live {
+            border-color: rgba(74, 222, 128, 0.55);
+            color: #bbf7d0;
+            background: rgba(22, 101, 52, 0.32);
+        }
+
+        .streamctl-chip.pending {
+            border-color: rgba(250, 204, 21, 0.55);
+            color: #fde68a;
+            background: rgba(120, 53, 15, 0.35);
+        }
+
+        .streamctl-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+
+        .streamctl-card {
+            border: 1px solid rgba(148, 163, 184, 0.28);
+            border-radius: 12px;
+            padding: 10px;
+            background: linear-gradient(145deg, rgba(15, 23, 42, 0.86), rgba(2, 6, 23, 0.78));
+            display: grid;
+            gap: 6px;
+        }
+
+        .streamctl-card-title {
+            color: #f8fafc;
+            font-size: 0.85em;
+            font-weight: 700;
+            line-height: 1.2;
+        }
+
+        .streamctl-card-line {
+            color: rgba(148, 163, 184, 0.95);
+            font-size: 0.72em;
+        }
+
+        .streamctl-state-pill {
+            display: inline-flex;
+            align-items: center;
+            border-radius: 999px;
+            padding: 3px 9px;
+            font-size: 0.65em;
+            letter-spacing: 0.8px;
+            text-transform: uppercase;
+            font-weight: 700;
+            border: 1px solid rgba(148, 163, 184, 0.34);
+            color: #cbd5e1;
+            background: rgba(2, 6, 23, 0.6);
+            width: fit-content;
+        }
+
+        .streamctl-state-pill.running {
+            border-color: rgba(74, 222, 128, 0.5);
+            color: #bbf7d0;
+            background: rgba(20, 83, 45, 0.42);
+        }
+
+        .streamctl-state-pill.offline {
+            border-color: rgba(248, 113, 113, 0.5);
+            color: #fecaca;
+            background: rgba(127, 29, 29, 0.3);
+        }
+
+        .streamctl-actions-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+
+        .streamctl-btn {
+            border: 1px solid rgba(148, 163, 184, 0.36);
+            border-radius: 9px;
+            padding: 8px 12px;
+            background: rgba(15, 23, 42, 0.84);
+            color: #f8fafc;
+            font-size: 0.75em;
+            letter-spacing: 0.6px;
+            text-transform: uppercase;
+            font-weight: 700;
+            cursor: pointer;
+            transition: transform 0.18s ease, border-color 0.18s ease;
+        }
+
+        .streamctl-btn:hover {
+            transform: translateY(-1px);
+            border-color: rgba(255, 255, 255, 0.55);
+        }
+
+        .streamctl-btn.primary {
+            border-color: rgba(74, 222, 128, 0.55);
+            background: rgba(22, 101, 52, 0.45);
+            color: #bbf7d0;
+        }
+
+        .streamctl-btn.warn {
+            border-color: rgba(250, 204, 21, 0.5);
+            background: rgba(120, 53, 15, 0.4);
+            color: #fde68a;
+        }
+
+        .streamctl-btn.danger {
+            border-color: rgba(248, 113, 113, 0.55);
+            background: rgba(127, 29, 29, 0.4);
+            color: #fecaca;
+        }
+
+        .streamctl-btn:disabled {
+            opacity: 0.55;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .streamctl-form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .streamctl-form {
+            border: 1px solid rgba(148, 163, 184, 0.26);
+            border-radius: 10px;
+            background: rgba(2, 6, 23, 0.62);
+            padding: 10px;
+            display: grid;
+            gap: 8px;
+        }
+
+        .streamctl-form-title {
+            color: #f8fafc;
+            font-size: 0.76em;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: 700;
+        }
+
+        .streamctl-form-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 7px;
+            align-items: center;
+        }
+
+        .streamctl-input,
+        .streamctl-select {
+            border: 1px solid rgba(148, 163, 184, 0.4);
+            border-radius: 8px;
+            padding: 8px 9px;
+            background: rgba(15, 23, 42, 0.92);
+            color: #e2e8f0;
+            font-size: 0.78em;
+            min-width: 120px;
+            flex: 1;
+        }
+
+        .streamctl-checkbox {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            color: #cbd5e1;
+            font-size: 0.74em;
+        }
+
+        .streamctl-log-wrap {
+            border: 1px solid rgba(148, 163, 184, 0.28);
+            border-radius: 10px;
+            background: rgba(2, 6, 23, 0.8);
+            overflow: hidden;
+            margin-top: 10px;
+        }
+
+        .streamctl-log-head {
+            padding: 8px 10px;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+            color: #93c5fd;
+            font-size: 0.68em;
+            text-transform: uppercase;
+            letter-spacing: 1.1px;
+            font-weight: 700;
+        }
+
+        .streamctl-log {
+            margin: 0;
+            padding: 10px;
+            min-height: 150px;
+            max-height: 340px;
+            overflow: auto;
+            white-space: pre-wrap;
+            word-break: break-word;
+            color: #dbeafe;
+            font-size: 0.76em;
+            line-height: 1.45;
+            font-family: "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+            background: rgba(2, 6, 23, 0.55);
+        }
+
+        .streamctl-foot {
+            margin-top: 10px;
+            color: rgba(148, 163, 184, 0.94);
+            font-size: 0.72em;
+            line-height: 1.4;
+        }
+
+        .streamctl-foot code {
+            color: #bfdbfe;
+            background: rgba(15, 23, 42, 0.78);
+            border: 1px solid rgba(96, 165, 250, 0.3);
+            border-radius: 6px;
+            padding: 1px 5px;
+        }
+    </style>
+</head>
+<body class="dashboard-view density-compact mission-control-mode page-tools page-tools-stream-control">
+    <%- include('../partials/navbar') %>
+
+    <div class="container streamctl-shell">
+        <div class="mission-strip tools-mission-strip" aria-label="Estado stream control">
+            <span class="mission-chip mission-chip-live">STREAM OPS ACTIVE</span>
+            <span class="mission-chip">YT LIVE ORCHESTRATOR</span>
+            <span class="mission-chip">TMUX REMOTE CONTROL</span>
+            <span class="mission-chip">SYNC OR DELAY MODE</span>
+        </div>
+
+        <section class="section streamctl-panel">
+            <div class="section-header">
+                <h2><span class="section-icon">📡</span> YouTube Stream Control</h2>
+                <a href="/tools" class="btn btn-ghost">Volver a Tools</a>
+            </div>
+
+            <p class="streamctl-copy">
+                Control central para tus 2 Linodes. Ejecuta <code>now</code>, <code>delay</code>, <code>at</code>, <code>status</code> y <code>stop</code>
+                usando <code>scripts/start-streams.sh</code> sin entrar manualmente a cada server.
+            </p>
+
+            <% if (loadError) { %>
+                <div class="streamctl-flash error"><strong>Error:</strong> <%= loadError %></div>
+            <% } %>
+
+            <% if (!scriptExists) { %>
+                <div class="streamctl-flash error">
+                    No se detecta el script de control remoto. Verifica la ruta <code><%= scriptPath %></code>.
+                </div>
+            <% } %>
+
+            <div class="streamctl-summary" id="streamctl-summary"></div>
+            <div class="streamctl-grid" id="streamctl-server-grid"></div>
+
+            <div class="streamctl-actions-grid">
+                <button type="button" class="streamctl-btn primary" id="streamctl-now" data-stream-action>▶ Iniciar Ahora (Ambos)</button>
+                <button type="button" class="streamctl-btn" id="streamctl-refresh" data-stream-action>🔄 Refrescar Estado</button>
+                <button type="button" class="streamctl-btn danger" id="streamctl-stop-all" data-stream-action>■ Stop All</button>
+            </div>
+
+            <div class="streamctl-form-grid">
+                <form id="streamctl-delay-form" class="streamctl-form" autocomplete="off">
+                    <div class="streamctl-form-title">Delay Start</div>
+                    <div class="streamctl-form-row">
+                        <input id="streamctl-delay-seconds" class="streamctl-input" type="number" min="1" max="86400" value="180" placeholder="segundos" required>
+                    </div>
+                    <div class="streamctl-form-row">
+                        <button type="submit" class="streamctl-btn warn" data-stream-action>⏱ Iniciar con Delay</button>
+                    </div>
+                </form>
+
+                <form id="streamctl-at-form" class="streamctl-form" autocomplete="off">
+                    <div class="streamctl-form-title">Schedule (AT)</div>
+                    <div class="streamctl-form-row">
+                        <input id="streamctl-time1" class="streamctl-input" type="text" placeholder="today 20:00" required>
+                    </div>
+                    <div class="streamctl-form-row">
+                        <label class="streamctl-checkbox">
+                            <input id="streamctl-same-time" type="checkbox" checked>
+                            Misma hora para ambos servidores
+                        </label>
+                    </div>
+                    <div class="streamctl-form-row">
+                        <input id="streamctl-time2" class="streamctl-input" type="text" placeholder="today 20:05" disabled>
+                    </div>
+                    <div class="streamctl-form-row">
+                        <button type="submit" class="streamctl-btn" data-stream-action>🗓 Programar Streams</button>
+                    </div>
+                </form>
+
+                <form id="streamctl-stop-form" class="streamctl-form" autocomplete="off">
+                    <div class="streamctl-form-title">Stop Target</div>
+                    <div class="streamctl-form-row">
+                        <select id="streamctl-stop-target" class="streamctl-select">
+                            <option value="all">all (ambos)</option>
+                            <option value="1">server 1</option>
+                            <option value="2">server 2</option>
+                        </select>
+                    </div>
+                    <div class="streamctl-form-row">
+                        <button type="submit" class="streamctl-btn danger" data-stream-action>⛔ Stop Target</button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="streamctl-log-wrap">
+                <div class="streamctl-log-head">Command Output</div>
+                <pre id="streamctl-log" class="streamctl-log">Esperando acciones...</pre>
+            </div>
+
+            <p class="streamctl-foot">
+                Script: <code><%= scriptPath %></code>.
+                Config activa: <code><%= configFilePath %></code>.
+                <% if (configOverrideEnabled) { %>Usando override por <code>STREAM_CONTROL_CONFIG_FILE</code>.<% } %>
+                <% if (sshKeyOverrideEnabled) { %>Usando override por <code>STREAM_CONTROL_SSH_KEY</code>.<% } %>
+            </p>
+        </section>
+    </div>
+
+    <%- include('../partials/footer') %>
+
+    <script>
+        (function () {
+            const bootstrap = <%- JSON.stringify({
+                scriptExists,
+                initialStatus,
+                loadError
+            }) %>;
+
+            const summaryEl = document.getElementById('streamctl-summary');
+            const serverGridEl = document.getElementById('streamctl-server-grid');
+            const logEl = document.getElementById('streamctl-log');
+
+            const nowBtn = document.getElementById('streamctl-now');
+            const refreshBtn = document.getElementById('streamctl-refresh');
+            const stopAllBtn = document.getElementById('streamctl-stop-all');
+
+            const delayForm = document.getElementById('streamctl-delay-form');
+            const delayInput = document.getElementById('streamctl-delay-seconds');
+
+            const atForm = document.getElementById('streamctl-at-form');
+            const time1Input = document.getElementById('streamctl-time1');
+            const time2Input = document.getElementById('streamctl-time2');
+            const sameTimeCheckbox = document.getElementById('streamctl-same-time');
+
+            const stopForm = document.getElementById('streamctl-stop-form');
+            const stopTargetSelect = document.getElementById('streamctl-stop-target');
+
+            let busy = false;
+
+            function escapeHtml(value) {
+                return String(value || '')
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#39;');
+            }
+
+            function setBusy(nextBusy) {
+                busy = Boolean(nextBusy);
+                document.querySelectorAll('[data-stream-action]').forEach((button) => {
+                    button.disabled = busy || !bootstrap.scriptExists;
+                });
+                delayInput.disabled = busy || !bootstrap.scriptExists;
+                time1Input.disabled = busy || !bootstrap.scriptExists;
+                time2Input.disabled = busy || sameTimeCheckbox.checked || !bootstrap.scriptExists;
+                sameTimeCheckbox.disabled = busy || !bootstrap.scriptExists;
+                stopTargetSelect.disabled = busy || !bootstrap.scriptExists;
+            }
+
+            function formatStatusChip(value, labels) {
+                const active = Boolean(value);
+                const text = active ? labels.active : labels.inactive;
+                const toneClass = active ? 'running' : 'offline';
+                return `<span class="streamctl-state-pill ${toneClass}">${escapeHtml(text)}</span>`;
+            }
+
+            function renderServerCards(status) {
+                const servers = Array.isArray(status && status.servers) ? status.servers : [];
+
+                if (!servers.length) {
+                    serverGridEl.innerHTML = `
+                        <article class="streamctl-card">
+                            <div class="streamctl-card-title">Sin datos de servidores</div>
+                            <div class="streamctl-card-line">Ejecuta Refrescar Estado para volver a consultar.</div>
+                        </article>
+                    `;
+                    return;
+                }
+
+                serverGridEl.innerHTML = servers.map((server, index) => {
+                    const host = server.host || `server-${index + 1}`;
+                    const session = server.session || '--';
+                    const pidText = server.pid ? `PID programado: ${server.pid}` : 'PID programado: --';
+
+                    return `
+                        <article class="streamctl-card">
+                            <div class="streamctl-card-title">${escapeHtml(host)}</div>
+                            <div class="streamctl-card-line">Session: <strong>${escapeHtml(session)}</strong></div>
+                            <div class="streamctl-card-line">Running: ${formatStatusChip(Boolean(server.running), { active: 'Running', inactive: 'Offline' })}</div>
+                            <div class="streamctl-card-line">Pending start: ${formatStatusChip(Boolean(server.pendingStart), { active: 'Pending', inactive: 'None' })}</div>
+                            <div class="streamctl-card-line">${escapeHtml(pidText)}</div>
+                        </article>
+                    `;
+                }).join('');
+            }
+
+            function renderSummary(status) {
+                const servers = Array.isArray(status && status.servers) ? status.servers : [];
+                const runningCount = servers.filter((item) => Boolean(item.running)).length;
+                const pendingCount = servers.filter((item) => Boolean(item.pendingStart)).length;
+                const checkedAt = status && status.checkedAt
+                    ? new Date(status.checkedAt).toLocaleString('es-ES')
+                    : '--';
+
+                summaryEl.innerHTML = `
+                    <span class="streamctl-chip">SERVERS: ${servers.length}</span>
+                    <span class="streamctl-chip live">RUNNING: ${runningCount}</span>
+                    <span class="streamctl-chip pending">PENDING: ${pendingCount}</span>
+                    <span class="streamctl-chip">CHECKED: ${escapeHtml(checkedAt)}</span>
+                `;
+            }
+
+            function renderStatus(status) {
+                renderSummary(status || {});
+                renderServerCards(status || {});
+            }
+
+            function writeLog(title, lines) {
+                const now = new Date().toLocaleString('es-ES');
+                const safeLines = Array.isArray(lines) && lines.length
+                    ? lines
+                    : ['(sin salida)'];
+                logEl.textContent = `[${now}] ${title}\n${safeLines.join('\n')}`;
+                logEl.scrollTop = 0;
+            }
+
+            async function requestJson(url, options) {
+                const response = await fetch(url, options);
+                const payload = await response.json().catch(() => ({}));
+                if (!response.ok || payload.ok === false) {
+                    const error = new Error(payload.error || `request_failed_${response.status}`);
+                    error.outputLines = Array.isArray(payload.outputLines) ? payload.outputLines : [];
+                    throw error;
+                }
+                return payload;
+            }
+
+            async function refreshStatus(target = 'all') {
+                try {
+                    setBusy(true);
+                    const query = target && target !== 'all'
+                        ? `?target=${encodeURIComponent(target)}`
+                        : '';
+                    const payload = await requestJson(`/tools/stream-control/status${query}`, { cache: 'no-store' });
+                    renderStatus(payload.status || {});
+                    writeLog('Status refreshed', (payload.status && payload.status.rawLines) || []);
+                } catch (error) {
+                    writeLog(`Status error: ${error.message}`, error.outputLines || []);
+                } finally {
+                    setBusy(false);
+                }
+            }
+
+            async function runAction(endpoint, body, title) {
+                try {
+                    setBusy(true);
+                    writeLog(`Running ${title}...`, []);
+                    const payload = await requestJson(endpoint, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: body ? JSON.stringify(body) : undefined
+                    });
+
+                    renderStatus(payload.status || {});
+                    writeLog(`${title} OK`, payload.outputLines || []);
+                } catch (error) {
+                    writeLog(`${title} failed: ${error.message}`, error.outputLines || []);
+                } finally {
+                    setBusy(false);
+                }
+            }
+
+            nowBtn.addEventListener('click', function () {
+                runAction('/tools/stream-control/now', null, 'NOW');
+            });
+
+            refreshBtn.addEventListener('click', function () {
+                refreshStatus('all');
+            });
+
+            stopAllBtn.addEventListener('click', function () {
+                if (!window.confirm('Esto detendra ambos streams. Continuar?')) return;
+                runAction('/tools/stream-control/stop', { target: 'all' }, 'STOP ALL');
+            });
+
+            delayForm.addEventListener('submit', function (event) {
+                event.preventDefault();
+                const seconds = Number.parseInt(String(delayInput.value || '').trim(), 10);
+                if (!Number.isInteger(seconds) || seconds < 1) {
+                    writeLog('Delay validation', ['Ingresa un numero de segundos valido (> 0).']);
+                    return;
+                }
+                runAction('/tools/stream-control/delay', { seconds }, `DELAY ${seconds}s`);
+            });
+
+            sameTimeCheckbox.addEventListener('change', function () {
+                time2Input.disabled = sameTimeCheckbox.checked || busy || !bootstrap.scriptExists;
+            });
+
+            atForm.addEventListener('submit', function (event) {
+                event.preventDefault();
+
+                const time1 = String(time1Input.value || '').trim();
+                const sameTime = sameTimeCheckbox.checked;
+                const time2 = String(time2Input.value || '').trim();
+
+                if (!time1) {
+                    writeLog('Schedule validation', ['Ingresa la fecha/hora principal.']);
+                    return;
+                }
+
+                if (!sameTime && !time2) {
+                    writeLog('Schedule validation', ['Ingresa la fecha/hora del servidor 2 o activa misma hora.']);
+                    return;
+                }
+
+                const payload = sameTime
+                    ? { time1 }
+                    : { time1, time2 };
+
+                runAction('/tools/stream-control/at', payload, sameTime ? `AT ${time1}` : `AT ${time1} / ${time2}`);
+            });
+
+            stopForm.addEventListener('submit', function (event) {
+                event.preventDefault();
+                const target = String(stopTargetSelect.value || 'all');
+                const title = target === 'all' ? 'STOP ALL' : `STOP SERVER ${target}`;
+                runAction('/tools/stream-control/stop', { target }, title);
+            });
+
+            renderStatus(bootstrap.initialStatus || {});
+            writeLog(
+                bootstrap.loadError ? `Initial load warning: ${bootstrap.loadError}` : 'Initial status loaded',
+                (bootstrap.initialStatus && bootstrap.initialStatus.rawLines) || []
+            );
+            setBusy(false);
+
+            if (bootstrap.scriptExists) {
+                setInterval(() => {
+                    if (!busy) {
+                        refreshStatus('all');
+                    }
+                }, 15000);
+            }
+        })();
+    </script>
+</body>
+</html>

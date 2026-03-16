@@ -968,7 +968,231 @@ const VIDEO_EDITOR_COMMAND_TIMEOUT_MS = Math.max(
     15000,
     Math.min(45 * 60 * 1000, Number.parseInt(process.env.VIDEO_EDITOR_COMMAND_TIMEOUT_MS || '1500000', 10) || 1500000)
 );
+const STREAM_CONTROL_SCRIPT_PATH = path.join(__dirname, '../../scripts/start-streams.sh');
+const STREAM_CONTROL_DEFAULT_CONFIG_PATH = path.join(__dirname, '../../scripts/start-streams.env');
+const STREAM_CONTROL_CONFIG_FILE = String(process.env.STREAM_CONTROL_CONFIG_FILE || '').trim();
+const STREAM_CONTROL_SSH_KEY = String(process.env.STREAM_CONTROL_SSH_KEY || '').trim();
+const STREAM_CONTROL_COMMAND_TIMEOUT_MS = Math.max(
+    5000,
+    Math.min(20 * 60 * 1000, Number.parseInt(process.env.STREAM_CONTROL_COMMAND_TIMEOUT_MS || '300000', 10) || 300000)
+);
 let dockerComposeCommandCache = null;
+
+function getStreamControlExecEnv() {
+    const env = {
+        ...process.env
+    };
+
+    if (STREAM_CONTROL_CONFIG_FILE) {
+        env.CONFIG_FILE = STREAM_CONTROL_CONFIG_FILE;
+    }
+
+    if (STREAM_CONTROL_SSH_KEY) {
+        env.SSH_KEY = STREAM_CONTROL_SSH_KEY;
+    }
+
+    return env;
+}
+
+function splitCommandOutputLines(rawOutput, limit = 260) {
+    const lines = String(rawOutput || '')
+        .split(/\r?\n/)
+        .map((line) => String(line || '').trimEnd())
+        .filter(Boolean);
+
+    if (lines.length <= limit) {
+        return lines;
+    }
+
+    return lines.slice(lines.length - limit);
+}
+
+function parseStreamStatusLine(line) {
+    const text = String(line || '').trim();
+    if (!text) {
+        return null;
+    }
+
+    const match = text.match(/^OK\s+([^:]+):\s+session=([^\s]+)\s+running=(yes|no)\s+pending_start=(yes|no)(?:\s+pid=(\d+))?/i);
+    if (!match) {
+        return null;
+    }
+
+    return {
+        host: String(match[1] || '').trim(),
+        session: String(match[2] || '').trim(),
+        running: String(match[3] || '').toLowerCase() === 'yes',
+        pendingStart: String(match[4] || '').toLowerCase() === 'yes',
+        pid: match[5] ? Number.parseInt(match[5], 10) : null
+    };
+}
+
+function normalizeStreamTarget(rawTarget) {
+    const target = String(rawTarget || 'all').trim().toLowerCase();
+    if (!target || target === 'all') {
+        return 'all';
+    }
+    if (target === '1' || target === '2') {
+        return target;
+    }
+    throw createHttpError(400, 'invalid_stream_target');
+}
+
+async function runStreamControlCommand(args, timeoutMs = STREAM_CONTROL_COMMAND_TIMEOUT_MS) {
+    if (!fs.existsSync(STREAM_CONTROL_SCRIPT_PATH)) {
+        throw createHttpError(500, `stream_script_missing:${STREAM_CONTROL_SCRIPT_PATH}`);
+    }
+
+    const commandArgs = Array.isArray(args)
+        ? args.map((value) => String(value || '').trim()).filter(Boolean)
+        : [];
+
+    const spawnArgs = [STREAM_CONTROL_SCRIPT_PATH, ...commandArgs];
+
+    return await new Promise((resolve, reject) => {
+        const child = spawn('bash', spawnArgs, {
+            cwd: path.join(__dirname, '../..'),
+            env: getStreamControlExecEnv(),
+            stdio: ['ignore', 'pipe', 'pipe']
+        });
+
+        let stdout = '';
+        let stderr = '';
+        let settled = false;
+        let timedOut = false;
+
+        const timeoutHandle = setTimeout(() => {
+            timedOut = true;
+            child.kill('SIGTERM');
+            setTimeout(() => {
+                if (!settled) {
+                    child.kill('SIGKILL');
+                }
+            }, 5000);
+        }, timeoutMs);
+
+        child.stdout.on('data', (chunk) => {
+            stdout += String(chunk || '');
+        });
+
+        child.stderr.on('data', (chunk) => {
+            stderr += String(chunk || '');
+        });
+
+        const settle = (callback) => {
+            if (settled) {
+                return;
+            }
+            settled = true;
+            clearTimeout(timeoutHandle);
+            callback();
+        };
+
+        child.on('error', (error) => {
+            settle(() => {
+                const commandError = createHttpError(500, error.message || 'stream_command_spawn_failed');
+                commandError.stdout = stdout;
+                commandError.stderr = stderr;
+                commandError.outputLines = splitCommandOutputLines(`${stdout}\n${stderr}`);
+                reject(commandError);
+            });
+        });
+
+        child.on('close', (code, signal) => {
+            const exitCode = Number(code || 0);
+            const outputLines = splitCommandOutputLines(`${stdout}\n${stderr}`);
+
+            if (timedOut) {
+                settle(() => {
+                    const timeoutError = createHttpError(504, `stream_command_timeout_${timeoutMs}ms`);
+                    timeoutError.stdout = stdout;
+                    timeoutError.stderr = stderr;
+                    timeoutError.outputLines = outputLines;
+                    timeoutError.exitCode = exitCode;
+                    timeoutError.signal = signal || null;
+                    reject(timeoutError);
+                });
+                return;
+            }
+
+            if (exitCode !== 0) {
+                settle(() => {
+                    const message = outputLines[outputLines.length - 1] || `stream_command_exit_${exitCode}`;
+                    const commandError = createHttpError(500, message);
+                    commandError.stdout = stdout;
+                    commandError.stderr = stderr;
+                    commandError.outputLines = outputLines;
+                    commandError.exitCode = exitCode;
+                    commandError.signal = signal || null;
+                    reject(commandError);
+                });
+                return;
+            }
+
+            settle(() => resolve({
+                stdout,
+                stderr,
+                outputLines,
+                exitCode,
+                signal: signal || null
+            }));
+        });
+    });
+}
+
+function toStreamCommandErrorPayload(error) {
+    const outputLinesText = Array.isArray(error?.outputLines)
+        ? error.outputLines.join('\n')
+        : String(error?.outputLines || '');
+
+    return {
+        error: String(error?.message || 'stream_command_failed'),
+        outputLines: splitCommandOutputLines(
+            `${String(error?.stdout || '')}\n${String(error?.stderr || '')}\n${outputLinesText}`
+        )
+    };
+}
+
+async function getStreamControlStatusSnapshot(rawTarget = 'all') {
+    const target = normalizeStreamTarget(rawTarget);
+    const args = target === 'all'
+        ? ['status']
+        : ['status', target];
+
+    const result = await runStreamControlCommand(args, Math.min(STREAM_CONTROL_COMMAND_TIMEOUT_MS, 120000));
+    const servers = result.outputLines
+        .map(parseStreamStatusLine)
+        .filter(Boolean);
+
+    return {
+        checkedAt: new Date().toISOString(),
+        target,
+        servers,
+        rawLines: result.outputLines
+    };
+}
+
+async function runStreamControlAction(args, statusTarget = 'all') {
+    const commandResult = await runStreamControlCommand(args, STREAM_CONTROL_COMMAND_TIMEOUT_MS);
+
+    let status;
+    try {
+        status = await getStreamControlStatusSnapshot(statusTarget);
+    } catch (statusError) {
+        status = {
+            checkedAt: new Date().toISOString(),
+            target: normalizeStreamTarget(statusTarget),
+            servers: [],
+            rawLines: toStreamCommandErrorPayload(statusError).outputLines,
+            error: statusError.message || 'status_refresh_failed'
+        };
+    }
+
+    return {
+        commandResult,
+        status
+    };
+}
 
 function toCodeEditorPosixPath(value) {
     return String(value || '').replace(/\\/g, '/');
@@ -2082,6 +2306,149 @@ router.get('/thumbnail-generator', (req, res) => {
     res.render('tools/thumbnail-generator', {
         title: 'Thumbnail Generator - El Inmortal 2 Dashboard'
     });
+});
+
+async function respondStreamControlAction(res, action, commandArgs, statusTarget = 'all') {
+    try {
+        const result = await runStreamControlAction(commandArgs, statusTarget);
+        return res.json({
+            ok: true,
+            action,
+            outputLines: result.commandResult.outputLines,
+            status: result.status
+        });
+    } catch (error) {
+        const payload = toStreamCommandErrorPayload(error);
+        return res.status(error.statusCode || 500).json({
+            ok: false,
+            action,
+            error: payload.error,
+            outputLines: payload.outputLines
+        });
+    }
+}
+
+router.get('/streams', (_req, res) => {
+    return res.redirect('/tools/stream-control');
+});
+
+router.get('/stream-control', async (_req, res) => {
+    const scriptExists = fs.existsSync(STREAM_CONTROL_SCRIPT_PATH);
+    const configFilePath = STREAM_CONTROL_CONFIG_FILE || STREAM_CONTROL_DEFAULT_CONFIG_PATH;
+    let initialStatus = {
+        checkedAt: new Date().toISOString(),
+        target: 'all',
+        servers: [],
+        rawLines: []
+    };
+    let loadError = '';
+
+    if (!scriptExists) {
+        loadError = `No existe el script requerido: ${STREAM_CONTROL_SCRIPT_PATH}`;
+    } else {
+        try {
+            initialStatus = await getStreamControlStatusSnapshot('all');
+        } catch (error) {
+            loadError = String(error.message || 'No se pudo consultar el estado inicial.');
+            initialStatus = {
+                checkedAt: new Date().toISOString(),
+                target: 'all',
+                servers: [],
+                rawLines: toStreamCommandErrorPayload(error).outputLines,
+                error: loadError
+            };
+        }
+    }
+
+    return res.render('tools/stream-control', {
+        title: 'Stream Control - El Inmortal 2 Dashboard',
+        scriptPath: STREAM_CONTROL_SCRIPT_PATH,
+        configFilePath,
+        configOverrideEnabled: Boolean(STREAM_CONTROL_CONFIG_FILE),
+        sshKeyOverrideEnabled: Boolean(STREAM_CONTROL_SSH_KEY),
+        scriptExists,
+        initialStatus,
+        loadError
+    });
+});
+
+router.get('/stream-control/status', async (req, res) => {
+    try {
+        const target = normalizeStreamTarget(req.query.target);
+        const status = await getStreamControlStatusSnapshot(target);
+        return res.json({
+            ok: true,
+            status
+        });
+    } catch (error) {
+        const payload = toStreamCommandErrorPayload(error);
+        return res.status(error.statusCode || 500).json({
+            ok: false,
+            error: payload.error,
+            outputLines: payload.outputLines
+        });
+    }
+});
+
+router.post('/stream-control/now', async (_req, res) => {
+    return await respondStreamControlAction(res, 'now', ['now'], 'all');
+});
+
+router.post('/stream-control/delay', async (req, res) => {
+    const rawSeconds = Number.parseInt(String(req.body?.seconds || '').trim(), 10);
+    if (!Number.isInteger(rawSeconds) || rawSeconds < 1 || rawSeconds > 86400) {
+        return res.status(400).json({
+            ok: false,
+            action: 'delay',
+            error: 'seconds_must_be_between_1_and_86400'
+        });
+    }
+
+    return await respondStreamControlAction(res, 'delay', ['delay', String(rawSeconds)], 'all');
+});
+
+router.post('/stream-control/at', async (req, res) => {
+    const time1 = String(req.body?.time1 || '').trim();
+    const time2 = String(req.body?.time2 || '').trim();
+
+    if (!time1) {
+        return res.status(400).json({
+            ok: false,
+            action: 'at',
+            error: 'time1_required'
+        });
+    }
+
+    if (time1.length > 120 || time2.length > 120) {
+        return res.status(400).json({
+            ok: false,
+            action: 'at',
+            error: 'time_expression_too_long'
+        });
+    }
+
+    const args = time2
+        ? ['at', time1, time2]
+        : ['at', time1];
+
+    return await respondStreamControlAction(res, 'at', args, 'all');
+});
+
+router.post('/stream-control/stop', async (req, res) => {
+    try {
+        const target = normalizeStreamTarget(req.body?.target);
+        const args = target === 'all'
+            ? ['stop']
+            : ['stop', target];
+
+        return await respondStreamControlAction(res, 'stop', args, 'all');
+    } catch (error) {
+        return res.status(error.statusCode || 400).json({
+            ok: false,
+            action: 'stop',
+            error: error.message || 'invalid_stop_target'
+        });
+    }
 });
 
 router.get('/notes', async (req, res) => {

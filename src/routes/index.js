@@ -5,6 +5,42 @@ const { sendYoutubeOpsDailyReportEmail } = require('../utils/youtubeMetadataAudi
 
 // GET home page / dashboard
 router.get('/', async (req, res) => {
+    const role = String(req.session?.user?.role || '').trim().toLowerCase();
+    const isAdmin = role === 'admin' || role === 'super_admin';
+
+    if (!isAdmin) {
+        try {
+            const publicTracks = await getAll(`
+                SELECT id, track_number, title
+                FROM tracks
+                WHERE is_public = 1
+                ORDER BY track_number ASC
+                LIMIT 15
+            `);
+
+            const recentComments = await getAll(`
+                SELECT id, user_name, comment, created_at
+                FROM landing_comments
+                WHERE is_approved = 1
+                ORDER BY created_at DESC
+                LIMIT 8
+            `);
+
+            return res.render('fan/dashboard', {
+                title: 'Dashboard Fan - El Inmortal 2',
+                publicTracks: publicTracks || [],
+                recentComments: recentComments || []
+            });
+        } catch (error) {
+            console.error('Fan Dashboard Error:', error);
+            return res.status(500).render('error', {
+                title: 'Error',
+                message: 'Error loading fan dashboard',
+                error: process.env.NODE_ENV === 'development' ? error : {}
+            });
+        }
+    }
+
     try {
         // Get statistics
         const stats = await getOne(`
@@ -83,6 +119,16 @@ router.get('/', async (req, res) => {
 });
 
 router.post('/send-daily-report-email', async (req, res) => {
+    const role = String(req.session?.user?.role || '').trim().toLowerCase();
+    const isAdmin = role === 'admin' || role === 'super_admin';
+    if (!isAdmin) {
+        return res.status(403).render('error', {
+            title: 'Access Denied',
+            message: 'You do not have permission to access this area.',
+            error: {}
+        });
+    }
+
     const fromDate = String(req.body.from || '').trim();
     const toDate = String(req.body.to || '').trim();
     const emailTo = String(req.body.email_to || '').trim();

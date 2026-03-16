@@ -75,10 +75,10 @@ function requireFanOrAdmin(req, res, next) {
 
     const role = String(req.session.user.role || '').trim().toLowerCase();
 
-    if (role === 'super_admin' || role === 'admin') {
+    if (role === 'super_admin' || role === 'admin' || role === 'fan') {
         req.userRole = role;
-        req.isAdmin = true;
-        req.isFan = false;
+        req.isAdmin = (role === 'super_admin' || role === 'admin');
+        req.isFan = role === 'fan';
         return next();
     }
 

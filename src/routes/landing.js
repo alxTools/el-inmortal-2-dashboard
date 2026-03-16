@@ -84,6 +84,11 @@ function toPublicImagePath(rawPath) {
     return `/uploads/images/${path.basename(normalized)}`;
 }
 
+function isAdminSessionUser(user) {
+    const role = String(user?.role || '').trim().toLowerCase();
+    return role === 'admin' || role === 'super_admin';
+}
+
 // Cache para archivos de audio disponibles
 let audioFilesCache = null;
 let audioFilesCacheTime = 0;
@@ -1063,8 +1068,9 @@ router.post('/reaction', async (req, res) => {
 // GET track info público (solo para fans verificados o admins)
 router.get('/track/:id', async (req, res) => {
     // Verificar si es admin o fan verificado
-    const isAdmin = req.session.user ? true : false;
-    const isVerifiedFan = req.cookies?.landing_el_inmortal_unlock === '1';
+    const role = String(req.session?.user?.role || '').trim().toLowerCase();
+    const isAdmin = role === 'admin' || role === 'super_admin';
+    const isVerifiedFan = role === 'fan' || req.cookies?.landing_el_inmortal_unlock === '1';
     
     if (!isAdmin && !isVerifiedFan) {
         return res.redirect('/ei2');
@@ -1354,7 +1360,7 @@ router.get('/unlock/:code', async (req, res) => {
 // Panel de configuración del landing
 router.get('/admin/config', async (req, res) => {
     // Verificar si es admin
-    if (!req.session.user) {
+    if (!isAdminSessionUser(req.session?.user)) {
         return res.redirect('/auth/login');
     }
     
@@ -1382,7 +1388,7 @@ router.get('/admin/config', async (req, res) => {
 
 // Actualizar configuración
 router.post('/admin/config/update', async (req, res) => {
-    if (!req.session.user) {
+    if (!isAdminSessionUser(req.session?.user)) {
         return res.status(401).json({ success: false, error: 'Unauthorized' });
     }
     
@@ -1456,7 +1462,7 @@ router.get('/debug', async (req, res) => {
 
 // Vista de admin para ver usuarios (HTML)
 router.get('/admin/users', async (req, res) => {
-    if (!req.session.user) {
+    if (!isAdminSessionUser(req.session?.user)) {
         return res.redirect('/auth/login');
     }
     
@@ -1507,7 +1513,7 @@ router.get('/admin/users', async (req, res) => {
 
 // Exportar a CSV
 router.get('/admin/export/csv', async (req, res) => {
-    if (!req.session.user) {
+    if (!isAdminSessionUser(req.session?.user)) {
         return res.status(401).json({ success: false, error: 'Unauthorized' });
     }
     
@@ -1527,7 +1533,7 @@ router.get('/admin/export/csv', async (req, res) => {
 
 // Exportar a JSON
 router.get('/admin/export/json', async (req, res) => {
-    if (!req.session.user) {
+    if (!isAdminSessionUser(req.session?.user)) {
         return res.status(401).json({ success: false, error: 'Unauthorized' });
     }
     
@@ -1547,7 +1553,7 @@ router.get('/admin/export/json', async (req, res) => {
 
 // API para obtener usuarios (JSON)
 router.get('/admin/api/users', async (req, res) => {
-    if (!req.session.user) {
+    if (!isAdminSessionUser(req.session?.user)) {
         return res.status(401).json({ success: false, error: 'Unauthorized' });
     }
     
@@ -1583,7 +1589,7 @@ router.get('/admin/api/users', async (req, res) => {
 
 // Verificar estado de integración con Notion
 router.get('/admin/notion/status', async (req, res) => {
-    if (!req.session.user) {
+    if (!isAdminSessionUser(req.session?.user)) {
         return res.status(401).json({ success: false, error: 'Unauthorized' });
     }
     
@@ -1613,7 +1619,7 @@ router.get('/admin/notion/status', async (req, res) => {
 
 // Sincronizar un usuario específico con Notion
 router.post('/admin/notion/sync-user', async (req, res) => {
-    if (!req.session.user) {
+    if (!isAdminSessionUser(req.session?.user)) {
         return res.status(401).json({ success: false, error: 'Unauthorized' });
     }
     
@@ -1653,7 +1659,7 @@ router.post('/admin/notion/sync-user', async (req, res) => {
 
 // Sincronizar TODOS los usuarios con Notion (bulk)
 router.post('/admin/notion/sync-all', async (req, res) => {
-    if (!req.session.user) {
+    if (!isAdminSessionUser(req.session?.user)) {
         return res.status(401).json({ success: false, error: 'Unauthorized' });
     }
     

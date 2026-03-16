@@ -197,7 +197,7 @@ app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, '../views'));
 
 // Import role middleware
-const { injectUser, requireAdmin, requireFanOrAdmin } = require('./middleware/roles');
+const { injectUser, requireAuth, requireAdmin, requireFanOrAdmin } = require('./middleware/roles');
 
 function isAdminSessionUser(user) {
     const role = String(user?.role || '').trim().toLowerCase();
@@ -295,7 +295,7 @@ app.get('/admin', (req, res) => {
         return res.redirect('/');
     }
     if (req.session?.user) {
-        return res.redirect('/landing');
+        return res.redirect('/');
     }
     return res.redirect('/auth/login');
 });
@@ -399,13 +399,13 @@ app.use('/bulk-upload', requireAdmin, bulkUploadRouter);
 app.use('/settings', requireAdmin, settingsRouter);
 app.use('/api', requireAdmin, apiRouter);
 
-// Fan-accessible routes (read-only for fans)
-app.use('/splitsheets', requireFanOrAdmin, splitsheetsRouter);
-app.use('/checklist', requireFanOrAdmin, checklistRouter);
-app.use('/albums', requireFanOrAdmin, albumsRouter);
-app.use('/', requireAdmin, indexRouter);
+// Internal routes (admin only)
+app.use('/splitsheets', requireAdmin, splitsheetsRouter);
+app.use('/checklist', requireAdmin, checklistRouter);
+app.use('/albums', requireAdmin, albumsRouter);
+app.use('/', requireAuth, indexRouter);
 
-// Fan Generator routes
+// Fan Generator routes (session fan/admin)
 app.use('/fan-generator', requireFanOrAdmin, fanGeneratorRouter);
 
 // Tools routes - protect dangerous ones

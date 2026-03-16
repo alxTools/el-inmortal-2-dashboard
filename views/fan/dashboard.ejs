@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %></title>
+    <link rel="stylesheet" href="/css/dashboard.css">
+</head>
+<body class="dashboard-view density-compact mission-control-mode">
+    <%- include('../partials/navbar') %>
+
+    <header class="header dashboard-hero">
+        <div class="dashboard-brand-logo-wrap">
+            <img
+                src="/images/galante_signature.png"
+                onerror="this.src='/images/logo.png'"
+                alt="Galante"
+                class="dashboard-brand-logo"
+            >
+        </div>
+        <div class="subtitle">Fan Dashboard · El Inmortal 2</div>
+        <div class="dashboard-hero-controls">
+            <span class="dashboard-mode-pill">Acceso Exclusivo</span>
+        </div>
+        <div class="mission-strip" aria-label="Estado del fan dashboard">
+            <span class="mission-chip mission-chip-live">FAN ONLINE</span>
+            <span class="mission-chip">TRACKS PUBLICOS: <%= publicTracks.length %></span>
+            <span class="mission-chip">COMUNIDAD ACTIVA</span>
+            <span class="mission-chip mission-chip-clock">UTC <span id="realtime-clock-mission">--:--:--</span></span>
+        </div>
+    </header>
+
+    <main class="container dashboard-shell">
+        <section class="section reveal">
+            <div class="section-header">
+                <h2><span class="section-icon">🚀</span> Accesos Fan</h2>
+            </div>
+            <% const featuredTrack = publicTracks && publicTracks.length > 0 ? publicTracks[0] : null; %>
+            <div class="emoji-command-grid" aria-label="Accesos para fans">
+                <a href="/ei2" class="emoji-command-link tone-gold" data-tooltip="Landing Oficial" aria-label="Landing Oficial">🌐</a>
+                <a href="<%= featuredTrack ? ('/landing/track/' + featuredTrack.id) : '/ei2' %>" class="emoji-command-link tone-cyan" data-tooltip="Track Destacado" aria-label="Track Destacado">🎵</a>
+                <a href="/ei2#comentarios" class="emoji-command-link tone-neon" data-tooltip="Comunidad" aria-label="Comunidad">💬</a>
+                <a href="/ei2#shop" class="emoji-command-link tone-amber" data-tooltip="MiniDisc" aria-label="MiniDisc">💿</a>
+            </div>
+        </section>
+
+        <div class="dashboard-main-grid">
+            <section class="section reveal">
+                <div class="section-header">
+                    <h2><span class="section-icon">🎧</span> Tracks Publicos</h2>
+                </div>
+                <table class="tracks-table dashboard-tracks-table">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Titulo</th>
+                            <th>Accion</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% if (!publicTracks || publicTracks.length === 0) { %>
+                        <tr>
+                            <td colspan="3" class="table-empty">No hay tracks publicos todavia.</td>
+                        </tr>
+                        <% } %>
+                        <% publicTracks.forEach(track => { %>
+                        <tr>
+                            <td><%= track.track_number || '-' %></td>
+                            <td><strong><%= track.title || 'Sin titulo' %></strong></td>
+                            <td>
+                                <a href="/landing/track/<%= track.id %>" class="btn-small">Ver + Comentar</a>
+                            </td>
+                        </tr>
+                        <% }) %>
+                    </tbody>
+                </table>
+            </section>
+
+            <aside class="dashboard-sidebar">
+                <section class="section reveal">
+                    <div class="section-header compact-section-header">
+                        <h2><span class="section-icon">💬</span> Ultimos Comentarios</h2>
+                    </div>
+                    <% if (!recentComments || recentComments.length === 0) { %>
+                        <div class="activity-empty">Aun no hay comentarios aprobados.</div>
+                    <% } else { %>
+                        <ul class="activity-list">
+                            <% recentComments.forEach(comment => { %>
+                            <li class="activity-item">
+                                <div class="activity-topline">
+                                    <span class="activity-action"><%= comment.user_name || 'Fan' %></span>
+                                    <span class="activity-time"><%= comment.created_at ? new Date(comment.created_at).toLocaleString('es-ES') : '' %></span>
+                                </div>
+                                <div class="activity-details"><%= comment.comment %></div>
+                            </li>
+                            <% }) %>
+                        </ul>
+                    <% } %>
+                </section>
+
+                <section class="section reveal">
+                    <div class="section-header compact-section-header">
+                        <h2><span class="section-icon">🛠️</span> Fan Tools</h2>
+                    </div>
+                    <p class="activity-details">Proximamente: dinamicas, rewards y herramientas exclusivas para la comunidad.</p>
+                    <a href="/ei2" class="btn" style="margin-top:10px;">Ir al Hub del Album</a>
+                </section>
+            </aside>
+        </div>
+    </main>
+
+    <%- include('../partials/footer') %>
+
+    <script src="/js/dashboard.js"></script>
+</body>
+</html>

@@ -12,7 +12,7 @@ router.get('/', async (req, res) => {
         try {
             const publicTracks = await getAll(`
                 SELECT t.id, t.track_number, t.title
-                FROM tracks
+                FROM tracks t
                 JOIN album_info a ON a.id = t.album_id
                 WHERE t.is_public = 1
                   AND LOWER(a.name) LIKE '%inmortal 2%'

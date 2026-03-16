@@ -134,6 +134,7 @@ export OPENCODE_BASE_URL='http://127.0.0.1:4096'
 export OPENCODE_SERVER_USERNAME='opencode'
 export OPENCODE_SERVER_PASSWORD='YOUR_PASSWORD'
 export OPENCODE_FALLBACK_ENABLED='true'
+export MISSION_GATEWAY_API_KEY='CHANGE_ME_GATEWAY_KEY'
 ```
 
 2. Start gateway:
@@ -146,6 +147,7 @@ node scripts/proxy/opencode_cluster/paperclip-mission-gateway.js
 
 ```bash
 curl -X POST http://127.0.0.1:8787/missions \
+  -H 'x-api-key: CHANGE_ME_GATEWAY_KEY' \
   -H 'Content-Type: application/json' \
   -d '{
     "mission_id": "mission-001",
@@ -156,3 +158,47 @@ curl -X POST http://127.0.0.1:8787/missions \
 ```
 
 When `PAPERCLIP_WEBHOOK_URL` is unavailable and `OPENCODE_FALLBACK_ENABLED=true`, the gateway dispatches directly to OpenCode `serve` so execution can continue.
+
+### Voice fire-and-forget flow (Cline / Kilo Code)
+
+Use this when you only want to speak a command and trigger action without waiting for full response.
+
+1. Submit mission quickly:
+
+```bash
+curl -X POST http://127.0.0.1:8787/missions/fire-and-forget \
+  -H 'x-api-key: CHANGE_ME_GATEWAY_KEY' \
+  -H 'Content-Type: application/json' \
+  -d '{"instruction":"Scan ASCAP for 30 tracks, enrich metadata, then prepare registration payloads."}'
+```
+
+You can also send plain text (ideal for microphone transcript):
+
+```bash
+curl -X POST http://127.0.0.1:8787/missions/fire-and-forget \
+  -H 'x-api-key: CHANGE_ME_GATEWAY_KEY' \
+  -H 'Content-Type: text/plain' \
+  --data 'Run scraping mission for latest sync opportunities and return CSV evidence.'
+```
+
+2. Poll status when needed:
+
+```bash
+curl -H 'x-api-key: CHANGE_ME_GATEWAY_KEY' \
+  http://127.0.0.1:8787/missions/<mission_id>/status
+```
+
+Accepted mission fields: `prompt`, `goal`, `task`, `instruction`, `input`, `transcript`.
+
+### Custom GPT / Cline Action schema
+
+Use this OpenAPI file for tool/action integration:
+
+- `scripts/proxy/opencode_cluster/paperclip-mission-gateway.openapi.json`
+
+Recommended actions to expose:
+
+- `enqueueMission` -> `POST /missions/fire-and-forget`
+- `getMissionStatus` -> `GET /missions/{missionId}/status`
+
+If you host gateway publicly, update the `servers[0].url` value in the OpenAPI file to your public HTTPS endpoint.

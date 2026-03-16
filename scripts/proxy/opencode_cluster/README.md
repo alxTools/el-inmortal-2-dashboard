@@ -120,3 +120,39 @@ docker run --rm -it \
 - OpenCode server auth is enforced with basic auth.
 - Tavily MCP is injected dynamically by the controller on each worker before prompting.
 - Keep `workers.json`, `hosts.json`, and `.env.worker` out of Git (they contain credentials).
+
+## Paperclip mission gateway (voice -> webhook -> orchestration)
+
+Use `paperclip-mission-gateway.js` as the bridge between a ChatGPT Action webhook and Paperclip/OpenCode workers.
+
+1. Configure env vars:
+
+```bash
+export MISSION_GATEWAY_PORT=8787
+export PAPERCLIP_WEBHOOK_URL='http://127.0.0.1:3100/your-paperclip-webhook'
+export OPENCODE_BASE_URL='http://127.0.0.1:4096'
+export OPENCODE_SERVER_USERNAME='opencode'
+export OPENCODE_SERVER_PASSWORD='YOUR_PASSWORD'
+export OPENCODE_FALLBACK_ENABLED='true'
+```
+
+2. Start gateway:
+
+```bash
+node scripts/proxy/opencode_cluster/paperclip-mission-gateway.js
+```
+
+3. Send mission payload:
+
+```bash
+curl -X POST http://127.0.0.1:8787/missions \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "mission_id": "mission-001",
+    "goal": "Research 10 sync opportunities and provide source links",
+    "constraints": { "budget_usd": 10, "max_parallel_agents": 3 },
+    "tools": ["tavily", "playwright", "apify"]
+  }'
+```
+
+When `PAPERCLIP_WEBHOOK_URL` is unavailable and `OPENCODE_FALLBACK_ENABLED=true`, the gateway dispatches directly to OpenCode `serve` so execution can continue.

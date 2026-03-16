@@ -11,12 +11,23 @@ router.get('/', async (req, res) => {
     if (!isAdmin) {
         try {
             const publicTracks = await getAll(`
-                SELECT id, track_number, title
+                SELECT t.id, t.track_number, t.title
                 FROM tracks
-                WHERE is_public = 1
-                ORDER BY track_number ASC
-                LIMIT 15
+                JOIN album_info a ON a.id = t.album_id
+                WHERE t.is_public = 1
+                  AND LOWER(a.name) LIKE '%inmortal 2%'
+                ORDER BY t.track_number ASC, t.id ASC
+                LIMIT 21
             `);
+
+            const albumTrackTotalRow = await getOne(`
+                SELECT COUNT(*) AS total
+                FROM tracks t
+                JOIN album_info a ON a.id = t.album_id
+                WHERE LOWER(a.name) LIKE '%inmortal 2%'
+            `);
+
+            const albumTrackTotal = Number(albumTrackTotalRow?.total || 0) || 21;
 
             const recentComments = await getAll(`
                 SELECT id, user_name, comment, created_at
@@ -29,7 +40,8 @@ router.get('/', async (req, res) => {
             return res.render('fan/dashboard', {
                 title: 'Dashboard Fan - El Inmortal 2',
                 publicTracks: publicTracks || [],
-                recentComments: recentComments || []
+                recentComments: recentComments || [],
+                albumTrackTotal
             });
         } catch (error) {
             console.error('Fan Dashboard Error:', error);

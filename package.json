@@ -38,7 +38,8 @@
     "status:update": "node scripts/log-status-update.js",
     "loops:generate": "node scripts/batch-generate-loops.js",
     "loops:generate:force": "node scripts/batch-generate-loops.js --force",
-    "loops:generate:dry": "node scripts/batch-generate-loops.js --dry-run"
+    "loops:generate:dry": "node scripts/batch-generate-loops.js --dry-run",
+    "opencode:paperclip-gateway": "node scripts/proxy/opencode_cluster/paperclip-mission-gateway.js"
   },
   "engines": {
     "node": ">=16.0.0"

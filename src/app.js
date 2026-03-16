@@ -410,14 +410,20 @@ app.use('/fan-generator', requireFanOrAdmin, fanGeneratorRouter);
 
 // Tools routes - protect dangerous ones
 const publicToolsPaths = ['/proxy', '/download', '/extract-frame', '/gpu-info'];
+const fanToolsPaths = ['/minidisc-generator'];
 app.use('/tools', (req, res, next) => {
-    console.log('Tools middleware - req.path:', req.path, 'req.originalUrl:', req.originalUrl);
     // Public paths don't need auth
     const isPublicPath = publicToolsPaths.some(path => req.path.startsWith(path));
-    console.log('Is public path:', isPublicPath);
     if (isPublicPath) {
         return next();
     }
+
+    // Fan-allowed tool paths (require authenticated fan/admin session)
+    const isFanToolPath = fanToolsPaths.some(path => req.path.startsWith(path));
+    if (isFanToolPath) {
+        return requireFanOrAdmin(req, res, next);
+    }
+
     // All other tools need admin
     return requireAdmin(req, res, next);
 }, toolsRouter);

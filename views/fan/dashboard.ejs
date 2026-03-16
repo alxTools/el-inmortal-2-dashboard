@@ -24,7 +24,7 @@
         </div>
         <div class="mission-strip" aria-label="Estado del fan dashboard">
             <span class="mission-chip mission-chip-live">FAN ONLINE</span>
-            <span class="mission-chip">TRACKS PUBLICOS: <%= publicTracks.length %></span>
+            <span class="mission-chip">TRACKS PUBLICOS: <%= albumTrackTotal || 21 %></span>
             <span class="mission-chip">COMUNIDAD ACTIVA</span>
             <span class="mission-chip mission-chip-clock">UTC <span id="realtime-clock-mission">--:--:--</span></span>
         </div>
@@ -40,7 +40,7 @@
                 <a href="/ei2" class="emoji-command-link tone-gold" data-tooltip="Landing Oficial" aria-label="Landing Oficial">🌐</a>
                 <a href="<%= featuredTrack ? ('/landing/track/' + featuredTrack.id) : '/ei2' %>" class="emoji-command-link tone-cyan" data-tooltip="Track Destacado" aria-label="Track Destacado">🎵</a>
                 <a href="/ei2#comentarios" class="emoji-command-link tone-neon" data-tooltip="Comunidad" aria-label="Comunidad">💬</a>
-                <a href="/ei2#shop" class="emoji-command-link tone-amber" data-tooltip="MiniDisc" aria-label="MiniDisc">💿</a>
+                <a href="/tools/minidisc-generator" class="emoji-command-link tone-amber" data-tooltip="MiniDisc Generator" aria-label="MiniDisc Generator">💿</a>
             </div>
         </section>
 
@@ -102,8 +102,12 @@
                     <div class="section-header compact-section-header">
                         <h2><span class="section-icon">🛠️</span> Fan Tools</h2>
                     </div>
-                    <p class="activity-details">Proximamente: dinamicas, rewards y herramientas exclusivas para la comunidad.</p>
-                    <a href="/ei2" class="btn" style="margin-top:10px;">Ir al Hub del Album</a>
+                    <div class="emoji-command-grid" aria-label="Fan tools" style="margin-top: 12px;">
+                        <a href="/tools/minidisc-generator" class="emoji-command-link tone-amber" data-tooltip="MiniDisc Generator" aria-label="MiniDisc Generator">💿</a>
+                        <a href="/ei2#comentarios" class="emoji-command-link tone-neon" data-tooltip="Comunidad" aria-label="Comunidad">💬</a>
+                        <a href="/ei2" class="emoji-command-link tone-gold" data-tooltip="Hub del Album" aria-label="Hub del Album">🚀</a>
+                    </div>
+                    <p class="activity-details" style="margin-top: 10px;">Incluye herramientas para fans y acceso directo al MiniDisc Generator.</p>
                 </section>
             </aside>
         </div>

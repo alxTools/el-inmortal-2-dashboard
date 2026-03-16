@@ -2332,6 +2332,18 @@ router.get('/streams', (_req, res) => {
     return res.redirect('/tools/stream-control');
 });
 
+router.get('/streamcontrol', (_req, res) => {
+    return res.redirect('/tools/stream-control');
+});
+
+router.get('/youtube-stream-control', (_req, res) => {
+    return res.redirect('/tools/stream-control');
+});
+
+router.get('/live-control', (_req, res) => {
+    return res.redirect('/tools/stream-control');
+});
+
 router.get('/stream-control', async (_req, res) => {
     const scriptExists = fs.existsSync(STREAM_CONTROL_SCRIPT_PATH);
     const configFilePath = STREAM_CONTROL_CONFIG_FILE || STREAM_CONTROL_DEFAULT_CONFIG_PATH;

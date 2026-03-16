@@ -330,6 +330,18 @@ app.get('/streams', (req, res) => {
     return res.redirect('/tools/stream-control');
 });
 
+app.get('/streamcontrol', (req, res) => {
+    return res.redirect('/tools/stream-control');
+});
+
+app.get('/youtube-stream-control', (req, res) => {
+    return res.redirect('/tools/stream-control');
+});
+
+app.get('/live-control', (req, res) => {
+    return res.redirect('/tools/stream-control');
+});
+
 app.use('/api/auth', requireAdmin, (req, res, next) => {
     if (typeof toolsRouter.proxyVideoEditorFrontendRootApi !== 'function') {
         return next();

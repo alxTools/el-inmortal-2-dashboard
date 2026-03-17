@@ -6,7 +6,7 @@
     <title><%= title %></title>
     <link rel="stylesheet" href="/css/dashboard.css">
 </head>
-<body class="dashboard-view density-compact mission-control-mode">
+<body class="dashboard-view density-compact mission-control-mode page-fan-dashboard">
     <%- include('../partials/navbar') %>
 
     <header class="header dashboard-hero">
@@ -31,16 +31,31 @@
     </header>
 
     <main class="container dashboard-shell">
-        <section class="section reveal">
-            <div class="section-header">
-                <h2><span class="section-icon">🚀</span> Accesos Fan</h2>
-            </div>
+        <section class="section reveal fan-top-section">
             <% const featuredTrack = publicTracks && publicTracks.length > 0 ? publicTracks[0] : null; %>
-            <div class="emoji-command-grid" aria-label="Accesos para fans">
-                <a href="/ei2" class="emoji-command-link tone-gold" data-tooltip="Landing Oficial" aria-label="Landing Oficial">🌐</a>
-                <a href="<%= featuredTrack ? ('/landing/track/' + featuredTrack.id) : '/ei2' %>" class="emoji-command-link tone-cyan" data-tooltip="Track Destacado" aria-label="Track Destacado">🎵</a>
-                <a href="/ei2#comentarios" class="emoji-command-link tone-neon" data-tooltip="Comunidad" aria-label="Comunidad">💬</a>
-                <a href="/tools/minidisc-generator" class="emoji-command-link tone-amber" data-tooltip="MiniDisc Generator" aria-label="MiniDisc Generator">💿</a>
+            <div class="fan-top-grid">
+                <article class="fan-featured-card">
+                    <div class="fan-featured-tag">Track Destacado</div>
+                    <% if (featuredTrack) { %>
+                        <h2 class="fan-featured-title">#<%= featuredTrack.track_number || '-' %> · <%= featuredTrack.title || 'Sin titulo' %></h2>
+                        <p class="fan-featured-copy">Entra al track page para comentar, reaccionar y seguir el movimiento de la comunidad.</p>
+                        <a href="/landing/track/<%= featuredTrack.id %>" class="btn">Entrar al Track</a>
+                    <% } else { %>
+                        <h2 class="fan-featured-title">El Inmortal 2</h2>
+                        <p class="fan-featured-copy">Pronto se activan los tracks publicos del album.</p>
+                        <a href="/ei2" class="btn">Ir a EI2</a>
+                    <% } %>
+                </article>
+                <div class="fan-quick-actions-wrap">
+                    <div class="section-header compact-section-header">
+                        <h2><span class="section-icon">🚀</span> Accesos Fan</h2>
+                    </div>
+                    <div class="emoji-command-grid fan-quick-actions" aria-label="Accesos para fans">
+                        <a href="/ei2" class="emoji-command-link tone-gold" data-tooltip="Landing Oficial" aria-label="Landing Oficial">🌐</a>
+                        <a href="/ei2#comentarios" class="emoji-command-link tone-neon" data-tooltip="Comunidad" aria-label="Comunidad">💬</a>
+                        <a href="/tools/minidisc-generator" class="emoji-command-link tone-amber" data-tooltip="MiniDisc Generator" aria-label="MiniDisc Generator">💿</a>
+                    </div>
+                </div>
             </div>
         </section>
 

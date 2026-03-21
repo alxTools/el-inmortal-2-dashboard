@@ -69,7 +69,8 @@ app.use(helmet({
                 "https://*.paypal.com",
                 "https://*.paypalobjects.com",
                 "https://trykimu.com",
-                "https://*.trykimu.com"
+                "https://*.trykimu.com",
+                "https://opal.google"
             ],
         },
     },
@@ -343,6 +344,10 @@ app.get('/youtube-stream-control', (req, res) => {
 
 app.get('/live-control', (req, res) => {
     return res.redirect('/tools/stream-control');
+});
+
+app.get('/story-gen', (req, res) => {
+    return res.redirect('/tools/story-gen');
 });
 
 app.use('/api/auth', requireAdmin, (req, res, next) => {

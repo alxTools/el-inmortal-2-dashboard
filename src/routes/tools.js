@@ -2311,7 +2311,10 @@ router.get('/thumbnail-generator', (req, res) => {
 });
 
 router.get('/story-gen', (_req, res) => {
-    return res.redirect(STORY_GEN_OPAL_URL);
+    return res.render('tools/story-gen', {
+        title: 'Story Generator - El Inmortal 2 Dashboard',
+        storyGenUrl: STORY_GEN_OPAL_URL
+    });
 });
 
 async function respondStreamControlAction(res, action, commandArgs, statusTarget = 'all') {

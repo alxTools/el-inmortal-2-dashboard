@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %></title>
+    <link rel="stylesheet" href="/css/dashboard.css">
+    <style>
+        .story-shell {
+            padding-top: 24px;
+            padding-bottom: 20px;
+        }
+
+        .story-panel {
+            border: 1px solid rgba(130, 170, 240, 0.35);
+            border-radius: 14px;
+            padding: 16px;
+            background: linear-gradient(180deg, #09182f 0%, #071121 100%);
+            box-shadow: 0 20px 50px rgba(7, 18, 38, 0.45);
+        }
+
+        .story-copy {
+            margin: 0 0 12px;
+            color: #9fb8da;
+        }
+
+        .story-warning {
+            margin: 0 0 12px;
+            color: #ffd89a;
+            font-size: 0.92rem;
+        }
+
+        .story-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .story-frame-wrap {
+            position: relative;
+            border: 1px solid rgba(130, 170, 240, 0.28);
+            border-radius: 12px;
+            overflow: hidden;
+            background: #050b15;
+            min-height: 72vh;
+        }
+
+        .story-frame {
+            width: 100%;
+            height: 72vh;
+            border: 0;
+            display: block;
+            background: #050b15;
+        }
+
+        .story-frame-fallback {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            padding: 20px;
+            text-align: center;
+            background: rgba(5, 11, 21, 0.9);
+            color: #d7e6ff;
+        }
+
+        .story-frame-fallback.is-hidden {
+            display: none;
+        }
+
+        @media (max-width: 900px) {
+            .story-frame-wrap,
+            .story-frame {
+                min-height: 76vh;
+                height: 76vh;
+            }
+        }
+    </style>
+</head>
+<body class="dashboard-view density-compact mission-control-mode page-tools page-tools-story-gen">
+    <%- include('../partials/navbar') %>
+
+    <div class="container story-shell">
+        <div class="mission-strip tools-mission-strip" aria-label="Estado story generator">
+            <span class="mission-chip mission-chip-live">STORY LAB ACTIVE</span>
+            <span class="mission-chip">WRITING OPS</span>
+            <span class="mission-chip">PROMPT WORKFLOW</span>
+        </div>
+
+        <section class="story-panel">
+            <div class="section-header">
+                <h2><span class="section-icon">📚</span> Story Generator</h2>
+                <a href="/tools" class="btn btn-ghost">Volver a Tools</a>
+            </div>
+
+            <p class="story-copy">
+                Workspace del generador de historias cargado dentro del dashboard para trabajar sin salir del panel.
+            </p>
+            <p class="story-warning">
+                Si Google bloquea el embed en tu sesion, usa "Abrir en nueva pestana".
+            </p>
+
+            <div class="story-actions">
+                <a href="<%= storyGenUrl %>" class="btn" target="_blank" rel="noreferrer">Abrir en nueva pestana</a>
+            </div>
+
+            <div class="story-frame-wrap">
+                <iframe id="storyFrame" class="story-frame" src="<%= storyGenUrl %>" loading="lazy" referrerpolicy="strict-origin-when-cross-origin"></iframe>
+                <div id="storyFallback" class="story-frame-fallback is-hidden">
+                    <strong>No fue posible cargar Story Generator embebido.</strong>
+                    <span>Google puede restringir el uso en iframe por politicas de seguridad.</span>
+                    <a href="<%= storyGenUrl %>" class="btn" target="_blank" rel="noreferrer">Abrir Story Generator</a>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <%- include('../partials/footer') %>
+
+    <script>
+        (function () {
+            const frame = document.getElementById('storyFrame');
+            const fallback = document.getElementById('storyFallback');
+
+            if (!frame || !fallback) {
+                return;
+            }
+
+            let frameLoaded = false;
+
+            frame.addEventListener('load', function () {
+                frameLoaded = true;
+                fallback.classList.add('is-hidden');
+            });
+
+            window.setTimeout(function () {
+                let frameBlocked = !frameLoaded;
+
+                if (!frameBlocked) {
+                    try {
+                        const href = frame.contentWindow && frame.contentWindow.location
+                            ? String(frame.contentWindow.location.href || '')
+                            : '';
+                        if (!href || href === 'about:blank') {
+                            frameBlocked = true;
+                        }
+                    } catch (_) {
+                        frameBlocked = false;
+                    }
+                }
+
+                if (frameBlocked) {
+                    fallback.classList.remove('is-hidden');
+                }
+            }, 5000);
+        })();
+    </script>
+</body>
+</html>

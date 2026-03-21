@@ -70,7 +70,10 @@ app.use(helmet({
                 "https://*.paypalobjects.com",
                 "https://trykimu.com",
                 "https://*.trykimu.com",
-                "https://opal.google"
+                "https://opal.google",
+                "https://flow.google",
+                "https://labs.google",
+                "https://accounts.google.com"
             ],
         },
     },
@@ -348,6 +351,10 @@ app.get('/live-control', (req, res) => {
 
 app.get('/story-gen', (req, res) => {
     return res.redirect('/tools/story-gen');
+});
+
+app.get('/flow', (req, res) => {
+    return res.redirect('/tools/google-flow');
 });
 
 app.use('/api/auth', requireAdmin, (req, res, next) => {

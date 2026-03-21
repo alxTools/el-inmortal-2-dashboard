@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %></title>
+    <link rel="stylesheet" href="/css/dashboard.css">
+    <style>
+        .flow-shell {
+            padding-top: 24px;
+            padding-bottom: 20px;
+        }
+
+        .flow-panel {
+            border: 1px solid rgba(130, 170, 240, 0.35);
+            border-radius: 14px;
+            padding: 16px;
+            background: linear-gradient(180deg, #09182f 0%, #071121 100%);
+            box-shadow: 0 20px 50px rgba(7, 18, 38, 0.45);
+        }
+
+        .flow-copy {
+            margin: 0 0 12px;
+            color: #9fb8da;
+        }
+
+        .flow-warning {
+            margin: 0 0 12px;
+            color: #ffd89a;
+            font-size: 0.92rem;
+        }
+
+        .flow-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .flow-frame-wrap {
+            position: relative;
+            border: 1px solid rgba(130, 170, 240, 0.28);
+            border-radius: 12px;
+            overflow: hidden;
+            background: #050b15;
+            min-height: 74vh;
+        }
+
+        .flow-frame {
+            width: 100%;
+            height: 74vh;
+            border: 0;
+            display: block;
+            background: #050b15;
+        }
+
+        .flow-frame-fallback {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            padding: 20px;
+            text-align: center;
+            background: rgba(5, 11, 21, 0.9);
+            color: #d7e6ff;
+        }
+
+        .flow-frame-fallback.is-hidden {
+            display: none;
+        }
+
+        @media (max-width: 900px) {
+            .flow-frame-wrap,
+            .flow-frame {
+                min-height: 78vh;
+                height: 78vh;
+            }
+        }
+    </style>
+</head>
+<body class="dashboard-view density-compact mission-control-mode page-tools page-tools-google-flow">
+    <%- include('../partials/navbar') %>
+
+    <div class="container flow-shell">
+        <div class="mission-strip tools-mission-strip" aria-label="Estado google flow">
+            <span class="mission-chip mission-chip-live">FLOW LAB ACTIVE</span>
+            <span class="mission-chip">GOOGLE WORKSPACE</span>
+            <span class="mission-chip">PROMPT DESIGN</span>
+        </div>
+
+        <section class="flow-panel">
+            <div class="section-header">
+                <h2><span class="section-icon">🌊</span> Google Flow</h2>
+                <a href="/tools" class="btn btn-ghost">Volver a Tools</a>
+            </div>
+
+            <p class="flow-copy">
+                Google Flow cargado dentro del dashboard para que puedas trabajar sin perder el nav de la web.
+            </p>
+            <p class="flow-warning">
+                Si Google bloquea el embed por seguridad o login, usa "Abrir en nueva pestana".
+            </p>
+
+            <div class="flow-actions">
+                <a href="<%= googleFlowUrl %>" class="btn" target="_blank" rel="noreferrer">Abrir en nueva pestana</a>
+            </div>
+
+            <div class="flow-frame-wrap">
+                <iframe
+                    id="flowFrame"
+                    class="flow-frame"
+                    src="<%= googleFlowUrl %>"
+                    loading="lazy"
+                    referrerpolicy="strict-origin-when-cross-origin"
+                ></iframe>
+                <div id="flowFallback" class="flow-frame-fallback is-hidden">
+                    <strong>No fue posible cargar Google Flow embebido.</strong>
+                    <span>Algunas pantallas de Google pueden restringir iframes por politicas de seguridad.</span>
+                    <a href="<%= googleFlowUrl %>" class="btn" target="_blank" rel="noreferrer">Abrir Google Flow</a>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <%- include('../partials/footer') %>
+
+    <script>
+        (function () {
+            const frame = document.getElementById('flowFrame');
+            const fallback = document.getElementById('flowFallback');
+
+            if (!frame || !fallback) {
+                return;
+            }
+
+            let frameLoaded = false;
+
+            frame.addEventListener('load', function () {
+                frameLoaded = true;
+                fallback.classList.add('is-hidden');
+            });
+
+            window.setTimeout(function () {
+                let frameBlocked = !frameLoaded;
+
+                if (!frameBlocked) {
+                    try {
+                        const href = frame.contentWindow && frame.contentWindow.location
+                            ? String(frame.contentWindow.location.href || '')
+                            : '';
+                        if (!href || href === 'about:blank') {
+                            frameBlocked = true;
+                        }
+                    } catch (_) {
+                        frameBlocked = false;
+                    }
+                }
+
+                if (frameBlocked) {
+                    fallback.classList.remove('is-hidden');
+                }
+            }, 5000);
+        })();
+    </script>
+</body>
+</html>

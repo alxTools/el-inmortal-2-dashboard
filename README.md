@@ -203,6 +203,9 @@ npm run landing:build
 npm run cloudflare:code-subdomain
 npm run cloudflare:code-subdomain:status
 npm run cloudflare:code-subdomain:stop
+npm run cloudflare:flow-subdomain
+npm run cloudflare:flow-subdomain:status
+npm run cloudflare:flow-subdomain:stop
 ```
 
 Para transporte `graph`, la App Registration debe tener permiso de aplicación `Mail.Send` con admin consent.

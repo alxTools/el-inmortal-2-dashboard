@@ -200,6 +200,9 @@ npm run intel:social-scan -- --by cli --limit 21
 npm run intel:platform-footprint -- --by cli --limit 21
 npm run status:update -- --message "Landing actualizado" --source opencode --severity info
 npm run landing:build
+npm run cloudflare:code-subdomain
+npm run cloudflare:code-subdomain:status
+npm run cloudflare:code-subdomain:stop
 ```
 
 Para transporte `graph`, la App Registration debe tener permiso de aplicación `Mail.Send` con admin consent.

@@ -95,6 +95,8 @@ const {
     sendYoutubeOpsDailyReportEmail
 } = require('../utils/youtubeMetadataAudit');
 
+const STORY_GEN_OPAL_URL = 'https://opal.google/app/1UFFaAilixcnlAGOhp1NWvXigkwK1N13s';
+
 function isAllowedHost(hostname, allowedHosts) {
     return allowedHosts.some((allowed) => hostname === allowed || hostname.endsWith(`.${allowed}`));
 }
@@ -2306,6 +2308,10 @@ router.get('/thumbnail-generator', (req, res) => {
     res.render('tools/thumbnail-generator', {
         title: 'Thumbnail Generator - El Inmortal 2 Dashboard'
     });
+});
+
+router.get('/story-gen', (_req, res) => {
+    return res.redirect(STORY_GEN_OPAL_URL);
 });
 
 async function respondStreamControlAction(res, action, commandArgs, statusTarget = 'all') {

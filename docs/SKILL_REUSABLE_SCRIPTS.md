@@ -56,3 +56,6 @@ VAR2="${VAR2:-default}"
 
 - Script base ya alineado: `scripts/start-streams.sh`
 - Config reusable de ejemplo: `scripts/start-streams.env.example`
+- Skill operativa Cloudflare (DNS + redirect): `scripts/cloudflare-subdomain-redirect.sh`
+- Config example Cloudflare: `scripts/cloudflare-subdomain-redirect.env.example`
+- Config local Cloudflare: `scripts/cloudflare-subdomain-redirect.env` (no commitear secretos)

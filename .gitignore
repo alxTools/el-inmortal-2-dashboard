@@ -61,6 +61,7 @@ scripts/proxy/generated/
 scripts/proxy/PIA_accounts.pdf
 scripts/proxy/pia-accounts.csv
 scripts/proxy/pia-accounts-inventory.csv
+scripts/cloudflare-subdomain-redirect.env
 
 # Local uploaded media assets
 public/uploads/audio/

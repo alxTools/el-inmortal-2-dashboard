@@ -97,6 +97,8 @@ const {
 
 const STORY_GEN_OPAL_URL = 'https://opal.google/app/1UFFaAilixcnlAGOhp1NWvXigkwK1N13s';
 const GOOGLE_FLOW_URL = 'https://flow.google/';
+const PRD_GENERATOR_URL = 'https://claude.site/public/artifacts/951b276f-b535-4639-9179-1a23c3f8c3d9';
+const PRD_GENERATOR_EMBED_URL = `${PRD_GENERATOR_URL}/embed`;
 
 function isAllowedHost(hostname, allowedHosts) {
     return allowedHosts.some((allowed) => hostname === allowed || hostname.endsWith(`.${allowed}`));
@@ -2326,6 +2328,18 @@ router.get('/google-flow', (_req, res) => {
     return res.render('tools/google-flow', {
         title: 'Google Flow - El Inmortal 2 Dashboard',
         googleFlowUrl: GOOGLE_FLOW_URL
+    });
+});
+
+router.get('/prd', (_req, res) => {
+    return res.redirect('/tools/prd-generator');
+});
+
+router.get('/prd-generator', (_req, res) => {
+    return res.render('tools/prd-generator', {
+        title: 'PRD Generator - El Inmortal 2 Dashboard',
+        prdGeneratorUrl: PRD_GENERATOR_URL,
+        prdGeneratorEmbedUrl: PRD_GENERATOR_EMBED_URL
     });
 });
 

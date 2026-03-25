@@ -73,7 +73,9 @@ app.use(helmet({
                 "https://opal.google",
                 "https://flow.google",
                 "https://labs.google",
-                "https://accounts.google.com"
+                "https://accounts.google.com",
+                "https://claude.site",
+                "https://*.claude.site"
             ],
         },
     },
@@ -355,6 +357,14 @@ app.get('/story-gen', (req, res) => {
 
 app.get('/flow', (req, res) => {
     return res.redirect('/tools/google-flow');
+});
+
+app.get('/prd', (req, res) => {
+    return res.redirect('/tools/prd-generator');
+});
+
+app.get('/prd-generator', (req, res) => {
+    return res.redirect('/tools/prd-generator');
 });
 
 app.use('/api/auth', requireAdmin, (req, res, next) => {

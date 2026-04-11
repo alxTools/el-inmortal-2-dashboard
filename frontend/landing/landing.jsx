@@ -2337,34 +2337,54 @@ function LandingApp({ data }) {
                                                 const isCurrentTrack = currentTrack && currentTrack.trackNumber === track.trackNumber;
                                                 
                                                 return (
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handlePlayToggle(track)}
-                                                        disabled={isLocked || (isLoading && isCurrentTrack)}
-                                                        className={`rounded-full px-4 py-2.5 text-[11px] font-bold uppercase tracking-[0.15em] transition-all duration-300 ${
-                                                            isLocked
-                                                                ? 'cursor-not-allowed border border-slate-600 bg-slate-800/50 text-slate-500'
-                                                                : isLoading && isCurrentTrack
-                                                                    ? 'cursor-wait border border-white/20 bg-white/5 text-slate-400'
-                                                                    : isCurrentTrack && isPlaying
-                                                                        ? 'border-2 border-emerald-400 bg-emerald-400/20 text-emerald-300 shadow-[0_0_20px_rgba(52,211,153,0.3)]'
-                                                                        : track.audioUrl
-                                                                            ? 'border border-amber-400 bg-amber-400 text-slate-900 font-extrabold hover:bg-amber-300 hover:border-amber-300 hover:shadow-[0_0_20px_rgba(251,191,36,0.4)]'
-                                                                            : 'cursor-not-allowed border border-white/10 bg-white/5 text-slate-500'
-                                                        }`}
-                                                    >
-                                                        {isLocked
-                                                            ? '🔒 Locked'
-                                                            : isCurrentTrack
-                                                                ? isLoading
-                                                                    ? '...'
-                                                                    : isPlaying
-                                                                        ? '⏸ Pause'
-                                                                        : '▶ Play'
-                                                                : track.audioUrl
-                                                                    ? '▶ Play'
-                                                                    : '—'}
-                                                    </button>
+                                                    <>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handlePlayToggle(track)}
+                                                            disabled={isLocked || (isLoading && isCurrentTrack)}
+                                                            className={`rounded-full px-4 py-2.5 text-[11px] font-bold uppercase tracking-[0.15em] transition-all duration-300 ${
+                                                                isLocked
+                                                                    ? 'cursor-not-allowed border border-slate-600 bg-slate-800/50 text-slate-500'
+                                                                    : isLoading && isCurrentTrack
+                                                                        ? 'cursor-wait border border-white/20 bg-white/5 text-slate-400'
+                                                                        : isCurrentTrack && isPlaying
+                                                                            ? 'border-2 border-emerald-400 bg-emerald-400/20 text-emerald-300 shadow-[0_0_20px_rgba(52,211,153,0.3)]'
+                                                                            : track.audioUrl
+                                                                                ? 'border border-amber-400 bg-amber-400 text-slate-900 font-extrabold hover:bg-amber-300 hover:border-amber-300 hover:shadow-[0_0_20px_rgba(251,191,36,0.4)]'
+                                                                                : 'cursor-not-allowed border border-white/10 bg-white/5 text-slate-500'
+                                                            }`}
+                                                        >
+                                                            {isLocked
+                                                                ? '🔒 Locked'
+                                                                : isCurrentTrack
+                                                                    ? isLoading
+                                                                        ? '...'
+                                                                        : isPlaying
+                                                                            ? '⏸ Pause'
+                                                                            : '▶ Play'
+                                                                    : track.audioUrl
+                                                                        ? '▶ Play'
+                                                                        : '—'}
+                                                        </button>
+                                                        {track.audioUrl && !isLocked ? (
+                                                            <a
+                                                                href={track.audioUrl}
+                                                                download
+                                                                onClick={(event) => event.stopPropagation()}
+                                                                className="rounded-full px-3 py-2.5 text-[10px] font-bold uppercase tracking-[0.12em] transition-all border border-cyan-400 bg-cyan-400/15 text-cyan-200 hover:bg-cyan-300 hover:border-cyan-300 hover:text-slate-900 hover:shadow-[0_0_18px_rgba(34,211,238,0.35)] text-center"
+                                                            >
+                                                                ⬇ Descargar
+                                                            </a>
+                                                        ) : (
+                                                            <button
+                                                                type="button"
+                                                                disabled
+                                                                className="cursor-not-allowed rounded-full border border-white/10 bg-white/5 px-3 py-2.5 text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500"
+                                                            >
+                                                                {track.audioUrl ? '🔒 Locked' : '⬇ Sin audio'}
+                                                            </button>
+                                                        )}
+                                                    </>
                                                 );
                                             })()}
                                             {track.id && (

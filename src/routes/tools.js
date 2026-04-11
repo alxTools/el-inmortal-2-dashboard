@@ -99,6 +99,7 @@ const STORY_GEN_OPAL_URL = 'https://opal.google/app/1UFFaAilixcnlAGOhp1NWvXigkwK
 const GOOGLE_FLOW_URL = 'https://flow.google/';
 const PRD_GENERATOR_URL = 'https://claude.site/public/artifacts/951b276f-b535-4639-9179-1a23c3f8c3d9';
 const PRD_GENERATOR_EMBED_URL = `${PRD_GENERATOR_URL}/embed`;
+const AI_MUSIC_VIDEO_DIRECTOR_URL = 'https://ai-music-video-director-676773428856.us-west1.run.app/';
 
 function isAllowedHost(hostname, allowedHosts) {
     return allowedHosts.some((allowed) => hostname === allowed || hostname.endsWith(`.${allowed}`));
@@ -2340,6 +2341,17 @@ router.get('/prd-generator', (_req, res) => {
         title: 'PRD Generator - El Inmortal 2 Dashboard',
         prdGeneratorUrl: PRD_GENERATOR_URL,
         prdGeneratorEmbedUrl: PRD_GENERATOR_EMBED_URL
+    });
+});
+
+router.get('/music-video-director', (_req, res) => {
+    return res.redirect('/tools/ai-music-video-director');
+});
+
+router.get('/ai-music-video-director', (_req, res) => {
+    return res.render('tools/ai-music-video-director', {
+        title: 'AI Music Video Director - El Inmortal 2 Dashboard',
+        aiMusicVideoDirectorUrl: AI_MUSIC_VIDEO_DIRECTOR_URL
     });
 });
 

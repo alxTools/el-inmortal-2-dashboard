@@ -85,6 +85,39 @@
             font-size: 0.85em;
             color: #888;
         }
+        .track-actions-group {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+        .track-actions-group .play-track-btn {
+            background: linear-gradient(45deg, #28a745, #20c997);
+            border: none;
+            margin-right: 0;
+        }
+        .track-actions-group .play-track-btn:hover {
+            background: linear-gradient(45deg, #2ebd4f, #28d4a8);
+            color: #fff;
+        }
+        .track-actions-group .track-download-btn {
+            background: linear-gradient(45deg, #2563eb, #1d4ed8);
+            border: none;
+            color: #fff;
+        }
+        .track-actions-group .track-download-btn:hover {
+            background: linear-gradient(45deg, #3b82f6, #2563eb);
+            color: #fff;
+        }
+        .track-actions-group .track-download-btn.track-download-btn-disabled,
+        .track-actions-group .track-download-btn.track-download-btn-disabled:hover {
+            background: rgba(148, 163, 184, 0.14);
+            border: 1px solid rgba(148, 163, 184, 0.3);
+            color: #94a3b8;
+            cursor: not-allowed;
+            box-shadow: none;
+            transform: none;
+        }
         
         /* Mobile Responsive Styles for Tracks Table */
         @media (max-width: 768px) {
@@ -210,10 +243,16 @@
             
             .tracks-table tbody td:nth-child(7) {
                 justify-content: flex-start;
+                align-items: flex-start;
+                flex-wrap: wrap;
                 gap: 10px;
                 margin-top: 10px;
             }
-            
+
+            .track-actions-group {
+                width: 100%;
+            }
+             
             .track-features {
                 font-size: 0.8em;
             }
@@ -313,7 +352,7 @@
                         <th>Productor</th>
                         <th style="width: 120px;">Tipo</th>
                         <th>Splitsheet</th>
-                        <th style="width: 100px;">Acciones</th>
+                        <th style="width: 260px;">Acciones</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -371,10 +410,15 @@
                             <% } %>
                         </td>
                         <td>
-                            <% if (track.audio_file_path) { %>
-                                <button class="btn-small play-track-btn" data-track-id="<%= track.id %>" data-track-title="<%= track.title.replace(/"/g, '&quot;') %>" data-track-path="<%= track.audio_file_path %>" style="margin-right: 5px; background: linear-gradient(45deg, #28a745, #20c997); border: none;">▶️ Play</button>
-                            <% } %>
-                            <a href="/tracks/<%= track.id %>/edit" class="btn-small">Editar</a>
+                            <div class="track-actions-group">
+                                <% if (track.audio_file_path) { %>
+                                    <button class="btn-small play-track-btn" data-track-id="<%= track.id %>" data-track-title="<%= (track.title || 'Sin titulo').replace(/"/g, '&quot;') %>" data-track-path="<%= track.audio_file_path %>">▶️ Play</button>
+                                    <a href="<%= track.audio_file_path %>" download class="btn-small track-download-btn">⬇️ Descargar</a>
+                                <% } else { %>
+                                    <button type="button" class="btn-small track-download-btn track-download-btn-disabled" disabled title="No hay audio disponible">⬇️ Sin audio</button>
+                                <% } %>
+                                <a href="/tracks/<%= track.id %>/edit" class="btn-small">Editar</a>
+                            </div>
                         </td>
                     </tr>
                     <% }) %>

@@ -75,7 +75,8 @@ app.use(helmet({
                 "https://labs.google",
                 "https://accounts.google.com",
                 "https://claude.site",
-                "https://*.claude.site"
+                "https://*.claude.site",
+                "https://ai-music-video-director-676773428856.us-west1.run.app"
             ],
         },
     },
@@ -365,6 +366,14 @@ app.get('/prd', (req, res) => {
 
 app.get('/prd-generator', (req, res) => {
     return res.redirect('/tools/prd-generator');
+});
+
+app.get('/ai-music-video-director', (req, res) => {
+    return res.redirect('/tools/ai-music-video-director');
+});
+
+app.get('/music-video-director', (req, res) => {
+    return res.redirect('/tools/ai-music-video-director');
 });
 
 app.use('/api/auth', requireAdmin, (req, res, next) => {

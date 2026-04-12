@@ -51,8 +51,6 @@ coverage/
 .cache/
 .eslintcache
 
-.vercel
-
 # Local runtime and generated proxy artifacts
 n8n_data/
 cloudflared.deb

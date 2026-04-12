@@ -39,7 +39,7 @@ app.use(cookieParser());
 // Method override for PUT/DELETE from forms
 app.use(methodOverride('_method'));
 
-// Trust proxy (needed for Vercel)
+// Trust proxy when running behind a reverse proxy
 app.set('trust proxy', 1);
 
 // Session configuration (memory store for serverless)
